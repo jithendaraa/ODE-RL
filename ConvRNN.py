@@ -1,28 +1,45 @@
 import torch
 import torch.nn as nn
 
-
-class ConvGRU_cell(nn.Module):
+class ConvGRU(nn.Module):
     """
     ConvGRU Cell
     """
-    def __init__(self, shape, input_channels, filter_size, num_features):
-        super(ConvGRU_cell, self).__init__()
+    def __init__(self, shape, input_channels, filter_size, num_features, print_details=False):
+        super(ConvGRU, self).__init__()
+        
         self.shape = shape
         self.input_channels = input_channels
         # kernel_size of input_to_state equals state_to_state
         self.filter_size = filter_size
         self.num_features = num_features
         self.padding = (filter_size - 1) // 2
+
         self.conv1 = nn.Sequential(
-            nn.Conv2d(self.input_channels + self.num_features,
-                      2 * self.num_features, self.filter_size, 1,
-                      self.padding),
-            nn.GroupNorm(2 * self.num_features // 32, 2 * self.num_features))
+            nn.Conv2d(in_channels = self.input_channels + self.num_features,
+                      out_channels = 2 * self.num_features, 
+                      kernel_size = self.filter_size, 
+                      stride = 1,
+                      padding = self.padding),
+            nn.GroupNorm(2 * self.num_features // 32, 
+                        2 * self.num_features)
+            )
+            
         self.conv2 = nn.Sequential(
             nn.Conv2d(self.input_channels + self.num_features,
-                      self.num_features, self.filter_size, 1, self.padding),
+                      self.num_features, 
+                      self.filter_size, 
+                      1, 
+                      self.padding),
             nn.GroupNorm(self.num_features // 32, self.num_features))
+        
+        # if print_details:
+        #     print("CONV1: ", self.conv1)
+        #     print("shape:", shape, "\n",
+        #             "Input Channels: ", input_channels, "\n",
+        #             "Filter Size: ", filter_size, "\n",
+        #             "Num. Features: ", num_features, "\n", 
+        #             "Padding: ", self.padding, "\n")
 
     def forward(self, inputs=None, hidden_state=None, seq_len=10):
         # seq_len=10 for moving_mnist
@@ -31,6 +48,8 @@ class ConvGRU_cell(nn.Module):
                                  self.shape[0], self.shape[1]).cuda()
         else:
             htprev = hidden_state
+        
+        # print("h(t-1): ", htprev.size())
         output_inner = []
         for index in range(seq_len):
             if inputs is None:
@@ -49,19 +68,27 @@ class ConvGRU_cell(nn.Module):
 
             combined_2 = torch.cat((x, r * htprev),
                                    1)  # h' = tanh(W*(x+r*H_t-1))
+            
             ht = self.conv2(combined_2)
             ht = torch.tanh(ht)
             htnext = (1 - z) * htprev + z * ht
             output_inner.append(htnext)
             htprev = htnext
+        
+        # print("____________________________________")
+        # print(combined_1.size(), "COMBINEd before conv1 of ConvGRU")
+        # print(gates.size(), "COMBINEd after conv1 of ConvGRU")
+        # print(combined_2.size(), "COMBINEd before conv2 of ConvGRU")
+        # print(ht.size(), "COMBINEd after conv2 of ConvGRU")
+        # print("____________________________________")
         return torch.stack(output_inner), htnext
 
 
-class ConvLSTM_cell(nn.Module):
+class ConvLSTM(nn.Module):
     """ConvLSTMCell
     """
     def __init__(self, shape, input_channels, filter_size, num_features):
-        super(ConvLSTM_cell, self).__init__()
+        super(ConvLSTM, self).__init__()
 
         self.shape = shape  # H, W
         self.input_channels = input_channels

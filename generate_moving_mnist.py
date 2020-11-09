@@ -15,7 +15,6 @@ def load_mnist(root):
         mnist = mnist.reshape(-1, 28, 28)
     return mnist
 
-
 def load_fixed_set(root, is_train):
     # Load the fixed dataset
     filename = 'mnist_test_seq.npy'
