@@ -1,5 +1,8 @@
 import torch.nn as nn
 from collections import OrderedDict
+import numpy as np
+from tqdm import tqdm
+import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -52,4 +55,34 @@ def make_layers(block):
         else:
             raise NotImplementedError
     return nn.Sequential(OrderedDict(layers))
+
+
+def get_batch(data_size, batch_size, dataloader, batch_time=1, seq=10):
+    t = tqdm(dataloader, leave=False, total=len(dataloader))
+    for i, (idx, targetVar, inputVar, _, _) in enumerate(t):
+        # inputVar  --> batch_size x input_frames x c x 64 x 64; input first input_frames frames
+        # targetVar --> batch_size x output_frames x c x 64 x 64; output first input_frames frames
+        inputs = inputVar  # B,S,C,H,W
+        label = targetVar  # B,S,C,H,W
+        yield (inputs, i, label)
+
+def plot_images(batch_size, inputs, label, seq=10):
+    
+    for b in range(batch_size):
+        f = plt.figure()
+        batch_input = inputs[b]
+        batch_label = label[b]
+        for s in range(seq):
+            f.add_subplot(2, seq, s+1)
+            plt.imshow(batch_input[s][0])
+        
+        for s in range(seq):
+            f.add_subplot(2, seq, seq+s+1)
+            plt.imshow(batch_label[s][0])
+        
+        plt.title("Input and output(actual) sequence")
+        plt.show(block=True)
+        
+
+
 
