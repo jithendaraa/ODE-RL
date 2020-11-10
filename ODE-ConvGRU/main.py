@@ -20,6 +20,7 @@ from encoder_decoder import ED
 from generate_moving_mnist import MovingMNIST
 from earlystopping import EarlyStopping
 from ConvGRUCell import ConvGRU
+from helper import get_batch
 
 EPOCHS          = 3     # FIXME: 500 epochs in the paper
 INPUT_FRAMES    = 10
@@ -48,11 +49,43 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 trainFolder = MovingMNIST(is_train=True, root='../data/', n_frames_input=INPUT_FRAMES, n_frames_output=OUTPUT_FRAMES, num_objects=[3])
 validFolder = MovingMNIST(is_train=False, root='../data/', n_frames_input=INPUT_FRAMES, n_frames_output=OUTPUT_FRAMES, num_objects=[3])
 
+train_data_length = trainFolder.__len__()
+valid_data_length = validFolder.__len__()
+print("Train data length: ", train_data_length)
+print("Valid data length: ", valid_data_length)
+
 trainLoader = torch.utils.data.DataLoader(trainFolder, batch_size=BATCH_SIZE, shuffle=False)
 validLoader = torch.utils.data.DataLoader(validFolder, batch_size=BATCH_SIZE, shuffle=False)
 
+encoder_ode_specs = [
+    torch.nn.Conv2d(64, 64, 3, 1, 1),
+    torch.nn.Conv2d(64, 64, 3, 1, 1),
+    torch.nn.Conv2d(64, 64, 3, 1, 1),
+    torch.nn.Conv2d(64, 64, 3, 1, 1)
+]
+
 encoder_params = [
     # Conv Encoder E
+    [
+        OrderedDict({'conv1_downsample?64,64|_relu_1': [c, 32, 3, 1, 1]}),
+        OrderedDict({'conv2_relu_2': [32, 64, 3, 1, 1]}),
+        OrderedDict({'conv3_relu_3': [64, 128, 4, 2, 1]}),
+    ],
+    # ODE-ConvGRU
+    [
+        ConvGRU(shape=(int(h/4), int(w/4)), input_channels=128, filter_size=3, num_features=64, ode_specs=encoder_ode_specs)
+    ]
+]
+
+decoder_ode_specs = [
+    torch.nn.Conv2d(64, 64, 3, 1, 1),
+    torch.nn.Conv2d(64, 64, 3, 1, 1),
+    torch.nn.Conv2d(64, 64, 3, 1, 1),
+    torch.nn.Conv2d(64, 64, 3, 1, 1)
+]
+
+decoder_params = [
+    # Conv Decoder G
     [
         OrderedDict({'conv1_downsample?64,64|_relu_1': [c, 32, 3, 1, 1]}),
         OrderedDict({'conv2_relu_2': [32, 64, 3, 1, 1]}),
@@ -96,22 +129,19 @@ valid_losses = []
 avg_train_losses = []
 avg_valid_losses = []
 
-for epoch in range(cur_epoch, EPOCHS + 1):
-    ###################
-    # train the model #
-    ###################
-    t = tqdm(trainLoader, leave=False, total=len(trainLoader))
-    for i, (idx, targetVar, inputVar, _, _) in enumerate(t):
-        
-        # inputVar  --> batch_size x input_frames x 1 x 64 x 64; input first input_frames frames
-        # targetVar --> batch_size x output_frames x 1 x 64 x 64; output first input_frames frames
-        inputs = inputVar.to(device)  # B,S,C,H,W
-        label = targetVar.to(device)  # B,S,C,H,W
+t = tqdm(trainLoader, leave=False, total=len(trainLoader))
 
-        optimizer.zero_grad()
-        net.train()
-        pred = net(inputs)  # B,S,C,H,W
-        # print(type(pred))
+for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, trainLoader, seq=10):
+    inputs = inputs.to(device)
+    labels = labels.to(device)
+    print(inputs.size(), i, labels.size())
+    optimizer.zero_grad()
+    net.train()
+    pred = net(inputs)  # B,S,C,H,W
+    print(type(pred), len(pred))
 
-        break
     break
+#         # print(type(pred))
+
+    #     break
+    # break
