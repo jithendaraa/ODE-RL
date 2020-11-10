@@ -1,12 +1,14 @@
 import torch
 import torch.nn as nn
-from torchdiffeq import odeint
+import torch.optim as optim
+from torchdiffeq import odeint_adjoint as odeint
+from conv_encoder import Encoder_ODEModel
 
 class ConvGRU(nn.Module):
     """
     ConvGRU Cell
     """
-    def __init__(self, shape, input_channels, filter_size, num_features, print_details=False):
+    def __init__(self, shape, input_channels, filter_size, num_features, ode_specs, print_details=False, lr=1e-3):
         super(ConvGRU, self).__init__()
         
         self.shape = shape
@@ -15,6 +17,8 @@ class ConvGRU(nn.Module):
         self.filter_size = filter_size
         self.num_features = num_features
         self.padding = (filter_size - 1) // 2
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.ode_model = Encoder_ODEModel(ode_specs).to(self.device)
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels = self.input_channels + self.num_features,
@@ -35,33 +39,35 @@ class ConvGRU(nn.Module):
             nn.GroupNorm(self.num_features // 32, self.num_features))
         
     def forward(self, inputs=None, hidden_state=None, seq_len=10):
-        # seq_len=10 for moving_mnist
+
         if hidden_state is None:
             htprev = torch.zeros(inputs.size(1), self.num_features,
                                  self.shape[0], self.shape[1]).cuda()
         else:
             htprev = hidden_state
         
-        print("h(t-1): ", htprev.size())
-        # ht_ = ODESolve(f(theta), htprev, (tprev, t)) --> odeint(Encoder_ODE_model, htprev, (t-1, t))
-        # Change all `htprev` in next lines as ht_ 
+        print("h(t-1): ", htprev.size()) # 4 * 64 * 16 * 16
+        
         output_inner = []
+
         for index in range(seq_len):
             if inputs is None:
                 x = torch.zeros(htprev.size(0), self.input_channels,
                                 self.shape[0], self.shape[1]).cuda()
             else:
                 x = inputs[index, ...]
+            
+            # h_t_ = ODESolve(f(theta), htprev, (index, index+1)) --> odeint(Encoder_ODE_model, htprev, (t-1, t))
+            h_t_ = odeint(self.ode_model, htprev, torch.tensor([float(index), float(index+1.0)])).to(self.device)[1]
 
-            combined_1 = torch.cat((x, htprev), 1)  # E(X_t) + H_t_
+            combined_1 = torch.cat((x, h_t_), 1)  # E(X_t) + H_t_
             gates = self.conv1(combined_1)  # W * (E(X_t) + H_t_)
 
             zgate, rgate = torch.split(gates, self.num_features, dim=1)
             z = torch.sigmoid(zgate)
             r = torch.sigmoid(rgate)
 
-            combined_2 = torch.cat((x, r * htprev), 1)  # h' = tanh(W*(E(x)+r*H_t_))
-            
+            combined_2 = torch.cat((x, r * h_t_), 1)  # h' = tanh(W*(E(x)+r*H_t_))
             ht = self.conv2(combined_2)
             ht = torch.tanh(ht)
 
