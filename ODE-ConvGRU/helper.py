@@ -20,6 +20,16 @@ def make_layers(block):
                                                  stride=v[3],
                                                  padding=v[4])
             layers.append((layer_name, transposeConv2d))
+            if 'sample?' in layer_name: # *downsample?h,w|
+                h_start_idx = layer_name.find('?')
+                h_end_idx = layer_name.find(',')
+                w_end_idx = layer_name.find('|')
+                h = int(layer_name[h_start_idx+1:h_end_idx])
+                w = int(layer_name[h_end_idx+1:w_end_idx])
+                if 'upsample' in layer_name:
+                    layers.append(('upsample_' + layer_name, nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)))
+                else:
+                    layers.append(('downsample_' + layer_name, nn.Upsample(scale_factor=0.5, mode='bilinear', align_corners=True)))
             if 'relu' in layer_name:
                 layers.append(('relu_' + layer_name, nn.ReLU(inplace=True)))
             elif 'leaky' in layer_name:
@@ -76,6 +86,8 @@ def plot_images(batch_size, inputs, label, preds=None, seq=10):
         f = plt.figure()
         batch_input = inputs[b]
         batch_label = label[b]
+        if preds is not None:
+            batch_pred = preds[b]
         
         for s in range(seq):
             f.add_subplot(image_rows, seq, s+1)
@@ -87,8 +99,8 @@ def plot_images(batch_size, inputs, label, preds=None, seq=10):
         
         if preds is not None:
             for s in range(seq):
-                f.add_subplot(image_rows, seq, seq+s+1)
-                plt.imshow(batch_label[s][0])
+                f.add_subplot(image_rows, seq, (2*seq)+s+1)
+                plt.imshow(preds[s][0])
             plt.title("Input sequence, ground truth sequence, and predicted seqeunce")
         else:
             plt.title("Input and output(actual) sequence")
