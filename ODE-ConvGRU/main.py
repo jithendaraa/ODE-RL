@@ -15,12 +15,13 @@ import torch.nn as nn
 from torch.optim import lr_scheduler
 from torchdiffeq import odeint
 from conv_encoder import Encoder
+from conv_decoder import Decoder
 from encoder_decoder import ED
 
 from generate_moving_mnist import MovingMNIST
 from earlystopping import EarlyStopping
 from ConvGRUCell import ConvGRU
-from helper import get_batch
+from helper import get_batch, plot_images
 
 EPOCHS          = 3     # FIXME: 500 epochs in the paper
 INPUT_FRAMES    = 10
@@ -36,6 +37,7 @@ LAMBDA_SEQ      = 0.003
 h = 64
 w = 64
 c = 1
+predict_timesteps = [11., 12., 13., 14., 15., 16., 17., 18., 19., 20.]
 
 save_dir = './save_model/' + TIMESTAMP
 run_dir = './runs/' + TIMESTAMP
@@ -68,12 +70,12 @@ encoder_params = [
     # Conv Encoder E
     [
         OrderedDict({'conv1_downsample?64,64|_relu_1': [c, 32, 3, 1, 1]}),
-        OrderedDict({'conv2_relu_2': [32, 64, 3, 1, 1]}),
-        OrderedDict({'conv3_relu_3': [64, 128, 4, 2, 1]}),
+        OrderedDict({'conv2_relu_1': [32, 64, 3, 1, 1]}),
+        OrderedDict({'conv3_relu_1': [64, 128, 4, 2, 1]}),
     ],
-    # ODE-ConvGRU
+    # ConvGRU cells
     [
-        ConvGRU(shape=(int(h/4), int(w/4)), input_channels=128, filter_size=3, num_features=64, ode_specs=encoder_ode_specs)
+        ConvGRU(shape=(int(h/4), int(w/4)), input_channels=128, filter_size=3, num_features=64, ode_specs=encoder_ode_specs, feed='encoder')
     ]
 ]
 
@@ -85,20 +87,18 @@ decoder_ode_specs = [
 ]
 
 decoder_params = [
-    # Conv Decoder G
+    # Conv Decoder G: CNN's
     [
-        OrderedDict({'conv1_downsample?64,64|_relu_1': [c, 32, 3, 1, 1]}),
-        OrderedDict({'conv2_relu_2': [32, 64, 3, 1, 1]}),
-        OrderedDict({'conv3_relu_3': [64, 128, 4, 2, 1]}),
+        OrderedDict({'deconv1_upsample?16,16|_relu_1': [64, 128, 3, 1, 1]}),
+        OrderedDict({'deconv2_upsample?16,16|_relu_1': [128, 64, 3, 1, 1]}),
+        OrderedDict({'deconv3_relu_1': [64, c, 3, 1, 1]}),
     ],
-    # ODE-ConvGRU
-    [
-        ConvGRU(shape=(int(h/4), int(w/4)), input_channels=128, filter_size=3, num_features=64)
-    ]
+    # ConvGRU cells
+    []
 ]
 
 encoder = Encoder(encoder_params[0], encoder_params[1]).cuda()
-decoder = None
+decoder = Decoder(decoder_params[0], decoder_params[1], decoder_ode_specs, predict_timesteps, decoder_ode_specs)
 net = ED(encoder, decoder)
 
 # If we have multiple GPUs
@@ -134,11 +134,12 @@ t = tqdm(trainLoader, leave=False, total=len(trainLoader))
 for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, trainLoader, seq=10):
     inputs = inputs.to(device)
     labels = labels.to(device)
-    print(inputs.size(), i, labels.size())
     optimizer.zero_grad()
     net.train()
     pred = net(inputs)  # B,S,C,H,W
-    print(type(pred), len(pred))
+    print(type(pred), pred.size())
+    
+    plot_images(BATCH_SIZE, inputs.cpu(), labels.cpu(), preds=pred.cpu(), seq=10)
 
     break
 #         # print(type(pred))
