@@ -8,8 +8,7 @@ import logging
 class Encoder(nn.Module):
     def __init__(self, subnets, convgrus):
         super().__init__()
-        # A subnet can be nn.conv2d, nn.BatchNorm, or nn.ReLU
-        self.blocks = len(subnets)
+        self.subnet_blocks = len(subnets)  # A subnet can be nn.conv2d, nn.BatchNorm, or nn.ReLU
         self.convgru_blocks = len(convgrus)
         
         for index, params in enumerate(subnets, 1): # index sign from 1
@@ -20,7 +19,6 @@ class Encoder(nn.Module):
 
     def forward_by_stage(self, inputs, subnet):
         seq_number, batch_size, input_channel, height, width = inputs.size()
-        print(inputs.size(), subnet)
         inputs = torch.reshape(inputs, (-1, input_channel, height, width))
         embedded_inputs = subnet(inputs) # Pass thru conv
         embedded_inputs = torch.reshape(embedded_inputs, (seq_number, batch_size, embedded_inputs.size(1),
@@ -29,22 +27,18 @@ class Encoder(nn.Module):
 
     def forward(self, inputs):
         inputs = inputs.transpose(0, 1)  # to input_frames,Batch,1,64,64 
+        hidden_states = []
         logging.debug(inputs.size())
-        for i in range(1, self.blocks + 1):
-            # print("\nBLOCK", i)
-            inputs = self.forward_by_stage(
-                inputs, 
-                getattr(self, 'stage' + str(i))
-            )
-            # print(inputs.size())
-            # print("__________________________________________________________________________")
+
+        for i in range(1, self.subnet_blocks + 1):
+            inputs = self.forward_by_stage(inputs, getattr(self, 'stage' + str(i)))
         
         for i in range(1, self.convgru_blocks + 1):
-            # print("\nRNN_BLOCK", i)
             convgru = getattr(self, 'convgru' + str(i))
             outputs_stage, state_stage = convgru(inputs, None)
-            # print("__________________________________________________________________________")
-        return tuple(inputs)
+            hidden_statese_stages.append(state_stage)
+        
+        return tuple(hidden_states)
 
 class Encoder_ODEModel(nn.Module):
     def __init__(self, ode_specs, lr=1e-3):
