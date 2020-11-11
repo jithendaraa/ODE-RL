@@ -8,6 +8,7 @@ class ED(nn.Module):
         self.decoder = decoder
 
     def forward(self, input):
-        state = self.encoder(input)
-        # output = self.decoder(state)
-        return state
+        hidden_states = self.encoder(input) # list with len = number of convgru blocks (self.encoder.convgru_blocks)
+        h_T = hidden_states[-1] # aka h_s0 in figure 2 of the paper; size: batch_size * 64, h/4, w/4
+        output = self.decoder(h_T)
+        return output

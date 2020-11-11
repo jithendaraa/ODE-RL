@@ -36,9 +36,9 @@ class Encoder(nn.Module):
         for i in range(1, self.convgru_blocks + 1):
             convgru = getattr(self, 'convgru' + str(i))
             outputs_stage, state_stage = convgru(inputs, None)
-            hidden_statese_stages.append(state_stage)
-        
-        return tuple(hidden_states)
+            hidden_states.append(state_stage)
+            
+        return hidden_states
 
 class Encoder_ODEModel(nn.Module):
     def __init__(self, ode_specs, lr=1e-3):
@@ -48,7 +48,6 @@ class Encoder_ODEModel(nn.Module):
         self.conv2 = ode_specs[1]
         self.conv3 = ode_specs[2]
         self.conv4 = ode_specs[3]
-
         self.optim = optim.Adamax(self.parameters(), lr=lr)
     
     def forward(self, t, htprev):
