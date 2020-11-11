@@ -136,8 +136,7 @@ for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, trainLoader,
     optimizer.zero_grad()
     net.train()
     pred = net(inputs)  # B,S,C,H,W
-    print(type(pred), pred.size())
-    
+    pred = pred.transpose(0, 1) # S,B,C,H,W
     plot_images(BATCH_SIZE, inputs.cpu(), labels.cpu(), preds=pred.detach().cpu(), seq=10)
 
     break
