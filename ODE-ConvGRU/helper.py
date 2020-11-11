@@ -100,7 +100,7 @@ def plot_images(batch_size, inputs, label, preds=None, seq=10):
         if preds is not None:
             for s in range(seq):
                 f.add_subplot(image_rows, seq, (2*seq)+s+1)
-                plt.imshow(preds[s][0])
+                plt.imshow(batch_pred[s][0])
             plt.title("Input sequence, ground truth sequence, and predicted seqeunce")
         else:
             plt.title("Input and output(actual) sequence")
