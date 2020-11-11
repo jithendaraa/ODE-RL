@@ -66,21 +66,33 @@ def get_batch(data_size, batch_size, dataloader, batch_time=1, seq=10):
         label = targetVar  # B,S,C,H,W
         yield (inputs, i, label)
 
-def plot_images(batch_size, inputs, label, seq=10):
+def plot_images(batch_size, inputs, label, preds=None, seq=10):
     
+    image_rows = 2
+    if preds is not None:
+        image_rows = 3
+
     for b in range(batch_size):
         f = plt.figure()
         batch_input = inputs[b]
         batch_label = label[b]
+        
         for s in range(seq):
-            f.add_subplot(2, seq, s+1)
+            f.add_subplot(image_rows, seq, s+1)
             plt.imshow(batch_input[s][0])
         
         for s in range(seq):
-            f.add_subplot(2, seq, seq+s+1)
+            f.add_subplot(image_rows, seq, seq+s+1)
             plt.imshow(batch_label[s][0])
         
-        plt.title("Input and output(actual) sequence")
+        if preds is not None:
+            for s in range(seq):
+                f.add_subplot(image_rows, seq, seq+s+1)
+                plt.imshow(batch_label[s][0])
+            plt.title("Input sequence, ground truth sequence, and predicted seqeunce")
+        else:
+            plt.title("Input and output(actual) sequence")
+    
         plt.show(block=True)
         
 
