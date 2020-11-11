@@ -13,7 +13,6 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 from torch.optim import lr_scheduler
-from torchdiffeq import odeint
 from conv_encoder import Encoder
 from conv_decoder import Decoder
 from encoder_decoder import ED
@@ -139,7 +138,7 @@ for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, trainLoader,
     pred = net(inputs)  # B,S,C,H,W
     print(type(pred), pred.size())
     
-    plot_images(BATCH_SIZE, inputs.cpu(), labels.cpu(), preds=pred.cpu(), seq=10)
+    plot_images(BATCH_SIZE, inputs.cpu(), labels.cpu(), preds=pred.detach().cpu(), seq=10)
 
     break
 #         # print(type(pred))
