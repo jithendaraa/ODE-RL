@@ -30,6 +30,11 @@ def make_layers(block):
                     layers.append(('upsample_' + layer_name, nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)))
                 else:
                     layers.append(('downsample_' + layer_name, nn.Upsample(scale_factor=0.5, mode='bilinear', align_corners=True)))
+            if 'batchnorm(' in layer_name:
+                start_idx = layer_name.find("batchnorm(")
+                end_idx = layer_name.find(")")
+                channels = int(layer_name[start_idx+10:end_idx])
+                layers.append(('batchnorm_' + layer_name, nn.BatchNorm2d(channels)))
             if 'relu' in layer_name:
                 layers.append(('relu_' + layer_name, nn.ReLU(inplace=True)))
             elif 'leaky' in layer_name:
@@ -53,9 +58,9 @@ def make_layers(block):
                 else:
                     layers.append(('downsample_' + layer_name, nn.Upsample(scale_factor=0.5, mode='bilinear', align_corners=True)))
             if 'batchnorm(' in layer_name:
-                start_idx = layer_name.find("batchnorm((")
+                start_idx = layer_name.find("batchnorm(")
                 end_idx = layer_name.find(")")
-                channels = int(layer_name[start_idx+1:end_idx])
+                channels = int(layer_name[start_idx+10:end_idx])
                 layers.append(('batchnorm_' + layer_name, nn.BatchNorm2d(channels)))
             if 'relu' in layer_name:
                 layers.append(('relu_' + layer_name, nn.ReLU(inplace=True)))
