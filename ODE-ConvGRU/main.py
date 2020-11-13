@@ -68,9 +68,9 @@ encoder_ode_specs = [
 encoder_params = [
     # Conv Encoder E
     [
-        OrderedDict({'conv1_downsample?64,64|_relu_1': [c, 32, 3, 1, 1]}),
-        OrderedDict({'conv2_relu_1': [32, 64, 3, 1, 1]}),
-        OrderedDict({'conv3_relu_1': [64, 128, 4, 2, 1]}),
+        OrderedDict({'conv1_downsample?64,64|_batchnorm(32)_relu_1': [c, 32, 3, 1, 1]}),
+        OrderedDict({'conv2_batchnorm(64)_relu_1': [32, 64, 3, 1, 1]}),
+        OrderedDict({'conv3_batchnorm(128)_relu_1': [64, 128, 4, 2, 1]}),
     ],
     # ConvGRU cells
     [
@@ -88,8 +88,8 @@ decoder_ode_specs = [
 decoder_params = [
     # Conv Decoder G: CNN's
     [
-        OrderedDict({'deconv1_upsample?16,16|_relu_1': [64, 128, 3, 1, 1]}),
-        OrderedDict({'deconv2_upsample?16,16|_relu_1': [128, 64, 3, 1, 1]}),
+        OrderedDict({'deconv1_upsample?16,16|batchnorm(128)_relu_1': [64, 128, 3, 1, 1]}),
+        OrderedDict({'deconv2_upsample?16,16|batchnorm(64)_relu_1': [128, 64, 3, 1, 1]}),
         OrderedDict({'deconv3_relu_1': [64, c, 3, 1, 1]}),
     ],
     # ConvGRU cells
@@ -130,17 +130,70 @@ avg_valid_losses = []
 
 t = tqdm(trainLoader, leave=False, total=len(trainLoader))
 
-for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, trainLoader, seq=10):
-    inputs = inputs.to(device)
-    labels = labels.to(device)
-    optimizer.zero_grad()
-    net.train()
-    pred = net(inputs)  # B,S,C,H,W
-    pred = pred.transpose(0, 1) # S,B,C,H,W
-    plot_images(BATCH_SIZE, inputs.cpu(), labels.cpu(), preds=pred.detach().cpu(), seq=10)
+for epoch in range(cur_epoch, cur_epoch + 500):
+    losses = []
+    for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, trainLoader, seq=10):
+        
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+       
+        optimizer.zero_grad()
+        net.train()
+        pred = net(inputs)  # B,S,C,H,W
+        pred = pred.transpose(0, 1) # S,B,C,H,W
+        loss = lossfunction(pred, labels)
+        loss_aver = loss.item() / BATCH_SIZE
+        losses.append(loss.item())
+        # print("\nLoss for batch", i,": ", loss_aver)
+        train_losses.append(loss_aver)
+        loss.backward()
+        torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
+        optimizer.step()
 
-    break
-#         # print(type(pred))
+        with torch.no_grad():
+            net.eval()
+            for (inputs_, i_, labels_) in get_batch(valid_data_length, BATCH_SIZE, validLoader, seq=10):
+                if i == 10:
+                    break
+                inputs_ = inputs_.to(device)
+                labels_ = labels_.to(device)
+                pred = net(inputs_).transpose(0, 1)
+                loss = lossfunction(pred, labels_)
+                loss_aver = loss.item() / BATCH_SIZE
+                valid_losses.append(loss_aver)
+                torch.cuda.empty_cache()
+                train_loss = np.average(train_losses)
+                valid_loss = np.average(valid_losses)
+                avg_train_losses.append(train_loss)
+                avg_valid_losses.append(valid_loss)
 
-    #     break
-    # break
+                epoch_len = len(str(EPOCHS))
+                print_msg = (f'[{epoch:>{epoch_len}}/{EPOCHS:>{epoch_len}}] ' +
+                                 f'train_loss: {train_loss:.6f} ' +
+                                 f'valid_loss: {valid_loss:.6f}')
+
+                print(print_msg)
+                train_losses = []
+                valid_losses = []
+                pla_lr_scheduler.step(valid_loss)  # lr_scheduler
+                model_dict = {
+                    'epoch': epoch,
+                    'state_dict': net.state_dict(),
+                    'optimizer': optimizer.state_dict()
+                }
+                early_stopping(valid_loss.item(), model_dict, epoch, save_dir)
+                if early_stopping.early_stop:
+                    print("Early stopping")
+                    break
+                
+                with open("avg_train_losses.txt", 'wt') as f:
+                    for i in avg_train_losses:
+                        print(i, file=f)
+
+                with open("avg_valid_losses.txt", 'wt') as f:
+                    for i in avg_valid_losses:
+                        print(i, file=f)
+    
+    print("End of epoch", epoch)
+    if epoch%50 == 0:
+        plot_images(BATCH_SIZE, inputs.cpu(), labels.cpu(), preds=pred.detach().cpu(), seq=10)
