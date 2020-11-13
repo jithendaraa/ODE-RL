@@ -1,0 +1,5 @@
+__pycache__
+.ipynb_checkpoints
+assets
+runs
+save_model
