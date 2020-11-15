@@ -39,7 +39,6 @@ class Encoder(nn.Module):
             hidden_states.append(state_stage)
         return tuple(hidden_states)
 
-
     
 class Decoder(nn.Module):
     def __init__(self, subnets, rnns):

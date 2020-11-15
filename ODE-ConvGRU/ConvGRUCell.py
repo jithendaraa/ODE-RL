@@ -3,12 +3,13 @@ import torch.nn as nn
 import torch.optim as optim
 from torchdiffeq import odeint_adjoint as odeint
 from conv_encoder import Encoder_ODEModel
+from conv_decoder import Decoder_ODEModel
 
 class ConvGRU(nn.Module):
     """
     ConvGRU Cell
     """
-    def __init__(self, shape, input_channels, filter_size, num_features, ode_specs, print_details=False, lr=1e-3):
+    def __init__(self, shape, input_channels, filter_size, num_features, ode_specs, feed='enconder' ,print_details=False, lr=1e-3):
         super(ConvGRU, self).__init__()
         
         self.shape = shape
@@ -18,7 +19,12 @@ class ConvGRU(nn.Module):
         self.num_features = num_features
         self.padding = (filter_size - 1) // 2
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.ode_model = Encoder_ODEModel(ode_specs).to(self.device)
+        self.feed = feed
+        
+        if feed == 'encoder':
+            self.ode_model = Encoder_ODEModel(ode_specs).to(self.device)
+        elif feed == 'decoder':
+            self.ode_model = Decoder_ODEModel(ode_specs).to(self.device)
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels = self.input_channels + self.num_features,
@@ -46,8 +52,7 @@ class ConvGRU(nn.Module):
         else:
             htprev = hidden_state
         
-        print("h(t-1): ", htprev.size()) # 4 * 64 * 16 * 16
-        
+        # print("h(t-1): ", htprev.size()) # 4 * 64 * 16 * 16
         output_inner = []
 
         for index in range(seq_len):
@@ -59,22 +64,17 @@ class ConvGRU(nn.Module):
             
             # h_t_ = ODESolve(f(theta), htprev, (index, index+1)) --> odeint(Encoder_ODE_model, htprev, (t-1, t))
             h_t_ = odeint(self.ode_model, htprev, torch.tensor([float(index), float(index+1.0)])).to(self.device)[1]
-
             combined_1 = torch.cat((x, h_t_), 1)  # E(X_t) + H_t_
             gates = self.conv1(combined_1)  # W * (E(X_t) + H_t_)
-
             zgate, rgate = torch.split(gates, self.num_features, dim=1)
             z = torch.sigmoid(zgate)
             r = torch.sigmoid(rgate)
-
             combined_2 = torch.cat((x, r * h_t_), 1)  # h' = tanh(W*(E(x)+r*H_t_))
             ht = self.conv2(combined_2)
             ht = torch.tanh(ht)
-
             htnext = (1 - z) * htprev + z * ht
             output_inner.append(htnext)
             htprev = htnext
-        
         # print("____________________________________")
         # print(combined_1.size(), "COMBINEd before conv1 of ConvGRU")
         # print(gates.size(), "COMBINEd after conv1 of ConvGRU")

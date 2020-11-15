@@ -41,7 +41,7 @@ class Encoder(nn.Module):
         return hidden_states
 
 class Encoder_ODEModel(nn.Module):
-    def __init__(self, ode_specs, lr=1e-3):
+    def __init__(self, ode_specs, lr=1e-5):
         super(Encoder_ODEModel, self).__init__()
         print("Encoder ODE fθ initialised")
         self.conv1 = ode_specs[0]

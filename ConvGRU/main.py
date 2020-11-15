@@ -118,7 +118,6 @@ for epoch in range(cur_epoch, EPOCHS + 1):
         optimizer.zero_grad()
         net.train()
         pred = net(inputs)  # B,S,C,H,W
-        print(type(pred), len(pred), pred[0].size(), pred[1].size(), pred[2].size(), pred[3].size())
         loss = lossfunction(pred, label)
         loss_aver = loss.item() / BATCH_SIZE
         train_losses.append(loss_aver)

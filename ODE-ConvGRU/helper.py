@@ -81,7 +81,7 @@ def get_batch(data_size, batch_size, dataloader, batch_time=1, seq=10):
         label = targetVar  # B,S,C,H,W
         yield (inputs, i, label)
 
-def plot_images(batch_size, inputs, label, preds=None, seq=10):
+def plot_images(batch_size, inputs, label, preds=None, seq=10, image_name='lol'):
     
     image_rows = 2
     if preds is not None:
@@ -109,8 +109,8 @@ def plot_images(batch_size, inputs, label, preds=None, seq=10):
             plt.title("Input sequence, ground truth sequence, and predicted seqeunce")
         else:
             plt.title("Input and output(actual) sequence")
-    
-        plt.show(block=True)
+
+        plt.savefig("plots/"+image_name+"_Batch_"+str(b+1)+".png")
         
 
 

@@ -8,6 +8,7 @@ from tensorboardX import SummaryWriter
 from tqdm import tqdm
 import logging
 import matplotlib.pyplot as plt
+import pickle
 
 import torch
 import torch.optim as optim
@@ -22,7 +23,7 @@ from earlystopping import EarlyStopping
 from ConvGRUCell import ConvGRU
 from helper import get_batch, plot_images
 
-EPOCHS          = 3     # FIXME: 500 epochs in the paper
+EPOCHS          = 500     # FIXME: 500 epochs in the paper
 INPUT_FRAMES    = 10
 OUTPUT_FRAMES   = 10
 LR              = 1e-3
@@ -39,11 +40,11 @@ c = 1
 predict_timesteps = [11., 12., 13., 14., 15., 16., 17., 18., 19., 20.]
 
 save_dir = './save_model/' + TIMESTAMP
-run_dir = './runs/' + TIMESTAMP
-if not os.path.isdir(run_dir):
-    os.makedirs(run_dir)
+# run_dir = './runs/' + TIMESTAMP
+# if not os.path.isdir(run_dir):
+#     os.makedirs(run_dir)
 
-tb = SummaryWriter(run_dir)
+# tb = SummaryWriter(run_dir)
 early_stopping = EarlyStopping(patience=20, verbose=True)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -120,7 +121,7 @@ else:
 # FIXME Loss: As given in paper; Adamax optimizer; exponential LR deacy -> 0.99 per epoch
 lossfunction = nn.MSELoss().cuda()
 optimizer = optim.Adamax(net.parameters(), lr=LR)
-pla_lr_scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=4, verbose=True)
+pla_lr_scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.99, patience=4, verbose=True)
 
 # to track the training loss, validation loss, and their averages as the model trains
 train_losses = []
@@ -130,70 +131,60 @@ avg_valid_losses = []
 
 t = tqdm(trainLoader, leave=False, total=len(trainLoader))
 
-for epoch in range(cur_epoch, cur_epoch + 500):
+for epoch in range(cur_epoch, cur_epoch + EPOCHS):
     losses = []
     for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, trainLoader, seq=10):
-        
+        if i >= 20:
+            break
         inputs = inputs.to(device)
         labels = labels.to(device)
-       
         optimizer.zero_grad()
         net.train()
-        pred = net(inputs)  # B,S,C,H,W
-        pred = pred.transpose(0, 1) # S,B,C,H,W
+        pred = net(inputs).transpose(0, 1)   # S,B,C,H,W
         loss = lossfunction(pred, labels)
         loss_aver = loss.item() / BATCH_SIZE
         losses.append(loss.item())
-        # print("\nLoss for batch", i,": ", loss_aver)
         train_losses.append(loss_aver)
         loss.backward()
         torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
         optimizer.step()
 
-        with torch.no_grad():
-            net.eval()
-            for (inputs_, i_, labels_) in get_batch(valid_data_length, BATCH_SIZE, validLoader, seq=10):
-                if i == 10:
-                    break
-                inputs_ = inputs_.to(device)
-                labels_ = labels_.to(device)
-                pred = net(inputs_).transpose(0, 1)
-                loss = lossfunction(pred, labels_)
-                loss_aver = loss.item() / BATCH_SIZE
-                valid_losses.append(loss_aver)
-                torch.cuda.empty_cache()
-                train_loss = np.average(train_losses)
-                valid_loss = np.average(valid_losses)
-                avg_train_losses.append(train_loss)
-                avg_valid_losses.append(valid_loss)
-
-                epoch_len = len(str(EPOCHS))
-                print_msg = (f'[{epoch:>{epoch_len}}/{EPOCHS:>{epoch_len}}] ' +
-                                 f'train_loss: {train_loss:.6f} ' +
-                                 f'valid_loss: {valid_loss:.6f}')
-
-                print(print_msg)
-                train_losses = []
-                valid_losses = []
-                pla_lr_scheduler.step(valid_loss)  # lr_scheduler
-                model_dict = {
-                    'epoch': epoch,
-                    'state_dict': net.state_dict(),
-                    'optimizer': optimizer.state_dict()
-                }
-                early_stopping(valid_loss.item(), model_dict, epoch, save_dir)
-                if early_stopping.early_stop:
-                    print("Early stopping")
-                    break
+    with torch.no_grad():
+        net.eval()
+        for (inputs_, i_, labels_) in get_batch(valid_data_length, BATCH_SIZE, validLoader, seq=10):
+            if i_ >= 10:
+                break
+            inputs_ = inputs_.to(device)
+            labels_ = labels_.to(device)
+            pred_ = net(inputs_).transpose(0, 1)
+            loss = lossfunction(pred_, labels_)
+            loss_aver = loss.item() / BATCH_SIZE
+            valid_losses.append(loss_aver)
+            torch.cuda.empty_cache()
+            train_loss = np.average(train_losses)
+            valid_loss = np.average(valid_losses)
+            avg_train_losses.append(train_loss)
+            avg_valid_losses.append(valid_loss)
+            epoch_len = len(str(EPOCHS))
+            print_msg = (f'[{epoch:>{epoch_len}}/{EPOCHS:>{epoch_len}}] ' +
+                             f'train_loss: {train_loss:.6f} ' +
+                             f'valid_loss: {valid_loss:.6f}')
+            print(print_msg)
+            train_losses = []
+            valid_losses = []
+            pla_lr_scheduler.step(valid_loss)  # lr_scheduler
+            model_dict = {
+                'epoch': epoch,
+                'state_dict': net.state_dict(),
+                'optimizer': optimizer.state_dict()
+            }
+            with open('params.pickle', 'wb') as handle:
+                pickle.dump(model_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            early_stopping(valid_loss.item(), model_dict, epoch, save_dir)
+            if early_stopping.early_stop:
+                # print("Early stopping")
+                break
                 
-                with open("avg_train_losses.txt", 'wt') as f:
-                    for i in avg_train_losses:
-                        print(i, file=f)
-
-                with open("avg_valid_losses.txt", 'wt') as f:
-                    for i in avg_valid_losses:
-                        print(i, file=f)
-    
     print("End of epoch", epoch)
-    if epoch%50 == 0:
-        plot_images(BATCH_SIZE, inputs.cpu(), labels.cpu(), preds=pred.detach().cpu(), seq=10)
+    plot_images(BATCH_SIZE, inputs.cpu(), labels.cpu(), preds=pred.detach().cpu(), seq=10, image_name="Train_epoch_"+str(epoch))
+    plot_images(BATCH_SIZE, inputs_.cpu(), labels_.cpu(), preds=pred_.detach().cpu(), seq=10, image_name="Valid_epoch_"+str(epoch))

@@ -14,6 +14,7 @@ class Decoder_ODEModel(nn.Module):
         self.conv2 = ode_specs[1]
         self.conv3 = ode_specs[2]
         self.conv4 = ode_specs[3]
+        self.optim = optim.Adamax(self.parameters(), lr=lr)
 
     def forward(self, t, htprev):
         htprev = F.tanh(self.conv1(htprev))
@@ -30,7 +31,7 @@ class Decoder(nn.Module):
         self.output_frames =  len(predict_timesteps)
         self.ode_model = Decoder_ODEModel(ode_specs)
         self.predict_timesteps = predict_timesteps
-        
+
         for index, params in enumerate(subnets, 1): # index sign from 1
             setattr(self, 'stage' + str(index), make_layers(params))
         
@@ -48,14 +49,10 @@ class Decoder(nn.Module):
 
         
     def forward(self, h_s0):
-        print(h_s0.size(), self.predict_timesteps)
-        K = len(self.predict_timesteps)
-        
         # h_s1, h_s2, ..... h_sK = ODESolve(fϕ, h_s0, [s1, s2, .... sK])
-        hidden_states = odeint(self.ode_model, h_s0, torch.tensor(self.predict_timesteps))
+        outputs = odeint(self.ode_model, h_s0, torch.tensor(self.predict_timesteps))
         
         for i in list(range(1, self.subnet_blocks+1)):
-            outputs = self.forward_by_stage(hidden_states, getattr(self, 'stage' + str(i)))
-            hidden_states = outputs
+            outputs = self.forward_by_stage(outputs, getattr(self, 'stage' + str(i)))
 
         return outputs
