@@ -14,22 +14,19 @@ def make_layers(block):
             layers.append((layer_name, layer))
             
         elif 'deconv' in layer_name:
+            if 'sample' in layer_name: # *downsample?h,w|
+                if 'upsample' in layer_name:
+                    layers.append(('upsample_' + layer_name, nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)))
+                else:
+                    layers.append(('downsample_' + layer_name, nn.Upsample(scale_factor=0.5, mode='bilinear', align_corners=True)))
+                    
             transposeConv2d = nn.ConvTranspose2d(in_channels=v[0],
                                                  out_channels=v[1],
                                                  kernel_size=v[2],
                                                  stride=v[3],
                                                  padding=v[4])
             layers.append((layer_name, transposeConv2d))
-            if 'sample?' in layer_name: # *downsample?h,w|
-                h_start_idx = layer_name.find('?')
-                h_end_idx = layer_name.find(',')
-                w_end_idx = layer_name.find('|')
-                h = int(layer_name[h_start_idx+1:h_end_idx])
-                w = int(layer_name[h_end_idx+1:w_end_idx])
-                if 'upsample' in layer_name:
-                    layers.append(('upsample_' + layer_name, nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)))
-                else:
-                    layers.append(('downsample_' + layer_name, nn.Upsample(scale_factor=0.5, mode='bilinear', align_corners=True)))
+            
             if 'batchnorm(' in layer_name:
                 start_idx = layer_name.find("batchnorm(")
                 end_idx = layer_name.find(")")
@@ -47,12 +44,7 @@ def make_layers(block):
                                stride=v[3],
                                padding=v[4])
             layers.append((layer_name, conv2d))
-            if 'sample?' in layer_name: # *downsample?h,w|
-                h_start_idx = layer_name.find('?')
-                h_end_idx = layer_name.find(',')
-                w_end_idx = layer_name.find('|')
-                h = int(layer_name[h_start_idx+1:h_end_idx])
-                w = int(layer_name[h_end_idx+1:w_end_idx])
+            if 'sample' in layer_name: # *downsample?h,w|
                 if 'upsample' in layer_name:
                     layers.append(('upsample_' + layer_name, nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)))
                 else:
