@@ -29,7 +29,7 @@ EPOCHS          = 5
 INPUT_FRAMES    = 3
 OUTPUT_FRAMES   = TOTAL_FRAMES - INPUT_FRAMES
 LR              = 1e-3
-BATCH_SIZE      = 4
+BATCH_SIZE      = 6
 LAMBDA_DIFF     = 1.0
 LAMBDA_IMG      = 0.003
 LAMBDA_SEQ      = 0.003
@@ -53,7 +53,7 @@ class PhyreRolloutDataset(torch.utils.data.Dataset):
         return self.x_data[idx], self.y_data[idx], self.rollout_results[idx]
 
 
-def load_rollout_data(INPUT_FRAMES=3, TOTAL_FRAMES=17, train_test_split=0.8):
+def load_rollout_data(INPUT_FRAMES=3, TOTAL_FRAMES=17, train_test_split=0.6):
     OUTPUT_FRAMES = TOTAL_FRAMES - INPUT_FRAMES
     data_dir = 'rollout_data'
     rollout_nums = len(os.listdir(data_dir))
@@ -92,35 +92,39 @@ early_stopping = EarlyStopping(patience=20, verbose=True)
 
 # # Encoder params
 
+encoder_ode_specs = [
+    torch.nn.Conv2d(128, 128, 3, 1, 1),
+    torch.nn.Conv2d(128, 128, 3, 1, 1),
+    torch.nn.Conv2d(128, 128, 3, 1, 1),
+    torch.nn.Conv2d(128, 128, 3, 1, 1)
+]
+
 encoder_params = [
     # Conv Encoder E
     [
-        OrderedDict({'conv1_downsample?64,64|_batchnorm(32)_relu_1': [channels, 32, 3, 1, 1]}),
-        OrderedDict({'conv2_batchnorm(64)_relu_1': [32, 64, 3, 1, 1]}),
-        OrderedDict({'conv3_batchnorm(128)_relu_1': [64, 128, 4, 2, 1]}),
+        OrderedDict({'conv1_batchnorm(32)_relu_1': [channels, 32, 4, 2, 1]}),
+        OrderedDict({'conv2_batchnorm(64)_relu_2': [32, 64, 3, 1, 1]}),
+        OrderedDict({'conv3_batchnorm(128)_relu_3': [64, 128, 4, 2, 1]}),
     ],
     # ConvGRU cells
     [
-        # ConvGRU(shape=(int(h/4), int(w/4)), input_channels=128, filter_size=3, num_features=64, ode_specs=encoder_ode_specs, feed='encoder')
+        ConvGRU(shape=(int(height/4), int(width/4)), input_channels=128, filter_size=3, num_features=128, ode_specs=encoder_ode_specs, feed='encoder')
     ]
 ]
 
 decoder_ode_specs = [
-    torch.nn.Conv2d(64, 64, 3, 1, 1),
-    torch.nn.Conv2d(64, 64, 3, 1, 1),
-    torch.nn.Conv2d(64, 64, 3, 1, 1),
-    torch.nn.Conv2d(64, 64, 3, 1, 1)
+    torch.nn.Conv2d(128, 128, 3, 1, 1),
+    torch.nn.Conv2d(128, 128, 3, 1, 1),
+    torch.nn.Conv2d(128, 128, 3, 1, 1),
+    torch.nn.Conv2d(128, 128, 3, 1, 1)
 ]
 
 decoder_params = [
-    # Conv Decoder G: CNN's
+    # Conv Decoder G: CNN's Deconvs
     [
-        OrderedDict({'deconv1_upsample?16,16|batchnorm(128)_relu_1': [64, 128, 3, 1, 1]}),
-        OrderedDict({'deconv2_upsample?16,16|batchnorm(64)_relu_1': [128, 64, 3, 1, 1]}),
-        OrderedDict({'deconv3_relu_1': [64, channels, 3, 1, 1]}),
-    ],
-    # ConvGRU cells
-    []
+        OrderedDict({'deconv1_upsample_batchnorm(64)_relu_1': [128, 64, 3, 1, 1]}),
+        OrderedDict({'deconv2_upsample_relu_2': [64, channels, 3, 1, 1]}),
+    ], []
 ]
 
 encoder = Encoder(encoder_params[0], encoder_params[1]).cuda()
@@ -143,18 +147,19 @@ valid_losses = []
 avg_train_losses = []
 avg_valid_losses = []
 train_data_length = train_loader.__len__()
-print("here")
 
 for range in range(cur_epoch, cur_epoch + EPOCHS):
     losses = []
     for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, train_loader, seq=3):
         if i >= 20:
             break
-        inputs = inputs.to(device)
-        labels = labels.to(device)
+        # inputs and labels -> B, S, H, W, C to B, S, C, H, W
+        inputs = inputs.to(device).transpose(2, 4).transpose(3, 4)
+        labels = labels.to(device).transpose(2, 4).transpose(3, 4)
         optimizer.zero_grad()
         net.train()
-        pred = net(inputs).transpose(0, 1)   # S,B,C,H,W
+        pred = net(inputs)
+        # .transpose(0, 1)   # S,B,C,H,W
         # loss = lossfunction(pred, labels)
         # loss_aver = loss.item() / BATCH_SIZE
         # losses.append(loss.item())
