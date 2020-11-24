@@ -35,9 +35,9 @@ class Encoder(nn.Module):
         
         for i in range(1, self.convgru_blocks + 1):
             convgru = getattr(self, 'convgru' + str(i))
-            outputs_stage, state_stage = convgru(inputs, None)
+            outputs_stage, state_stage = convgru(inputs, None, seq_len=3)
             hidden_states.append(state_stage)
-            
+        
         return hidden_states
 
 class Encoder_ODEModel(nn.Module):
