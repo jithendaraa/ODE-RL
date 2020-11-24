@@ -33,7 +33,7 @@ class Decoder(nn.Module):
         self.predict_timesteps = predict_timesteps
 
         for index, params in enumerate(subnets, 1): # index sign from 1
-            setattr(self, 'stage' + str(index), make_layers(params))
+            setattr(self, 'deconv' + str(index), make_layers(params))
         
         for index, convgru in enumerate(convgrus, 1):   # index sign from 1
             setattr(self, 'convgru' + str(index), convgru)
@@ -51,8 +51,7 @@ class Decoder(nn.Module):
     def forward(self, h_s0):
         # h_s1, h_s2, ..... h_sK = ODESolve(fϕ, h_s0, [s1, s2, .... sK])
         outputs = odeint(self.ode_model, h_s0, torch.tensor(self.predict_timesteps))
-        
         for i in list(range(1, self.subnet_blocks+1)):
-            outputs = self.forward_by_stage(outputs, getattr(self, 'stage' + str(i)))
+            outputs = self.forward_by_stage(outputs, getattr(self, 'deconv' + str(i)))
 
         return outputs
