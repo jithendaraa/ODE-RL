@@ -26,6 +26,7 @@ class Encoder(nn.Module):
         return embedded_inputs
 
     def forward(self, inputs):
+        print(inputs.size())
         inputs = inputs.transpose(0, 1)  # to input_frames,Batch,1,64,64 
         hidden_states = []
         logging.debug(inputs.size())

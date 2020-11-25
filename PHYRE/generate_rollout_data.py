@@ -7,7 +7,7 @@ import math
 import random
 import argparse
 
-get_n_rollouts = 50
+get_n_rollouts = 20
 eval_setup = 'ball_cross_template'
 fold_id = 0
 rollouts = np.array([])

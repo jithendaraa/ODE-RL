@@ -75,10 +75,4 @@ class ConvGRU(nn.Module):
             htnext = (1 - z) * htprev + z * ht
             output_inner.append(htnext)
             htprev = htnext
-        # print("____________________________________")
-        # print(combined_1.size(), "COMBINEd before conv1 of ConvGRU")
-        # print(gates.size(), "COMBINEd after conv1 of ConvGRU")
-        # print(combined_2.size(), "COMBINEd before conv2 of ConvGRU")
-        # print(ht.size(), "COMBINEd after conv2 of ConvGRU")
-        # print("____________________________________")
         return torch.stack(output_inner), htnext

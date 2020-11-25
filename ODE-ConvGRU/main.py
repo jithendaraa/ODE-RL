@@ -98,7 +98,7 @@ decoder_params = [
 ]
 
 encoder = Encoder(encoder_params[0], encoder_params[1]).cuda()
-decoder = Decoder(decoder_params[0], decoder_params[1], decoder_ode_specs, predict_timesteps, decoder_ode_specs)
+decoder = Decoder(decoder_params[0], decoder_params[1], decoder_ode_specs, predict_timesteps)
 net = ED(encoder, decoder)
 
 # If we have multiple GPUs
@@ -141,49 +141,49 @@ for epoch in range(cur_epoch, cur_epoch + EPOCHS):
         optimizer.zero_grad()
         net.train()
         pred = net(inputs).transpose(0, 1)   # S,B,C,H,W
-        loss = lossfunction(pred, labels)
-        loss_aver = loss.item() / BATCH_SIZE
-        losses.append(loss.item())
-        train_losses.append(loss_aver)
-        loss.backward()
-        torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
-        optimizer.step()
+        # loss = lossfunction(pred, labels)
+        # loss_aver = loss.item() / BATCH_SIZE
+        # losses.append(loss.item())
+        # train_losses.append(loss_aver)
+        # loss.backward()
+        # torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
+        # optimizer.step()
 
-    with torch.no_grad():
-        net.eval()
-        for (inputs_, i_, labels_) in get_batch(valid_data_length, BATCH_SIZE, validLoader, seq=10):
-            if i_ >= 10:
-                break
-            inputs_ = inputs_.to(device)
-            labels_ = labels_.to(device)
-            pred_ = net(inputs_).transpose(0, 1)
-            loss = lossfunction(pred_, labels_)
-            loss_aver = loss.item() / BATCH_SIZE
-            valid_losses.append(loss_aver)
-            torch.cuda.empty_cache()
-            train_loss = np.average(train_losses)
-            valid_loss = np.average(valid_losses)
-            avg_train_losses.append(train_loss)
-            avg_valid_losses.append(valid_loss)
-            epoch_len = len(str(EPOCHS))
-            print_msg = (f'[{epoch:>{epoch_len}}/{EPOCHS:>{epoch_len}}] ' +
-                             f'train_loss: {train_loss:.6f} ' +
-                             f'valid_loss: {valid_loss:.6f}')
-            print(print_msg)
-            train_losses = []
-            valid_losses = []
-            pla_lr_scheduler.step(valid_loss)  # lr_scheduler
-            model_dict = {
-                'epoch': epoch,
-                'state_dict': net.state_dict(),
-                'optimizer': optimizer.state_dict()
-            }
-            with open('params.pickle', 'wb') as handle:
-                pickle.dump(model_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            early_stopping(valid_loss.item(), model_dict, epoch, save_dir)
-            if early_stopping.early_stop:
-                # print("Early stopping")
-                break
+    # with torch.no_grad():
+    #     net.eval()
+    #     for (inputs_, i_, labels_) in get_batch(valid_data_length, BATCH_SIZE, validLoader, seq=10):
+    #         if i_ >= 10:
+    #             break
+    #         inputs_ = inputs_.to(device)
+    #         labels_ = labels_.to(device)
+    #         pred_ = net(inputs_).transpose(0, 1)
+    #         loss = lossfunction(pred_, labels_)
+    #         loss_aver = loss.item() / BATCH_SIZE
+    #         valid_losses.append(loss_aver)
+    #         torch.cuda.empty_cache()
+    #         train_loss = np.average(train_losses)
+    #         valid_loss = np.average(valid_losses)
+    #         avg_train_losses.append(train_loss)
+    #         avg_valid_losses.append(valid_loss)
+    #         epoch_len = len(str(EPOCHS))
+    #         print_msg = (f'[{epoch:>{epoch_len}}/{EPOCHS:>{epoch_len}}] ' +
+    #                          f'train_loss: {train_loss:.6f} ' +
+    #                          f'valid_loss: {valid_loss:.6f}')
+    #         print(print_msg)
+    #         train_losses = []
+    #         valid_losses = []
+    #         pla_lr_scheduler.step(valid_loss)  # lr_scheduler
+    #         model_dict = {
+    #             'epoch': epoch,
+    #             'state_dict': net.state_dict(),
+    #             'optimizer': optimizer.state_dict()
+    #         }
+    #         with open('params.pickle', 'wb') as handle:
+    #             pickle.dump(model_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    #         early_stopping(valid_loss.item(), model_dict, epoch, save_dir)
+    #         if early_stopping.early_stop:
+    #             # print("Early stopping")
+    #             break
                 
     print("End of epoch", epoch)
     plot_images(BATCH_SIZE, inputs.cpu(), labels.cpu(), preds=pred.detach().cpu(), seq=10, image_name="Train_epoch_"+str(epoch))

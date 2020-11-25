@@ -46,14 +46,15 @@ class ConvGRU(nn.Module):
         
     def forward(self, inputs=None, hidden_state=None, seq_len=10):
 
+        # inputs size: S, B, C, H, W
         if hidden_state is None:
             htprev = torch.zeros(inputs.size(1), self.num_features,
                                  self.shape[0], self.shape[1]).cuda()
         else:
             htprev = hidden_state
         
-        # print("h(t-1): ", htprev.size()) # 4 * 64 * 16 * 16
         output_inner = []
+        htnext = None
 
         for index in range(seq_len):
             if inputs is None:

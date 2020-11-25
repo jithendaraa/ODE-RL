@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 from torch.optim import lr_scheduler
+from torchvision import transforms
 
 import numpy as np
 import matplotlib
@@ -24,12 +25,13 @@ TOTAL_FRAMES = 17
 height = 256
 width = 256
 channels = 3
+train_test_split = 0.1
 
-EPOCHS          = 5
+EPOCHS          = 100
 INPUT_FRAMES    = 3
 OUTPUT_FRAMES   = TOTAL_FRAMES - INPUT_FRAMES
 LR              = 1e-3
-BATCH_SIZE      = 6
+BATCH_SIZE      = 2
 LAMBDA_DIFF     = 1.0
 LAMBDA_IMG      = 0.003
 LAMBDA_SEQ      = 0.003
@@ -42,8 +44,8 @@ class PhyreRolloutDataset(torch.utils.data.Dataset):
         self.rollout_results = rollout_results
         true_inputs = rollout_data[:, :INPUT_FRAMES]
         true_outputs = rollout_data[:, INPUT_FRAMES:]
-        self.x_data = torch.tensor(true_inputs, dtype=torch.float32).to(device)
-        self.y_data = torch.tensor(true_outputs, dtype=torch.float32).to(device)
+        self.x_data = torch.tensor(true_inputs, dtype=torch.float32).to(device)/255.
+        self.y_data = torch.tensor(true_outputs, dtype=torch.float32).to(device)/255.
     
     def __len__(self):
         return len(self.x_data)
@@ -53,7 +55,7 @@ class PhyreRolloutDataset(torch.utils.data.Dataset):
         return self.x_data[idx], self.y_data[idx], self.rollout_results[idx]
 
 
-def load_rollout_data(INPUT_FRAMES=3, TOTAL_FRAMES=17, train_test_split=0.6):
+def load_rollout_data(INPUT_FRAMES=3, TOTAL_FRAMES=17, train_test_split=train_test_split):
     OUTPUT_FRAMES = TOTAL_FRAMES - INPUT_FRAMES
     data_dir = 'rollout_data'
     rollout_nums = len(os.listdir(data_dir))
@@ -78,10 +80,9 @@ def load_rollout_data(INPUT_FRAMES=3, TOTAL_FRAMES=17, train_test_split=0.6):
     test_rollout_data, test_rollout_results = rollout_data[train_idx:], rollout_results[train_idx:]
 
     train_dataset = PhyreRolloutDataset(train_rollout_data, train_rollout_results)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False)
     test_dataset = PhyreRolloutDataset(test_rollout_data, test_rollout_results)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
     return train_loader, test_loader
 
@@ -90,8 +91,7 @@ train_loader, test_loader = load_rollout_data()
 predict_timesteps = np.arange(INPUT_FRAMES+1., TOTAL_FRAMES+1., 1.0)
 early_stopping = EarlyStopping(patience=20, verbose=True)
 
-# # Encoder params
-
+# Encoder params
 encoder_ode_specs = [
     torch.nn.Conv2d(128, 128, 3, 1, 1),
     torch.nn.Conv2d(128, 128, 3, 1, 1),
@@ -137,35 +137,42 @@ net.to(device)
 
 cur_epoch = 0
 
-lossfunction = nn.MSELoss().cuda()
-optimizer = optim.Adamax(net.parameters(), lr=LR)
-pla_lr_scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.99, patience=4, verbose=True)
+# lossfunction = nn.MSELoss().cuda()
+# optimizer = optim.Adamax(net.parameters(), lr=LR)
+# pla_lr_scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.99, patience=4, verbose=True)
 
-# to track the training loss, validation loss, and their averages as the model trains
-train_losses = []
-valid_losses = []
-avg_train_losses = []
-avg_valid_losses = []
-train_data_length = train_loader.__len__()
+# # to track the training loss, validation loss, and their averages as the model trains
+# train_losses = []
+# valid_losses = []
+# avg_train_losses = []
+# avg_valid_losses = []
+# train_data_length = train_loader.__len__()
+# pred, inputs, labels = None, None, None
 
-for range in range(cur_epoch, cur_epoch + EPOCHS):
-    losses = []
-    for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, train_loader, seq=3):
-        if i >= 20:
-            break
-        # inputs and labels -> B, S, H, W, C to B, S, C, H, W
-        inputs = inputs.to(device).transpose(2, 4).transpose(3, 4)
-        labels = labels.to(device).transpose(2, 4).transpose(3, 4)
-        optimizer.zero_grad()
-        net.train()
-        pred = net(inputs)
-        # .transpose(0, 1)   # S,B,C,H,W
-        # loss = lossfunction(pred, labels)
-        # loss_aver = loss.item() / BATCH_SIZE
-        # losses.append(loss.item())
-        # train_losses.append(loss_aver)
-        # loss.backward()
-        # torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
-        # optimizer.step()
-    break
+# for epoch in range(cur_epoch, cur_epoch + EPOCHS):
+#     losses = []
+#     for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, train_loader, seq=3):
+#         # inputs and labels -> S, B, H, W, C to B, S, C, H, W
+#         if i >= 20: break
+#         inputs = inputs.to(device).transpose(2, 4).transpose(3, 4)
+#         labels = labels.to(device).transpose(2, 4).transpose(3, 4)
+#         optimizer.zero_grad()
+#         net.train()
+#         pred = net(inputs).transpose(0, 1)   # B, S, C, H, W
+#         predicted_image = pred.detach().cpu().transpose(2,3).transpose(3,4)[0,0]
+#         loss = lossfunction(pred, labels)
+#         loss_aver = loss.item() / BATCH_SIZE
+#         losses.append(loss.item())
+#         train_losses.append(loss_aver)
+#         loss.backward()
+#         torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
+#         optimizer.step()
+#     break
+#     print("Epoch", epoch, "/", EPOCHS)
+#     if epoch % 3 == 0:
+#         plt.imshow(predicted_image)
+#         plt.show()
+#         plt.imshow(predicted_image/255.)
+#         plt.show()
+
 

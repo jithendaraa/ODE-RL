@@ -1,5 +1,6 @@
 import torch.nn as nn
 from collections import OrderedDict
+import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -64,10 +65,8 @@ def make_layers(block):
     return nn.Sequential(OrderedDict(layers))
 
 def get_batch(data_size, batch_size, dataloader, batch_time=1, seq=10):
-    t = tqdm(dataloader, leave=False, total=len(dataloader))
-    for i, (input_frames, output_frames, rollout_results) in enumerate(t):
+    # t = tqdm(dataloader, leave=False, total=len(dataloader))
+    for i, (input_frames, output_frames, rollout_results) in enumerate(dataloader):
         # input_frames  --> batch_size x input_frames x c x 64 x 64; input first input_frames frames
         # output_frames --> batch_size x output_frames x c x 64 x 64; output first input_frames frames
-        inputs = input_frames  # B,S,C,H,W
-        label = output_frames  # B,S,C,H,W
-        yield (inputs, i, label)
+        yield (input_frames, i, output_frames)
