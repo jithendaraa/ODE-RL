@@ -7,7 +7,7 @@ import math
 import random
 import argparse
 
-get_n_rollouts = 20
+get_n_rollouts = 1000
 eval_setup = 'ball_cross_template'
 fold_id = 0
 rollouts = np.array([])
@@ -50,7 +50,7 @@ for _ in range(get_n_rollouts):
     if len(sequence) == 0: print("Error: Sequence is 0 frames long!")
     while len(sequence) < total_frames:
         print(sequence[len(sequence)-1].shape)
-        sequence = np.append(sequence, sequence[len(sequence)-1], axis=0)
+        sequence = np.append(sequence, sequence[len(sequence)-1].reshape(1, height, width, channels), axis=0)
 
     if len(rollouts) == 0:  rollouts = sequence.reshape(1, total_frames, height, width, channels)
     else:                   rollouts = np.append(rollouts, sequence.reshape(1, total_frames, height, width, channels), axis=0)
