@@ -27,7 +27,7 @@ width = 256
 channels = 3
 train_test_split = 0.1
 
-EPOCHS          = 100
+EPOCHS          = 1000
 INPUT_FRAMES    = 3
 OUTPUT_FRAMES   = TOTAL_FRAMES - INPUT_FRAMES
 LR              = 1e-3
@@ -36,8 +36,9 @@ LAMBDA_DIFF     = 1.0
 LAMBDA_IMG      = 0.003
 LAMBDA_SEQ      = 0.003
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+gpu_num = "0"
+device = torch.device("cuda:"+gpu_num if torch.cuda.is_available() else "cpu")
+print("Device", device)
 class PhyreRolloutDataset(torch.utils.data.Dataset):
     def __init__(self, rollout_data, rollout_results):
         self.rollout_data = rollout_data
@@ -132,7 +133,7 @@ decoder = Decoder(decoder_params[0], decoder_params[1], decoder_ode_specs, predi
 net = ED(encoder, decoder)
 
 # If we have multiple GPUs
-if torch.cuda.device_count() > 1:   net = nn.DataParallel(net)
+#if torch.cuda.device_count() > 1:   net = nn.DataParallel(net)
 net.to(device)
 
 cur_epoch = 0
@@ -153,7 +154,6 @@ for epoch in range(cur_epoch, cur_epoch + EPOCHS):
     losses = []
     for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, train_loader, seq=3):
         # inputs and labels -> S, B, H, W, C to B, S, C, H, W
-        if i >= 20: break
         inputs = inputs.to(device).transpose(2, 4).transpose(3, 4)
         labels = labels.to(device).transpose(2, 4).transpose(3, 4)
         optimizer.zero_grad()
