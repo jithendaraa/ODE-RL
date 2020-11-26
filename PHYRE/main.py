@@ -137,42 +137,48 @@ net.to(device)
 
 cur_epoch = 0
 
-# lossfunction = nn.MSELoss().cuda()
-# optimizer = optim.Adamax(net.parameters(), lr=LR)
-# pla_lr_scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.99, patience=4, verbose=True)
+lossfunction = nn.MSELoss().cuda()
+optimizer = optim.Adamax(net.parameters(), lr=LR)
+pla_lr_scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.99, patience=4, verbose=True)
 
-# # to track the training loss, validation loss, and their averages as the model trains
-# train_losses = []
-# valid_losses = []
-# avg_train_losses = []
-# avg_valid_losses = []
-# train_data_length = train_loader.__len__()
-# pred, inputs, labels = None, None, None
+# to track the training loss, validation loss, and their averages as the model trains
+train_losses = []
+valid_losses = []
+avg_train_losses = []
+avg_valid_losses = []
+train_data_length = train_loader.__len__()
+pred, inputs, labels = None, None, None
 
-# for epoch in range(cur_epoch, cur_epoch + EPOCHS):
-#     losses = []
-#     for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, train_loader, seq=3):
-#         # inputs and labels -> S, B, H, W, C to B, S, C, H, W
-#         if i >= 20: break
-#         inputs = inputs.to(device).transpose(2, 4).transpose(3, 4)
-#         labels = labels.to(device).transpose(2, 4).transpose(3, 4)
-#         optimizer.zero_grad()
-#         net.train()
-#         pred = net(inputs).transpose(0, 1)   # B, S, C, H, W
-#         predicted_image = pred.detach().cpu().transpose(2,3).transpose(3,4)[0,0]
-#         loss = lossfunction(pred, labels)
-#         loss_aver = loss.item() / BATCH_SIZE
-#         losses.append(loss.item())
-#         train_losses.append(loss_aver)
-#         loss.backward()
-#         torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
-#         optimizer.step()
-#     break
-#     print("Epoch", epoch, "/", EPOCHS)
-#     if epoch % 3 == 0:
-#         plt.imshow(predicted_image)
-#         plt.show()
-#         plt.imshow(predicted_image/255.)
-#         plt.show()
+for epoch in range(cur_epoch, cur_epoch + EPOCHS):
+    losses = []
+    for (inputs, i, labels) in get_batch(train_data_length, BATCH_SIZE, train_loader, seq=3):
+        # inputs and labels -> S, B, H, W, C to B, S, C, H, W
+        if i >= 20: break
+        inputs = inputs.to(device).transpose(2, 4).transpose(3, 4)
+        labels = labels.to(device).transpose(2, 4).transpose(3, 4)
+        optimizer.zero_grad()
+        net.train()
+        pred = net(inputs).transpose(0, 1)   # B, S, C, H, W
+        predicted_image = pred.detach().cpu().transpose(2,3).transpose(3,4)[0].numpy()
+        loss = lossfunction(pred, labels)
+        loss_aver = loss.item() / BATCH_SIZE
+        losses.append(loss.item())
+        train_losses.append(loss_aver)
+        loss.backward()
+        torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
+        optimizer.step()
+    print("Epoch", epoch, "/", EPOCHS)
+    
+    if epoch % 5 == 0:
 
+        for frame_num in range(predicted_image.shape[0]):
+            predicted_frame_num = frame_num + 1 + INPUT_FRAMES
+            predicted_image_int = predicted_image[frame_num].astype(np.uint8)
+            predicted_image_raw = predicted_image[frame_num]
+            predicted_image_raw = np.clip(predicted_image_raw, 0, 1)
+            ground_truth = labels.cpu().transpose(2,3).transpose(3,4)[0, frame_num].numpy()
+            filename = 'epoch_' + str(epoch) + '_frame_' + str(predicted_frame_num) + '.jpg'
 
+            matplotlib.image.imsave('predicted_image_int/'+filename, predicted_image_int)
+            matplotlib.image.imsave('predicted_image/'+filename, predicted_image_raw)
+            matplotlib.image.imsave('ground_truth/'+filename, ground_truth)

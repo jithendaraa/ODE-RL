@@ -13,7 +13,6 @@ fold_id = 0
 rollouts = np.array([])
 rollout_results = []
 rollout_num = 1
-
 total_frames = 17
 height = 256
 width = 256
