@@ -7,7 +7,11 @@ import math
 import random
 import argparse
 
-get_n_rollouts = 50
+parser = argparse.ArgumentParser()
+parser.add_argument("-r", "--rollouts", help="get n rollouts of PHYRE plays", default=10)
+args = parser.parse_args()
+
+get_n_rollouts = args.rollouts
 eval_setup = 'ball_cross_template'
 fold_id = 0
 rollouts = np.array([])

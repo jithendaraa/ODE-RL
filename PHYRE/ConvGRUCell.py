@@ -9,7 +9,7 @@ class ConvGRU(nn.Module):
     """
     ConvGRU Cell
     """
-    def __init__(self, shape, input_channels, filter_size, num_features, ode_specs, feed='enconder' ,print_details=False, lr=1e-3):
+    def __init__(self, shape, input_channels, filter_size, num_features, ode_specs, feed='encoder' ,print_details=False, lr=1e-3, device=None):
         super(ConvGRU, self).__init__()
         
         self.shape = shape
@@ -18,7 +18,7 @@ class ConvGRU(nn.Module):
         self.filter_size = filter_size
         self.num_features = num_features
         self.padding = (filter_size - 1) // 2
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.feed = feed
         
         if feed == 'encoder':

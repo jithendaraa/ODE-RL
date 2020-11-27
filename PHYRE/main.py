@@ -13,32 +13,41 @@ import matplotlib
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 from tqdm import tqdm 
+import argparse
 
 from earlystopping import EarlyStopping
 from encoder import Encoder
 from decoder import Decoder
 from encoder_decoder import ED
 from ConvGRUCell import ConvGRU
-from helper import get_batch
+from helper import *
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-e", "--epochs", default=100, type=int)
+parser.add_argument("-lr", "--learning_rate", default=1e-3, type=float)
+parser.add_argument("-bs", "--batch_size", default=4, type=int)
+parser.add_argument("-tts", "--train_test_split", default=0.1, type=float)
+parser.add_argument("-gpu", "--gpu_num", default=0, type=int)
+args = parser.parse_args()
 
 TOTAL_FRAMES = 17
+INPUT_FRAMES    = 3
+OUTPUT_FRAMES   = TOTAL_FRAMES - INPUT_FRAMES
 height = 256
 width = 256
 channels = 3
-train_test_split = 0.1
 
-EPOCHS          = 1000
-INPUT_FRAMES    = 3
-OUTPUT_FRAMES   = TOTAL_FRAMES - INPUT_FRAMES
-LR              = 1e-3
-BATCH_SIZE      = 2
+train_test_split = args.train_test_split
+EPOCHS          = args.epochs
+LR              = args.learning_rate
+BATCH_SIZE      = args.batch_size
 LAMBDA_DIFF     = 1.0
 LAMBDA_IMG      = 0.003
 LAMBDA_SEQ      = 0.003
 
-gpu_num = "0"
+gpu_num = str(args.gpu_num)
 device = torch.device("cuda:"+gpu_num if torch.cuda.is_available() else "cpu")
-print("Device", device)
+print("Device:", device)
 class PhyreRolloutDataset(torch.utils.data.Dataset):
     def __init__(self, rollout_data, rollout_results):
         self.rollout_data = rollout_data
@@ -109,7 +118,7 @@ encoder_params = [
     ],
     # ConvGRU cells
     [
-        ConvGRU(shape=(int(height/4), int(width/4)), input_channels=128, filter_size=3, num_features=128, ode_specs=encoder_ode_specs, feed='encoder')
+        ConvGRU(shape=(int(height/4), int(width/4)), input_channels=128, filter_size=3, num_features=128, ode_specs=encoder_ode_specs, feed='encoder', device=device)
     ]
 ]
 
