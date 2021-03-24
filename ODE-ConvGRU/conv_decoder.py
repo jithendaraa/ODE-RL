@@ -51,7 +51,6 @@ class Decoder(nn.Module):
     def forward(self, h_s0):
         # h_s1, h_s2, ..... h_sK = ODESolve(fϕ, h_s0, [s1, s2, .... sK])
         outputs = odeint(self.ode_model, h_s0, torch.tensor(self.predict_timesteps))
-        
         for i in list(range(1, self.subnet_blocks+1)):
             outputs = self.forward_by_stage(outputs, getattr(self, 'stage' + str(i)))
 
