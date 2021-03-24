@@ -1,0 +1,6 @@
+__pycache__
+phyre_results/
+results/
+runs/
+save_model/
+*.pickle
