@@ -1,0 +1,12 @@
+__pycache__
+data/
+*.gz
+save_model
+*.pth
+*.pth.tar
+# .ipynb_checkpoints
+# assets
+# runs
+# planet/rollout_data
+# phyre_results
+# results
