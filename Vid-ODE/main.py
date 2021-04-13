@@ -1,218 +1,252 @@
-import sys
-import os
-sys.path.append('../')
-
-import numpy as np
-from collections import OrderedDict
-from tensorboardX import SummaryWriter
-from tqdm import tqdm
-import logging
-import matplotlib.pyplot as plt
-import pickle
-import argparse
-
 import torch
 import torch.optim as optim
-import torch.nn as nn
-from torch.optim import lr_scheduler
-from torchvision.utils import make_grid, save_image
-from conv_encoder import Encoder
-from conv_decoder import Decoder
-from encoder_decoder import ED
 
-from generate_moving_mnist import MovingMNIST
-from earlystopping import EarlyStopping
-from ConvGRUCell import ConvGRU
-from helper import get_batch, plot_images
-from utils import write_video
+import argparse
+import os
+import time
+import datetime
+import json
+from pathlib import Path
+import numpy as np
 
-os.system('./launch.sh')
+from dataloader import parse_datasets
+from models.conv_odegru import *
+from models.gan import *
+from tester import Tester
+import utils
+import visualize
+import warnings
+warnings.filterwarnings("ignore") 
 
-def arg_parser():
-    # Hyperparameters
+
+def get_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--algo', type=str, default='ode_convgru', help='ode_convgru')
-    parser.add_argument('--id', type=str, default='default', help='Experiment ID')
-    parser.add_argument('--seed', type=int, default=1, metavar='S', help='Random seed')
-    parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
-    parser.add_argument('--epochs', default=2000, type=int)
-    parser.add_argument('--input-frames', default=10, type=int)
-    parser.add_argument('--output-frames', default=10, type=int)  
-    parser.add_argument('--learning-rate', default=3e-4, type=float)  
-    parser.add_argument('--batch-size', default=10, type=int) 
-    parser.add_argument('--timestamp', default="2020-03-09T00-00-00")
-    parser.add_argument('-d', '--dataset', default="MNIST")  
-
-    parser.add_argument('--lambda-diff', default=1.0, type=float)
-    parser.add_argument('--lambda-img', default=3e-3, type=float)
-    parser.add_argument('--lambda-seq', default=3e-3, type=float)
     
-    args = parser.parse_args()
-    return args
+    parser.add_argument("--name", default="vid_ode", help='Specify experiment')
+    parser.add_argument('-j', '--workers', type=int, default=4)
+    parser.add_argument('-b', '--batch_size', type=int, default=8)
+    parser.add_argument('--epoch', type=int, default=2000, help='epoch')
+    parser.add_argument('--phase', default="train", choices=["train", "test_met"])
+    
+    # Hyper-parameters
+    parser.add_argument('--lr', type=float, default=1e-3, help="Starting learning rate.")
+    parser.add_argument('--window_size', type=int, default=10, help="Window size to sample")
+    parser.add_argument('--sample_size', type=int, default=10, help="Number of time points to sub-sample")
+    
+    # Hyper-parameters
+    parser.add_argument('--lamb_adv', type=float, default=0.003, help="Adversarial Loss lambda")
+    
+    # Network variants for experiment..
+    parser.add_argument('--input_size', type=int, default=128)
+    parser.add_argument('--dec_diff', type=str, default='dopri5', choices=['dopri5', 'euler', 'adams', 'rk4'])
+    parser.add_argument('--n_layers', type=int, default=2, help='A number of layer of ODE func')
+    parser.add_argument('--n_downs', type=int, default=2)
+    parser.add_argument('--init_dim', type=int, default=32)
+    parser.add_argument('--input_norm', action='store_true', default=False)
+    
+    parser.add_argument('--run_backwards', action='store_true', default=True)
+    parser.add_argument('--irregular', action='store_true', default=False, help="Train with irregular time-steps")
+    
+    # Need to be tested...
+    parser.add_argument('--extrap', action='store_true', default=False, help="Set extrapolation mode. If this flag is not set, run interpolation mode.")
+    parser.add_argument("--sample_from_beg", type=bool, default=False)
+
+    # Test argument:
+    parser.add_argument('--split_time', default=10, type=int, help='Split time for extrapolation or interpolation ')
+    
+    # Log
+    parser.add_argument("--ckpt_save_freq", type=int, default=5000)
+    parser.add_argument("--log_print_freq", type=int, default=10)
+    parser.add_argument("--image_print_freq", type=int, default=50)
+    
+    # Path (Data & Checkpoint & Tensorboard)
+    parser.add_argument('--dataset', type=str, default='kth', choices=["phyre", "mgif", "hurricane", "kth", "penn"])
+    parser.add_argument('--log_dir', type=str, default='./logs', help='save tensorboard infos')
+    parser.add_argument('--checkpoint_dir', type=str, default='./checkpoints', help='save checkpoint infos')
+    parser.add_argument('--test_dir', type=str, help='load saved model')
+    
+    opt = parser.parse_args()
+    if opt.dataset == 'phyre':
+        opt.input_size = 64
+        opt.extrap = True
+        opt.sample_from_beg = True
 
 
-# Setup
-args = arg_parser()
+    opt.input_dim = 3
+    
+    if opt.phase == 'train':
+        # Make Directory
+        STORAGE_PATH = utils.create_folder_ifnotexist("./storage")
+        STORAGE_PATH = STORAGE_PATH.resolve()
+        LOG_PATH = utils.create_folder_ifnotexist(STORAGE_PATH / "logs")
+        CKPT_PATH = utils.create_folder_ifnotexist(STORAGE_PATH / "checkpoints")
 
-if args.dataset == 'MNIST':
-    h, w, c = 64, 64, 1
-    predict_timesteps = [11., 12., 13., 14., 15., 16., 17., 18., 19., 20.]
-elif args.dataset == 'phyre':
-    orig_h, orig_w, c = 256, 256, 3
-    h, w = 64, 64
-    predict_timesteps = np.arange(2.0, 18.0)
+        # Modify Desc
+        now = datetime.datetime.now()
+        month_day = f"{now.month:02d}{now.day:02d}"
+        opt.name = f"dataset{opt.dataset}_extrap{opt.extrap}_irregular{opt.irregular}_runBack{opt.run_backwards}_{opt.name}"
+        opt.log_dir = utils.create_folder_ifnotexist(LOG_PATH / month_day / opt.name)
+        opt.checkpoint_dir = utils.create_folder_ifnotexist(CKPT_PATH / month_day / opt.name)
 
-save_dir = './save_model/' + args.timestamp
-run_dir = './runs/' + args.timestamp
-if not os.path.isdir(run_dir):
-    os.makedirs(run_dir)
+        # Write opt information
+        with open(str(opt.log_dir / 'options.json'), 'w') as fp:
+            opt.log_dir = str(opt.log_dir)
+            opt.checkpoint_dir = str(opt.checkpoint_dir)
+            json.dump(opt.__dict__, fp=fp)
+            print("option.json dumped!")
+            opt.log_dir = Path(opt.log_dir)
+            opt.checkpoint_dir = Path(opt.checkpoint_dir)
+        
+        opt.train_image_path = utils.create_folder_ifnotexist(opt.log_dir / "train_images")
+        opt.test_image_path = utils.create_folder_ifnotexist(opt.log_dir / "test_images")
+    else:
+        print("[Info] In test phase, skip dumping options.json..!")
+    
+    return opt
 
-tb = SummaryWriter(run_dir)
-early_stopping = EarlyStopping(patience=20, verbose=True)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
 
-trainFolder = MovingMNIST(is_train=True, root='../data/', n_frames_input=args.input_frames, n_frames_output=args.output_frames, num_objects=[3])
-validFolder = MovingMNIST(is_train=False, root='../data/', n_frames_input=args.input_frames, n_frames_output=args.output_frames, num_objects=[3])
+def main():
+    # Option
+    opt = get_opt()
+    
+    if opt.phase != 'train':
+        tester = Tester()
+        opt = tester._load_json(opt)
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"device:{device}")
+    
+    # Dataloader
+    loader_objs = parse_datasets(opt, device)
+    
+    # Model
+    model = VidODE(opt, device)
+    
+    # Set tester
+    if opt.phase != 'train':
+        tester._load_model(opt, model)
+        tester._set_properties(opt, model, loader_objs, device)
+    
+    # # Phase
+    if opt.phase == 'train':
+        train(opt, model, loader_objs, device)
+    if opt.phase == 'test_met':
+        tester.infer_and_metrics()
 
-train_data_length = trainFolder.__len__()
-valid_data_length = validFolder.__len__()
-print("Train data length: ", train_data_length)
-print("Valid data length: ", valid_data_length)
 
-trainLoader = torch.utils.data.DataLoader(trainFolder, batch_size=args.batch_size, shuffle=False)
-validLoader = torch.utils.data.DataLoader(validFolder, batch_size=args.batch_size, shuffle=False)
+def train(opt, netG, loader_objs, device):
+    # Optimizer
+    optimizer_netG = optim.Adamax(netG.parameters(), lr=opt.lr)
+    
+    # Discriminator
+    netD_img, netD_seq, optimizer_netD = create_netD(opt, device)
+    
+    train_dataloader = loader_objs['train_dataloader']
+    test_dataloader = loader_objs['test_dataloader']
+    n_train_batches = loader_objs['n_train_batches']
+    n_test_batches = loader_objs['n_test_batches']
+    total_step = 0
+    start_time = time.time()
 
-encoder_ode_specs = [
-    torch.nn.Conv2d(64, 64, 3, 1, 1),
-    torch.nn.Conv2d(64, 64, 3, 1, 1),
-    torch.nn.Conv2d(64, 64, 3, 1, 1),
-    torch.nn.Conv2d(64, 64, 3, 1, 1)
-]
+    for epoch in range(opt.epoch):
+        utils.update_learning_rate(optimizer_netG, decay_rate=0.99, lowest=opt.lr / 10)
+        utils.update_learning_rate(optimizer_netD, decay_rate=0.99, lowest=opt.lr / 10)
+        
+        for it in range(n_train_batches):
+            data_dict = utils.get_data_dict(train_dataloader)
+            batch_dict = utils.get_next_batch(data_dict, opt=opt)
 
-encoder_params = [
-    # Conv Encoder E
-    [
-        OrderedDict({'conv1_downsample?64,64|_batchnorm(32)_relu_1': [c, 32, 3, 1, 1]}),
-        OrderedDict({'conv2_batchnorm(64)_relu_1': [32, 64, 3, 1, 1]}),
-        OrderedDict({'conv3_batchnorm(128)_relu_1': [64, 128, 4, 2, 1]}),
-    ],
-    # ConvGRU cells
-    [
-        ConvGRU(shape=(int(h/4), int(w/4)), input_channels=128, filter_size=3, num_features=64, ode_specs=encoder_ode_specs, feed='encoder')
-    ]
-]
+            res = netG.compute_all_losses(batch_dict)
+            loss_netG = res["loss"]
+            
+            # Compute Adversarial Loss
+            real = batch_dict["data_to_predict"]
+            fake = res["pred_y"]
+            input_real = batch_dict["observed_data"]
 
-decoder_ode_specs = [
-    torch.nn.Conv2d(64, 64, 3, 1, 1),
-    torch.nn.Conv2d(64, 64, 3, 1, 1),
-    torch.nn.Conv2d(64, 64, 3, 1, 1),
-    torch.nn.Conv2d(64, 64, 3, 1, 1)
-]
+            # Filter out mask
+            if opt.irregular:
+                b, _, c, h, w = real.size()
+                observed_mask = batch_dict["observed_mask"]
+                mask_predicted_data = batch_dict["mask_predicted_data"]
 
-decoder_params = [
-    # Conv Decoder G: CNN's
-    [
-        OrderedDict({'deconv1_upsample?16,16|batchnorm(128)_relu_1': [64, 128, 3, 1, 1]}),
-        OrderedDict({'deconv2_upsample?16,16|batchnorm(64)_relu_1': [128, 64, 3, 1, 1]}),
-        OrderedDict({'deconv3_relu_1': [64, c, 3, 1, 1]}),
-    ],
-    # ConvGRU cells
-    []
-]
+                selected_timesteps = int(observed_mask[0].sum())
+                input_real = input_real[observed_mask.squeeze(-1).byte(), ...].view(b, selected_timesteps, c, h, w)
+                real = real[mask_predicted_data.squeeze(-1).byte(), ...].view(b, selected_timesteps, c, h, w)
 
-encoder = Encoder(encoder_params[0], encoder_params[1]).cuda()
-decoder = Decoder(decoder_params[0], decoder_params[1], decoder_ode_specs, predict_timesteps)
-net = ED(encoder, decoder)
+            loss_netD = opt.lamb_adv * netD_seq.netD_adv_loss(real, fake, input_real)
+            loss_netD += opt.lamb_adv * netD_img.netD_adv_loss(real, fake, None)
 
-# If we have multiple GPUs
-# if torch.cuda.device_count() > 1:   
-#     print("HMM")
-#     net = nn.DataParallel(net)
-net.to(device)
+            loss_adv_netG = opt.lamb_adv * netD_seq.netG_adv_loss(fake, input_real)
+            loss_adv_netG += opt.lamb_adv * netD_img.netG_adv_loss(fake, None)
+            loss_netG += loss_adv_netG
 
-cur_epoch = 0
-if os.path.exists(os.path.join(save_dir, 'checkpoint.pth.tar')):
-    # load existing model
-    print('==> loading existing model')
-    model_info = torch.load(os.path.join(save_dir, 'checkpoin.pth.tar'))
-    net.load_state_dict(model_info['state_dict'])
-    optimizer = torch.optim.Adam(net.parameters())
-    optimizer.load_state_dict(model_info['optimizer'])
-    cur_epoch = model_info['epoch'] + 1
-else:
-    if not os.path.isdir(save_dir):
-        os.makedirs(save_dir)
+            # Train D
+            optimizer_netD.zero_grad()
+            loss_netD.backward()
+            optimizer_netD.step()
+            
+            # Train G
+            optimizer_netG.zero_grad()
+            loss_netG.backward()
+            optimizer_netG.step()
+            
+            if (total_step + 1) % opt.log_print_freq == 0 or total_step == 0:
+                et = time.time() - start_time
+                et = str(datetime.timedelta(seconds=et))[:-7]
+                log = f"Elapsed [{et}] Epoch [{epoch:03d}/{opt.epoch:03d}]\t"\
+                        f"Iterations [{(total_step + 1):6d}] \t"\
+                        f"Mse [{res['loss'].item():.4f}]\t"\
+                        f"Adv_G [{loss_adv_netG.item():.4f}]\t"\
+                        f"Adv_D [{loss_netD.item():.4f}]"
+                
+                print(log)
 
-# FIXME Loss: As given in paper; Adamax optimizer; exponential LR deacy -> 0.99 per epoch
-lossfunction = nn.MSELoss().cuda()
-optimizer = optim.Adamax(net.parameters(), lr=args.learning_rate)
-pla_lr_scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.99, patience=4, verbose=True)
+            if (total_step + 1) % opt.ckpt_save_freq == 0 or (epoch + 1 == opt.epoch and it + 1 == n_train_batches) or total_step == 0:
+                utils.save_checkpoint(netG, os.path.join(opt.checkpoint_dir, f"ckpt_{(total_step + 1):08d}.pth"))
+            
+            if (total_step + 1) % opt.image_print_freq == 0 or total_step == 0:
+                
+                gt, pred, time_steps = visualize.make_save_sequence(opt, batch_dict, res)
+                
+                if opt.extrap:
+                    visualize.save_extrap_images(opt=opt, gt=gt, pred=pred, path=opt.train_image_path, total_step=total_step)
+                else:
+                    visualize.save_interp_images(opt=opt, gt=gt, pred=pred, path=opt.train_image_path, total_step=total_step)
+            
+            total_step += 1
+        
+        # Test
+        if (epoch + 1) % 100 == 0:
+            test(netG, epoch, test_dataloader, opt, n_test_batches)
 
-# to track the training loss, validation loss, and their averages as the model trains
-train_losses = []
-valid_losses = []
-avg_train_losses = []
-avg_valid_losses = []
-
-t = tqdm(trainLoader, leave=False, total=len(trainLoader))
-
-for epoch in range(cur_epoch, cur_epoch + args.epochs):
-    losses = []
-    train_losses = []
-
-    for (inputs, i, labels) in get_batch(train_data_length, args.batch_size, trainLoader, seq=10):
-        inputs = inputs.to(device)
-        labels = labels.to(device)
-        optimizer.zero_grad()
-        net.train()
-        pred = net(inputs).transpose(0, 1)   # Convert to S,B,C,H,W
-        loss = lossfunction(pred, labels)
-        loss_aver = loss.item() / args.batch_size
-        losses.append(loss.item())
-        train_losses.append(loss_aver)
-        loss.backward()
-        torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
-        optimizer.step()
-
-    video_frames = []
-    for frame_num in range(args.output_frames):
-        true_output_frame = labels.permute(1,0,2,3,4)[frame_num]
-        pred_output_frame = pred.permute(1,0,2,3,4)[frame_num]
-        video_frames.append(make_grid(torch.cat([true_output_frame.cpu(), pred_output_frame.cpu()], dim=3), nrow=5).detach().numpy())  # Decentre
-    write_video(video_frames, 'test_episode_' + str(epoch), 'results') 
-
+def test(netG, epoch, test_dataloader, opt, n_test_batches):
+    
+    # Select random index to save
+    random_saving_idx = np.random.randint(0, n_test_batches, size=1)
+    fix_saving_idx = 2
+    test_losses = 0.0
+    
     with torch.no_grad():
-        net.eval()
-        for (inputs_, i_, labels_) in get_batch(valid_data_length, args.batch_size, validLoader, seq=10):
-            inputs_ = inputs_.to(device)
-            labels_ = labels_.to(device)
-            pred_ = net(inputs_).transpose(0, 1)
-            loss = lossfunction(pred_, labels_)
-            loss_aver = loss.item() / args.batch_size
-            valid_losses.append(loss_aver)
-            torch.cuda.empty_cache()
-            train_loss = np.average(train_losses)
-            valid_loss = np.average(valid_losses)
-            avg_train_losses.append(train_loss)
-            avg_valid_losses.append(valid_loss)
-            epoch_len = len(str(args.epochs))
-            print_msg = (f'[{epoch:>{epoch_len}}/{args.epochs:>{epoch_len}}] ' +
-                             f'train_loss: {train_loss:.6f} ' +
-                             f'valid_loss: {valid_loss:.6f}')
-            print(print_msg)
-            valid_losses = []
-            pla_lr_scheduler.step(valid_loss)  # lr_scheduler
-            model_dict = {
-                'epoch': epoch,
-                'state_dict': net.state_dict(),
-                'optimizer': optimizer.state_dict()
-            }
-            with open('params.pickle', 'wb') as handle:
-                pickle.dump(model_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            early_stopping(valid_loss.item(), model_dict, epoch, save_dir)
-            if early_stopping.early_stop:
-                # print("Early stopping")
-                break
+        for i in range(n_test_batches):
+            data_dict = utils.get_data_dict(test_dataloader)
+            batch_dict = utils.get_next_batch(data_dict)
+
+            res = netG.compute_all_losses(batch_dict)
+            test_losses += res["loss"].detach()
+
+            if i == fix_saving_idx or i == random_saving_idx:
     
-    print("End of epoch", epoch)
+                gt, pred, time_steps = visualize.make_save_sequence(opt, batch_dict, res)
+
+                if opt.extrap:
+                    visualize.save_extrap_images(opt=opt, gt=gt, pred=pred, path=opt.test_image_path, total_step=100 * (epoch + 1) + i)
+                else:
+                    visualize.save_interp_images(opt=opt, gt=gt, pred=pred, path=opt.test_image_path, total_step=100 * (epoch + 1) + i)
+                    
+        test_losses /= n_test_batches
+
+    print(f"[Test] Epoch [{epoch:03d}/{opt.epoch:03d}]\t" f"Loss {test_losses:.4f}\t")
+
+if __name__ == '__main__':
+    main()
