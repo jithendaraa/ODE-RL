@@ -84,9 +84,6 @@ def get_next_batch(data_dict, test_interp=False, opt=None):
     batch_dict["data_to_predict"] = data_dict["data_to_predict"]
     batch_dict["tp_to_predict"] = data_dict["tp_to_predict"]
     
-    if opt is not None and opt.dataset == 'phyre': 
-        batch_dict['data_to_predict'] = ((batch_dict['data_to_predict'] * 255.0) * 2.0) - 1.0
-
     # Input: Mask out skipped data
     if ("observed_mask" in data_dict) and (data_dict["observed_mask"] is not None):
         batch_dict["observed_mask"] = data_dict["observed_mask"]
@@ -144,7 +141,10 @@ def get_dict_template():
 
 def split_data_extrap(data_dict, opt):
     
-    n_observed_tp = data_dict["data"].size(1) // 2
+    if opt.dataset in ['phyre', 'kth'] and opt.unequal is True:
+        n_observed_tp = opt.input_sequence
+    else:
+        n_observed_tp = data_dict["data"].size(1) // 2
     
     split_dict = {"observed_data": data_dict["data"][:, :n_observed_tp, :].clone(),
                   "observed_tp": data_dict["time_steps"][:n_observed_tp].clone(),

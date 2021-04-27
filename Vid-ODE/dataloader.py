@@ -284,7 +284,7 @@ def parse_datasets(opt, device):
         mask = torch.stack([b[1] for b in batch])
         
         data_dict = {"data": images, "time_steps": time_steps, "mask": mask}
-        
+
         data_dict = utils.split_and_subsample_batch(data_dict, opt, data_type=data_type)
         data_dict['mode'] = data_type
         return data_dict
@@ -309,6 +309,7 @@ def parse_datasets(opt, device):
                                      batch_size=opt.batch_size,
                                      shuffle=False,
                                      collate_fn=lambda batch: video_collate_fn(batch, time_steps, data_type="test"))
+    
     elif opt.dataset in ['mgif', 'kth', 'penn', 'phyre']:
         train_dataloader = DataLoader(VideoDataset(opt, train=True),
                                       batch_size=opt.batch_size,

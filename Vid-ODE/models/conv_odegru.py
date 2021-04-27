@@ -54,7 +54,8 @@ class VidODE(nn.Module):
                                         latents=base_dim,
                                         odeint_rtol=1e-3,
                                         odeint_atol=1e-4,
-                                        device=self.device)
+                                        device=self.device,
+                                        nru=self.opt.nru)
         
         self.encoder_z0 = Encoder_z0_ODE_ConvGRU(input_size=input_size,
                                                  input_dim=base_dim,
@@ -85,7 +86,8 @@ class VidODE(nn.Module):
                                           self.opt.dec_diff, base_dim,
                                           odeint_rtol=1e-3,
                                           odeint_atol=1e-4,
-                                          device=self.device)
+                                          device=self.device,
+                                          nru=self.opt.nru)
         
         ##### Conv Decoder
         self.decoder = Decoder(input_dim=base_dim * 2, output_dim=self.opt.input_dim + 3, n_ups=self.opt.n_downs).to(self.device)
@@ -101,25 +103,32 @@ class VidODE(nn.Module):
         resize = 2 ** self.opt.n_downs
         b, t, c, h, w = truth.shape
         pred_t_len = len(time_steps_to_predict)
+        # print("Inside Get reconstruction", pred_t_len)
         
         ##### Skip connection forwarding
         skip_image = truth[:, -1, ...] if self.opt.extrap else truth[:, 0, ...]
+        # print("skip image:", skip_image.size())
         skip_conn_embed = self.encoder(skip_image).view(b, -1, h // resize, w // resize)
+        # print("skip_conn_embed (After encoder): ", skip_conn_embed.size())
         
         ##### Conv encoding
         e_truth = self.encoder(truth.view(b * t, c, h, w)).view(b, t, -1, h // resize, w // resize)
+        
+        # print("truth", truth.size())
+        # print("e_truth (after encoding truth): ", e_truth.size())
         
         ##### ODE encoding
         first_point_mu, first_point_std = self.encoder_z0(input_tensor=e_truth, time_steps=truth_time_steps, mask=mask, tracker=self.tracker)
         
         # Sampling latent features
         first_point_enc = first_point_mu.unsqueeze(0).repeat(1, 1, 1, 1, 1)
-        
+        # print("first_point_enc", first_point_enc.size(), first_point_enc.squeeze(0).size())
         # ==================================================================================== #
         
         ##### ODE decoding
         first_point_enc = first_point_enc.squeeze(0)
         sol_y = self.diffeq_solver(first_point_enc, time_steps_to_predict)
+        # print("Sol_y: ", type(sol_y), sol_y.size())
         self.tracker.write_info(key="sol_y", value=sol_y.clone().cpu())
         
         ##### Conv decoding
@@ -168,7 +177,6 @@ class VidODE(nn.Module):
         loss = torch.sum(torch.abs(pred_x - selected_truth)) / (b * selected_time_len * c * h * w)
         return loss
     
-    
     def get_diff(self, data, mask=None):
         
         data_diff = data[:, 1:, ...] - data[:, :-1, ...]
@@ -178,7 +186,6 @@ class VidODE(nn.Module):
         
         return masked_data_diff
 
-    
     def export_infos(self):
         infos = self.tracker.export_info()
         self.tracker.clean_info()

@@ -1,6 +1,6 @@
 import torch
 import torch.optim as optim
-
+torch.autograd.set_detect_anomaly(True)
 import argparse
 import os
 import time
@@ -16,7 +16,7 @@ from tester import Tester
 import utils
 import visualize
 import warnings
-warnings.filterwarnings("ignore") 
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def get_opt():
@@ -25,13 +25,13 @@ def get_opt():
     parser.add_argument("--name", default="vid_ode", help='Specify experiment')
     parser.add_argument('-j', '--workers', type=int, default=4)
     parser.add_argument('-b', '--batch_size', type=int, default=8)
-    parser.add_argument('--epoch', type=int, default=2000, help='epoch')
+    parser.add_argument('--epoch', type=int, default=1000, help='epoch')
     parser.add_argument('--phase', default="train", choices=["train", "test_met"])
     
     # Hyper-parameters
     parser.add_argument('--lr', type=float, default=1e-3, help="Starting learning rate.")
-    parser.add_argument('--window_size', type=int, default=10, help="Window size to sample")
-    parser.add_argument('--sample_size', type=int, default=10, help="Number of time points to sub-sample")
+    parser.add_argument('--window_size', type=int, default=17, help="Window size to sample")
+    parser.add_argument('--sample_size', type=int, default=17, help="Number of time points to sub-sample")
     
     # Hyper-parameters
     parser.add_argument('--lamb_adv', type=float, default=0.003, help="Adversarial Loss lambda")
@@ -46,18 +46,24 @@ def get_opt():
     
     parser.add_argument('--run_backwards', action='store_true', default=True)
     parser.add_argument('--irregular', action='store_true', default=False, help="Train with irregular time-steps")
-    
+    parser.add_argument('--nru', action='store_true', default=False)
+    parser.add_argument("--sample_from_beg", type=bool, default=False)
+
     # Need to be tested...
     parser.add_argument('--extrap', action='store_true', default=False, help="Set extrapolation mode. If this flag is not set, run interpolation mode.")
-    parser.add_argument("--sample_from_beg", type=bool, default=False)
 
     # Test argument:
     parser.add_argument('--split_time', default=10, type=int, help='Split time for extrapolation or interpolation ')
     
+    # Sequence parameters
+    parser.add_argument('--input_sequence', default=3, type=int, help='Input frame sequence length')
+    parser.add_argument('--output_sequence', default=14, type=int, help='Ouput frame sequence length')
+    parser.add_argument('-u', '--unequal', action='store_true', default=False)
+
     # Log
     parser.add_argument("--ckpt_save_freq", type=int, default=5000)
-    parser.add_argument("--log_print_freq", type=int, default=10)
-    parser.add_argument("--image_print_freq", type=int, default=50)
+    parser.add_argument("--log_print_freq", type=int, default=1)
+    parser.add_argument("--image_print_freq", type=int, default=1)
     
     # Path (Data & Checkpoint & Tensorboard)
     parser.add_argument('--dataset', type=str, default='kth', choices=["phyre", "mgif", "hurricane", "kth", "penn"])
@@ -70,7 +76,9 @@ def get_opt():
         opt.input_size = 64
         opt.extrap = True
         opt.sample_from_beg = True
-
+    
+    elif opt.dataset == 'kth':
+        opt.extrap = True
 
     opt.input_dim = 3
     
@@ -122,12 +130,13 @@ def main():
     # Model
     model = VidODE(opt, device)
     
+    print("NRU:", opt.nru)
     # Set tester
     if opt.phase != 'train':
         tester._load_model(opt, model)
         tester._set_properties(opt, model, loader_objs, device)
     
-    # # Phase
+    # Phase
     if opt.phase == 'train':
         train(opt, model, loader_objs, device)
     if opt.phase == 'test_met':
@@ -138,15 +147,18 @@ def train(opt, netG, loader_objs, device):
     # Optimizer
     optimizer_netG = optim.Adamax(netG.parameters(), lr=opt.lr)
     
-    # Discriminator
-    netD_img, netD_seq, optimizer_netD = create_netD(opt, device)
-    
     train_dataloader = loader_objs['train_dataloader']
     test_dataloader = loader_objs['test_dataloader']
     n_train_batches = loader_objs['n_train_batches']
     n_test_batches = loader_objs['n_test_batches']
     total_step = 0
     start_time = time.time()
+
+    # Discriminator
+    _, opt.output_sequence, _, _, _ = utils.get_next_batch(utils.get_data_dict(train_dataloader), opt=opt)['data_to_predict'].size()
+    if opt.extrap: 
+        opt.output_sequence -= 1
+    netD_img, netD_seq, optimizer_netD = create_netD(opt, device)
 
     for epoch in range(opt.epoch):
         utils.update_learning_rate(optimizer_netG, decay_rate=0.99, lowest=opt.lr / 10)
@@ -157,12 +169,16 @@ def train(opt, netG, loader_objs, device):
             batch_dict = utils.get_next_batch(data_dict, opt=opt)
 
             res = netG.compute_all_losses(batch_dict)
-            loss_netG = res["loss"]
+            loss_netG = res['loss']
             
             # Compute Adversarial Loss
             real = batch_dict["data_to_predict"]
             fake = res["pred_y"]
             input_real = batch_dict["observed_data"]
+
+            print("real: ", real.size())
+            print("fake: ", fake.size())
+            print("input_real: ", input_real.size())
 
             # Filter out mask
             if opt.irregular:
@@ -174,17 +190,17 @@ def train(opt, netG, loader_objs, device):
                 input_real = input_real[observed_mask.squeeze(-1).byte(), ...].view(b, selected_timesteps, c, h, w)
                 real = real[mask_predicted_data.squeeze(-1).byte(), ...].view(b, selected_timesteps, c, h, w)
 
-            loss_netD = opt.lamb_adv * netD_seq.netD_adv_loss(real, fake, input_real)
+            loss_netD = opt.lamb_adv * netD_seq.netD_adv_loss(real, fake, input_real, opt.unequal)  
             loss_netD += opt.lamb_adv * netD_img.netD_adv_loss(real, fake, None)
-
-            loss_adv_netG = opt.lamb_adv * netD_seq.netG_adv_loss(fake, input_real)
-            loss_adv_netG += opt.lamb_adv * netD_img.netG_adv_loss(fake, None)
-            loss_netG += loss_adv_netG
 
             # Train D
             optimizer_netD.zero_grad()
             loss_netD.backward()
             optimizer_netD.step()
+            
+            loss_adv_netG = opt.lamb_adv * netD_seq.netG_adv_loss(real, fake, input_real, opt.unequal)
+            loss_adv_netG += opt.lamb_adv * netD_img.netG_adv_loss(None, fake, None)
+            loss_netG += loss_adv_netG
             
             # Train G
             optimizer_netG.zero_grad()

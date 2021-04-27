@@ -49,11 +49,11 @@ class Discriminator(nn.Module):
         h = self.layer_4(h)
         return self.last_conv(h)
     
-    def netD_adv_loss(self, real, fake, input_real):
+    def netD_adv_loss(self, real, fake, input_real, unequal=False):
         
         if self.seq:
             if self.is_extrap:
-                real, fake = self.rearrange_seq(real, fake, input_real, only_fake=False)
+                real, fake = self.rearrange_seq(real, fake, input_real, only_fake=False, unequal=unequal)
             else:
                 real, fake = self.rearrange_seq_interp(real, fake, input_real, only_fake=False)
         elif not self.seq:
@@ -72,16 +72,16 @@ class Discriminator(nn.Module):
 
         return loss_D
     
-    def netG_adv_loss(self, fake, input_real):
+    def netG_adv_loss(self, real, fake, input_real, unequal=False):
         b, t, c, h, w = fake.size()
         if self.seq:
             if self.is_extrap:
-                fake = self.rearrange_seq(None, fake, input_real, only_fake=True)
+                fake = self.rearrange_seq(real, fake, input_real, only_fake=True, unequal=unequal)
             else:
                 fake = self.rearrange_seq_interp(None, fake, input_real, only_fake=True)
         elif not self.seq:
             fake = fake.contiguous().view(-1, c, h, w)
-        
+
         pred_fake = self.forward(fake)
 
         # GAN loss type
@@ -90,23 +90,46 @@ class Discriminator(nn.Module):
         
         return loss_real
      
-    def rearrange_seq(self, real, fake, input_real, only_fake=True):
-        
+    def get_real_fake_seqs(self, real, fake, input_real, only_fake):
         b, t, c, h, w = fake.size()
         fake_seqs = []
+        device = input_real.get_device()
+
         for i in range(t):
-            fake_seq = torch.cat([input_real[:, i:, ...], fake[:, :i+1, ...]], dim=1)
+            input_real_len = input_real[:, i:, ...].size()[1]
+            fake_len = fake[:, :i+1, ...].size()[1]
+            l = fake_len + input_real_len 
+            if l < t:
+                fake_seq = torch.cat([torch.zeros((b, t-l, c, h, w)).to(device), input_real[:, i:, ...], fake[:, :i+1, ...]], dim=1)
+            else:
+                fake_seq = torch.cat([input_real[:, i:, ...], fake[:, :i+1, ...]], dim=1)
+
             fake_seqs += [fake_seq]
+        
         fake_seqs = torch.cat(fake_seqs, dim=0).view(b * t, -1, h, w)
         
         if only_fake:
-            return fake_seqs
+            return None, fake_seqs
         
         real_seqs = []
         for i in range(t):
-            real_seq = torch.cat([input_real[:, i:, ...], real[:, :i+1, ...]], dim=1)
+            input_real_len = input_real[:, i:, ...].size()[1]
+            fake_len = fake[:, :i+1, ...].size()[1]
+            l = fake_len + input_real_len 
+            if l < t:
+                real_seq = torch.cat([torch.zeros((b, t-l, c, h, w)).to(device), input_real[:, i:, ...], real[:, :i+1, ...]], dim=1)
+            else:
+                real_seq = torch.cat([input_real[:, i:, ...], real[:, :i+1, ...]], dim=1)
             real_seqs += [real_seq]
         real_seqs = torch.cat(real_seqs, dim=0).view(b * t, -1, h, w)
+
+        return real_seqs, fake_seqs
+
+    def rearrange_seq(self, real, fake, input_real, only_fake=True, unequal=False):
+
+        real_seqs, fake_seqs = self.get_real_fake_seqs(real, fake, input_real, only_fake)
+        
+        if only_fake is True: return fake_seqs
         
         return real_seqs, fake_seqs
 
@@ -137,7 +160,11 @@ class Discriminator(nn.Module):
 def create_netD(opt, device):
     
     # Model
-    seq_len = opt.sample_size // 2
+    if opt.dataset in ['phyre', 'kth'] and opt.unequal is True:
+        seq_len = opt.output_sequence    
+    else:
+        seq_len = opt.sample_size // 2
+
     if opt.irregular and not opt.extrap:
         seq_len = opt.sample_size
     
