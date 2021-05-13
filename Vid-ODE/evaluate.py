@@ -29,9 +29,9 @@ def Evaluation(opt, pred_list, gt_list):
                              Transforms.Normalize(mean=(0.5, 0.5, 0.5),
                                                  std=(0.5, 0.5, 0.5))])
 
-    model = models.PerceptualLoss(model='net-lin',net='alex',use_gpu=True)
-    model.eval()
-
+    # model = models.PerceptualLoss(model='net-lin',net='alex',use_gpu=True)
+    # model.eval()
+    print("Evaluating")
     avg_ssim, avg_mse, avg_distance = 0.0, 0.0, 0.0
 
     with torch.no_grad():
@@ -45,9 +45,9 @@ def Evaluation(opt, pred_list, gt_list):
             avg_ssim += ssim(gt_np, pred_np, data_range=255, gaussian_weights=True, use_sample_covariance=False)
 
             # Calculate LPIPS
-            gt_img_LPIPS = T2(gt_img).unsqueeze(0).cuda()
-            pred_img_LPIPS = T2(pred_img).unsqueeze(0).cuda()
-            avg_distance += model.forward(gt_img_LPIPS, pred_img_LPIPS)
+            # gt_img_LPIPS = T2(gt_img).unsqueeze(0).cuda()
+            # pred_img_LPIPS = T2(pred_img).unsqueeze(0).cuda()
+            # avg_distance += model.forward(gt_img_LPIPS, pred_img_LPIPS)
 
             # Calculate MSE
             gt_img_MSE = T1(gt_img).unsqueeze(0).cuda()
@@ -60,11 +60,12 @@ def Evaluation(opt, pred_list, gt_list):
         avg_ssim /= len(gt_list)
         avg_mse = avg_mse / len(gt_list)
         avg_psnr = 10 * log10(1 / avg_mse)
-        avg_distance = avg_distance / len(gt_list)
+        # avg_distance = avg_distance / len(gt_list)
 
-    print("SSIM : %f / MSE : %f / LPIPS : %f / PSNR : %f" % (avg_ssim, avg_mse, avg_distance, avg_psnr))
-
-    return avg_ssim, avg_mse, avg_distance
+    # print("SSIM : %f / MSE : %f / LPIPS : %f / PSNR : %f" % (avg_ssim, avg_mse, avg_distance, avg_psnr))
+    print("SSIM : %f / MSE : %f / PSNR : %f" % (avg_ssim, avg_mse, avg_psnr))
+    # return avg_ssim, avg_mse, avg_distance
+    return avg_ssim, avg_mse, avg_psnr
 
 
 def main():
@@ -74,8 +75,8 @@ def main():
     pred_list = os.listdir(os.path.join(opt.result_image_dir, 'pred'))
     gt_list = os.listdir(os.path.join(opt.result_image_dir, 'gt'))
 
-    avg_ssim, avg_mse, avg_distance = Evaluation(opt, pred_list, gt_list)
-
+    # avg_ssim, avg_mse, avg_distance = Evaluation(opt, pred_list, gt_list)
+    avg_ssim, avg_mse, avg_psnr = Evaluation(opt, pred_list, gt_list)
     print("Finish evaluate.py...")
 
 

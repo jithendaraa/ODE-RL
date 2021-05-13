@@ -233,7 +233,7 @@ class VideoDataset(Dataset_base):
             vtrans = [vtransforms.Scale(size=128)]
         elif opt.dataset == 'kth':
             data_root = './dataset/kth_action/'
-            vtrans = [vtransforms.CenterCrop(size=120), vtransforms.Scale(size=128)]
+            vtrans = [vtransforms.CenterCrop(size=120), vtransforms.Scale(size=opt.frame_dims)]
         elif opt.dataset == 'penn':
             data_root = './dataset/penn_action/'
             vtrans = [vtransforms.Scale(size=128)]
@@ -294,6 +294,7 @@ def parse_datasets(opt, device):
     else:
         if opt.extrap:
             time_steps = np.arange(0, opt.sample_size) / opt.sample_size
+            print(time_steps)
         else:
             time_steps = np.arange(0, opt.sample_size // 2) / (opt.sample_size // 2)
             # time_steps = np.arange(0, opt.sample_size) / opt.sample_size

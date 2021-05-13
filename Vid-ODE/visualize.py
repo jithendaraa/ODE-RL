@@ -74,7 +74,10 @@ def save_extrap_images(opt, gt, pred, path, total_step):
     b, t, c, h, w = gt.shape
     
     # Padding zeros
-    PAD = torch.zeros((b, t // 2, c, h, w))
+    if opt.unequal and opt.dataset in ['phyre', 'kth']:
+        PAD = torch.zeros((b, opt.input_sequence, c, h, w))
+    else:
+        PAD = torch.zeros((b, t // 2, c, h, w))
     pred = torch.cat([PAD, pred], dim=1)
     
     save_me = []

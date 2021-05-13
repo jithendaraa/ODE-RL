@@ -55,7 +55,8 @@ class VidODE(nn.Module):
                                         odeint_rtol=1e-3,
                                         odeint_atol=1e-4,
                                         device=self.device,
-                                        nru=self.opt.nru)
+                                        nru=self.opt.nru,
+                                        nru2=self.opt.nru2)
         
         self.encoder_z0 = Encoder_z0_ODE_ConvGRU(input_size=input_size,
                                                  input_dim=base_dim,
@@ -87,7 +88,8 @@ class VidODE(nn.Module):
                                           odeint_rtol=1e-3,
                                           odeint_atol=1e-4,
                                           device=self.device,
-                                          nru=self.opt.nru)
+                                          nru=self.opt.nru,
+                                          nru2=self.opt.nru2)
         
         ##### Conv Decoder
         self.decoder = Decoder(input_dim=base_dim * 2, output_dim=self.opt.input_dim + 3, n_ups=self.opt.n_downs).to(self.device)

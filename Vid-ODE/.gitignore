@@ -4,3 +4,6 @@ storage/
 __pycache__/
 *.png
 *.npy
+*.pth
+*.gz
+*.out

@@ -49,6 +49,7 @@ class Tester:
     def infer_and_metrics(self):
         
         test_interp = True if not self.opt.extrap else False
+        print("Test batches:", self.n_test_batches)
         
         for it in range(self.n_test_batches):
             data_dict = utils.get_data_dict(self.test_dataloader)
@@ -71,5 +72,6 @@ class Tester:
         
         pred_list = os.listdir(os.path.join(self.opt.result_image_dir, 'pred'))
         gt_list = os.listdir(os.path.join(self.opt.result_image_dir, 'gt'))
+        print("DONE")
         
         evaluate.Evaluation(self.opt, pred_list, gt_list)

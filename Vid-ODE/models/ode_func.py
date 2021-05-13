@@ -7,7 +7,7 @@ from torchdiffeq import odeint as odeint
 
 class DiffeqSolver(nn.Module):
     def __init__(self, input_dim, ode_func, method, latents,
-                 odeint_rtol=1e-4, odeint_atol=1e-5, device=torch.device("cpu"), nru=False):
+                 odeint_rtol=1e-4, odeint_atol=1e-5, device=torch.device("cpu"), nru=False, nru2=False):
         super(DiffeqSolver, self).__init__()
         
         self.ode_method = method
@@ -15,6 +15,7 @@ class DiffeqSolver(nn.Module):
         self.device = device
         self.ode_func = ode_func
         self.nru = nru
+        self.nru2 = nru2
         
         self.odeint_rtol = odeint_rtol
         self.odeint_atol = odeint_atol
@@ -41,8 +42,32 @@ class DiffeqSolver(nn.Module):
 
             pred_y = torch.stack(hidden_states[-time_len:])
             pred_y = pred_y.permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]
+        
+        elif self.nru2 is True:
+            memory = []
+            hidden_states = [first_point]
+            time_len = len(time_steps_to_predict.cpu())
 
-        elif self.nru is False:
+            memory_pred = odeint(self.ode_func, first_point, time_steps_to_predict,
+                        rtol=self.odeint_rtol, atol=self.odeint_atol, method=self.ode_method)
+            
+            for m_t in memory_pred:
+                h_t = hidden_states[-1]
+                hidden_states.append(h_t + m_t)
+
+            for i in range(time_len):
+                time = time_steps_to_predict[i:i+1]
+                m_t = odeint(self.ode_func, hidden_states[-1], time,
+                        rtol=self.odeint_rtol, atol=self.odeint_atol, method=self.ode_method)
+
+                memory.append(m_t.squeeze(0))
+                h_t = hidden_states[-1] + memory[-1]
+                hidden_states.append(h_t)
+
+            pred_y = torch.stack(hidden_states[-time_len:])
+            pred_y = pred_y.permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]
+
+        else:
             pred_y = odeint(self.ode_func, first_point, time_steps_to_predict,
                         rtol=self.odeint_rtol, atol=self.odeint_atol, method=self.ode_method)
             pred_y = pred_y.permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]

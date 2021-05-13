@@ -60,7 +60,7 @@ class Discriminator(nn.Module):
             b, t, c, h, w = fake.size()
             real = real.contiguous().view(-1, c, h, w)
             fake = fake.contiguous().view(-1, c, h, w)
-        
+
         pred_fake = self.forward(fake.detach())
         pred_real = self.forward(real)
         
