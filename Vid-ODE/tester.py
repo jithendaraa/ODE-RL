@@ -31,6 +31,7 @@ class Tester:
     
     def _load_model(self, opt, model):
         checkpoints = os.listdir(opt.checkpoint_dir)
+        checkpoints.sort()
         print(f"Possible loading models:{checkpoints}")
         checkpoint_file = checkpoints[-1]
         print(f"Load checkpoint file... {os.path.join(opt.checkpoint_dir, checkpoint_file)}")

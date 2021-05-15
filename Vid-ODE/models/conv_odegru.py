@@ -62,7 +62,7 @@ class VidODE(nn.Module):
                                                  input_dim=base_dim,
                                                  hidden_dim=base_dim,
                                                  kernel_size=(3, 3),
-                                                 num_layers=1,
+                                                 num_layers=self.opt.n_layers,
                                                  dtype=torch.cuda.FloatTensor if self.device == 'cuda' else torch.FloatTensor,
                                                  batch_first=True,
                                                  bias=True,

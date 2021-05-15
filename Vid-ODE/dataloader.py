@@ -240,6 +240,9 @@ class VideoDataset(Dataset_base):
         elif opt.dataset == 'phyre':
             data_root = './dataset/phyre/'
             vtrans = [vtransforms.Scale(size=64)]
+        elif opt.dataset == 'minerl':
+            data_root = './dataset/minerl_navigate/'
+            vtrans = [vtransforms.Scale(size=64)]
         
         if self.train:
             vtrans += [vtransforms.RandomHorizontalFlip()]
@@ -255,7 +258,7 @@ class VideoDataset(Dataset_base):
             self.image_path = os.path.join(data_root, 'test')
         
         threshold = self.window_size if opt.irregular else self.sample_size
-        if opt.dataset in ['kth', 'sintel', 'ucf101', 'penn', 'phyre']:
+        if opt.dataset in ['kth', 'sintel', 'ucf101', 'penn', 'phyre', 'minerl']:
             self.image_list = os.listdir(self.image_path)
         elif opt.dataset in ['mgif', 'stickman']:
             self.image_list = remove_files_under_sample_size(image_path=self.image_path, threshold=threshold)
@@ -294,7 +297,7 @@ def parse_datasets(opt, device):
     else:
         if opt.extrap:
             time_steps = np.arange(0, opt.sample_size) / opt.sample_size
-            print(time_steps)
+            print("Timesteps: ", len(time_steps))
         else:
             time_steps = np.arange(0, opt.sample_size // 2) / (opt.sample_size // 2)
             # time_steps = np.arange(0, opt.sample_size) / opt.sample_size
@@ -311,7 +314,7 @@ def parse_datasets(opt, device):
                                      shuffle=False,
                                      collate_fn=lambda batch: video_collate_fn(batch, time_steps, data_type="test"))
     
-    elif opt.dataset in ['mgif', 'kth', 'penn', 'phyre']:
+    elif opt.dataset in ['mgif', 'kth', 'penn', 'phyre', 'minerl']:
         train_dataloader = DataLoader(VideoDataset(opt, train=True),
                                       batch_size=opt.batch_size,
                                       shuffle=True,

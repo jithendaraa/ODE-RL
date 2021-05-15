@@ -26,8 +26,8 @@ def get_opt():
     parser.add_argument("--jobid", default="sample", help='Specify experiment')
     parser.add_argument('-j', '--workers', type=int, default=4)
     parser.add_argument('-b', '--batch_size', type=int, default=6)
-    parser.add_argument('--epoch', type=int, default=500, help='epoch')
-    parser.add_argument('--phase', default="train", choices=["train", "test_met"])
+    parser.add_argument('-e', '--epoch', type=int, default=500, help='epoch')
+    parser.add_argument('-p', '--phase', default="train", choices=["train", "test_met"])
     
     # Hyper-parameters
     parser.add_argument('--lr', type=float, default=1e-3, help="Starting learning rate.")
@@ -38,18 +38,19 @@ def get_opt():
     parser.add_argument('--lamb_adv', type=float, default=0.003, help="Adversarial Loss lambda")
     
     # Network variants for experiment..
-    parser.add_argument('--frame_dims', type=int, default=64)
+    parser.add_argument('-fd', '--frame_dims', type=int, default=64)
     parser.add_argument('--input_size', type=int, default=128)
     parser.add_argument('--dec_diff', type=str, default='dopri5', choices=['dopri5', 'euler', 'adams', 'rk4'])
-    parser.add_argument('--n_layers', type=int, default=2, help='A number of layer of ODE func')
+    parser.add_argument('-nl', '--n_layers', type=int, default=2, help='A number of layer of ODE func')
+    parser.add_argument('-cc', '--convGRU_cells', type=int, default=1, help='A number of layer of ODE func')
     parser.add_argument('--n_downs', type=int, default=2)
     parser.add_argument('--init_dim', type=int, default=32)
     parser.add_argument('--input_norm', action='store_true', default=False)
     
     parser.add_argument('--run_backwards', action='store_true', default=True)
     parser.add_argument('--irregular', action='store_true', default=False, help="Train with irregular time-steps")
-    parser.add_argument('--nru', action='store_true', default=False) # alternatively predict m_t and h_t
-    parser.add_argument('--nru2', action='store_true', default=False) # predict all m_t at once, then use that to get h_t's
+    parser.add_argument('--nru', default=False) # alternatively predict m_t and h_t
+    parser.add_argument('--nru2', default=False) # predict all m_t at once, then use that to get h_t's
     parser.add_argument("--sample_from_beg", type=bool, default=False)
 
     # Need to be tested...
@@ -59,8 +60,8 @@ def get_opt():
     parser.add_argument('--split_time', default=10, type=int, help='Split time for extrapolation or interpolation ')
     
     # Sequence parameters
-    parser.add_argument('--input_sequence', default=3, type=int, help='Input frame sequence length')
-    parser.add_argument('--output_sequence', default=14, type=int, help='Ouput frame sequence length')
+    parser.add_argument('-is', '--input_sequence', default=3, type=int, help='Input frame sequence length')
+    parser.add_argument('-os', '--output_sequence', default=14, type=int, help='Ouput frame sequence length')
     parser.add_argument('-u', '--unequal', action='store_true', default=False)
 
     # Log
@@ -69,10 +70,10 @@ def get_opt():
     parser.add_argument("--image_print_freq", type=int, default=1)
     
     # Path (Data & Checkpoint & Tensorboard)
-    parser.add_argument('--dataset', type=str, default='kth', choices=["phyre", "mgif", "hurricane", "kth", "penn", "minerl"])
+    parser.add_argument('-d', '--dataset', type=str, default='kth', choices=["phyre", "mgif", "hurricane", "kth", "penn", "minerl"])
     parser.add_argument('--log_dir', type=str, default='./logs', help='save tensorboard infos')
     parser.add_argument('--checkpoint_dir', type=str, default='./checkpoints', help='save checkpoint infos')
-    parser.add_argument('--test_dir', type=str, help='load saved model')
+    parser.add_argument('-td', '--test_dir', type=str, help='load saved model')
     
     opt = parser.parse_args()
     if opt.dataset == 'phyre':
@@ -101,11 +102,13 @@ def get_opt():
         CKPT_PATH = utils.create_folder_ifnotexist(STORAGE_PATH / "checkpoints")
 
         # Modify Desc
-        now = datetime.datetime.now()
-        month_day = f"{now.month:02d}{now.day:02d}"
-        opt.name = f"dataset{opt.dataset}_extrap{opt.extrap}_irregular{opt.irregular}_runBack{opt.run_backwards}_{opt.name}_nru{opt.nru}_nru2{opt.nru2}_epoch{opt.epoch}_batch{opt.batch_size}_unequal{opt.unequal}_{opt.input_sequence}_{opt.output_sequence}_{opt.sample_size}"
-        opt.log_dir = utils.create_folder_ifnotexist(LOG_PATH / month_day / opt.name)
-        opt.checkpoint_dir = utils.create_folder_ifnotexist(CKPT_PATH / month_day / opt.name)
+        # now = datetime.datetime.now()
+        # month_day = f"{now.month:02d}{now.day:02d}"
+        opt.name = f"dataset{opt.dataset}_{opt.convGRU_cells}c_{opt.n_layers}l_extrap{opt.extrap}_f{opt.frame_dims}_nru{opt.nru}_nru2{opt.nru2}_e{opt.epoch}_b{opt.batch_size}_unequal{opt.unequal}_{opt.input_sequence}_{opt.output_sequence}_{opt.sample_size}"
+        # opt.log_dir = utils.create_folder_ifnotexist(LOG_PATH / month_day / opt.name)
+        # opt.checkpoint_dir = utils.create_folder_ifnotexist(CKPT_PATH / month_day / opt.name)
+        opt.log_dir = utils.create_folder_ifnotexist(LOG_PATH / opt.name)
+        opt.checkpoint_dir = utils.create_folder_ifnotexist(CKPT_PATH / opt.name)
 
         # Write opt information
         with open(str(opt.log_dir / 'options.json'), 'w') as fp:
@@ -123,7 +126,17 @@ def get_opt():
     
     return opt
 
-
+def set_seed(seed_value, use_cuda=True):
+    np.random.seed(seed_value) # cpu vars
+    torch.manual_seed(seed_value) # cpu  vars
+    random.seed(seed_value) # Python
+    os.environ['PYTHONHASHSEED'] = str(seed_value) # Python hash buildin
+    if use_cuda:
+        torch.cuda.manual_seed(seed_value)
+        torch.cuda.manual_seed_all(seed_value) # gpu vars
+        torch.backends.cudnn.deterministic = True  #needed
+        torch.backends.cudnn.benchmark = False
+        
 def main():
     # Option
     opt = get_opt()
