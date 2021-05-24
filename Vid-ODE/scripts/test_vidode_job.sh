@@ -6,15 +6,16 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-type=REQUEUE
 #SBATCH --mail-type=ALL
-#SBATCH --time=1:00:00
+#SBATCH --time=0:30:00
 #SBATCH --gres=gpu:v100:1
 #SBATCH --mem=32G
 
 start=`date +%s`
 test_dir=$1
+dataset=$2
 echo "Starting run at: `date`"
-echo "python main.py --test_dir ${test_dir} -d kth --extrap -p test_met"
-python main.py --test_dir $test_dir -d kth --extrap -p test_met
+echo "python main.py --test_dir ${test_dir} -d ${dataset} --extrap -p test_met"
+python main.py --test_dir $test_dir -d ${dataset} --extrap -p test_met
 echo "Ending run at: `date`"
 end=`date +%s`
 runtime=$((end-start))
