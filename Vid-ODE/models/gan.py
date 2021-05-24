@@ -160,7 +160,7 @@ class Discriminator(nn.Module):
 def create_netD(opt, device):
     
     # Model
-    if opt.dataset in ['phyre', 'kth'] and opt.unequal is True:
+    if opt.unequal is True:
         seq_len = opt.output_sequence    
     else:
         seq_len = opt.sample_size // 2

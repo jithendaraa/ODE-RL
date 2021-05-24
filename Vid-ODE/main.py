@@ -65,9 +65,9 @@ def get_opt():
     parser.add_argument('-u', '--unequal', action='store_true', default=False)
 
     # Log
-    parser.add_argument("--ckpt_save_freq", type=int, default=300)
-    parser.add_argument("--log_print_freq", type=int, default=1)
-    parser.add_argument("--image_print_freq", type=int, default=1)
+    parser.add_argument("--ckpt_save_freq", type=int, default=10000)
+    parser.add_argument("--log_print_freq", type=int, default=4000)
+    parser.add_argument("--image_print_freq", type=int, default=5000)
     
     # Path (Data & Checkpoint & Tensorboard)
     parser.add_argument('-d', '--dataset', type=str, default='kth', choices=["phyre", "mgif", "hurricane", "kth", "penn", "minerl"])
@@ -88,9 +88,9 @@ def get_opt():
             opt.window_size = opt.sample_size
 
     elif opt.dataset == 'minerl':
-        opt.frame_dims = 64
-        opt.sample_size = opt.input_sequence + opt.output_sequence
-        opt.window_size = opt.sample_size
+        if opt.unequal is True:
+            opt.sample_size = opt.input_sequence + opt.output_sequence
+            opt.window_size = opt.sample_size
 
     opt.input_dim = 3
     
@@ -155,6 +155,7 @@ def main():
     model = VidODE(opt, device)
     
     print("NRU:", opt.nru, opt.input_sequence, opt.output_sequence)
+    print("NRU2:", opt.nru2)
     print("Dataset:", opt.dataset)
     print("Batch size:", opt.batch_size)
     
@@ -183,6 +184,7 @@ def train(opt, netG, loader_objs, device):
 
     # Discriminator
     sample_data = utils.get_next_batch(utils.get_data_dict(train_dataloader), opt=opt)['data_to_predict']
+    print(sample_data.size())
     _, opt.output_sequence, _, _, _ = sample_data.size()
     
     if opt.extrap and opt.input_sequence != opt.output_sequence: 

@@ -141,7 +141,7 @@ def get_dict_template():
 
 def split_data_extrap(data_dict, opt):
     
-    if opt.dataset in ['phyre', 'kth'] and opt.unequal is True:
+    if opt.unequal is True:
         n_observed_tp = opt.input_sequence
     else:
         n_observed_tp = data_dict["data"].size(1) // 2
