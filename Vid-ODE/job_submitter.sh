@@ -41,7 +41,7 @@ do
 
     elif [ $epoch -le 1000 ]
     then
-        train_time="52:00:00"
+        train_time="45:00:00"
         test_time="1:00:00"
     fi
 

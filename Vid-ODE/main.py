@@ -36,6 +36,17 @@ def get_opt():
     
     # Hyper-parameters
     parser.add_argument('--lamb_adv', type=float, default=0.003, help="Adversarial Loss lambda")
+
+    # Model architectures
+    parser.add_argument('--nru', default=False) # alternatively predict m_t and h_t
+    parser.add_argument('--nru2', default=False) # predict all m_t at once, then use that to get h_t's
+    parser.add_argument('-sa', '--slot_attention', action='store_true', default=False) 
+    
+    # SLot attention network variants
+    parser.add_argument('--pos', type=int, default=2) # For slot attention: pos 1 -> slot attention after Encoder before ConvGRU
+    parser.add_argument('--num_slots', type=int, default=4)
+    parser.add_argument('--dim', type=int, default=256)
+    parser.add_argument('--slot_iters', type=int, default=3)
     
     # Network variants for experiment..
     parser.add_argument('-fd', '--frame_dims', type=int, default=64)
@@ -49,12 +60,10 @@ def get_opt():
     
     parser.add_argument('--run_backwards', action='store_true', default=True)
     parser.add_argument('--irregular', action='store_true', default=False, help="Train with irregular time-steps")
-    parser.add_argument('--nru', default=False) # alternatively predict m_t and h_t
-    parser.add_argument('--nru2', default=False) # predict all m_t at once, then use that to get h_t's
     parser.add_argument("--sample_from_beg", type=bool, default=False)
 
     # Need to be tested...
-    parser.add_argument('--extrap', action='store_true', default=False, help="Set extrapolation mode. If this flag is not set, run interpolation mode.")
+    parser.add_argument('--extrap', action='store_true', default=True, help="Set extrapolation mode. If this flag is not set, run interpolation mode.")
 
     # Test argument:
     parser.add_argument('--split_time', default=10, type=int, help='Split time for extrapolation or interpolation ')
@@ -70,7 +79,7 @@ def get_opt():
     parser.add_argument("--image_print_freq", type=int, default=5000)
     
     # Path (Data & Checkpoint & Tensorboard)
-    parser.add_argument('-d', '--dataset', type=str, default='kth', choices=["phyre", "mgif", "hurricane", "kth", "penn", "minerl"])
+    parser.add_argument('-d', '--dataset', type=str, default='kth', choices=["mgif", "hurricane", "kth", "penn", "minerl", 'cater', 'moving_mnist', 'box2D', "phyre"])
     parser.add_argument('--log_dir', type=str, default='./logs', help='save tensorboard infos')
     parser.add_argument('--checkpoint_dir', type=str, default='./checkpoints', help='save checkpoint infos')
     parser.add_argument('-td', '--test_dir', type=str, help='load saved model')
@@ -146,7 +155,7 @@ def main():
         opt = tester._load_json(opt)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"device:{device}")
+    # print(f"device:{device}")
     
     # Dataloader
     loader_objs = parse_datasets(opt, device)
@@ -154,10 +163,12 @@ def main():
     # Model
     model = VidODE(opt, device)
     
-    print("NRU:", opt.nru, opt.input_sequence, opt.output_sequence)
-    print("NRU2:", opt.nru2)
-    print("Dataset:", opt.dataset)
-    print("Batch size:", opt.batch_size)
+    # print("NRU:", opt.nru, opt.input_sequence, opt.output_sequence, opt.extrap)
+    # print("NRU2:", opt.nru2)
+    # print("Dataset:", opt.dataset)
+    # print("Batch size:", opt.batch_size)
+    # print("runback:", opt.run_backwards)
+    # print("Slot attention:", opt.slot_attention, opt.pos)
     
     # Set tester
     if opt.phase != 'train':
@@ -184,7 +195,7 @@ def train(opt, netG, loader_objs, device):
 
     # Discriminator
     sample_data = utils.get_next_batch(utils.get_data_dict(train_dataloader), opt=opt)['data_to_predict']
-    print(sample_data.size())
+
     _, opt.output_sequence, _, _, _ = sample_data.size()
     
     if opt.extrap and opt.input_sequence != opt.output_sequence: 

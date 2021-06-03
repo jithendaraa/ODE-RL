@@ -19,7 +19,87 @@ class VidODE(nn.Module):
         
         # tracker
         self.tracker = utils.Tracker()
+
+    def set_ode_func_netED(self):
+        
+        init_dim = self.opt.init_dim
+        num_slots = self.opt.num_slots
+        resize = 2 ** self.opt.n_downs
+        base_dim = init_dim * resize
+        input_size = (self.opt.input_size // resize, self.opt.input_size // resize)
+        ode_dim = base_dim
+
+        if self.opt.slot_attention is False:
+            ode_func_netE = create_convnet(n_inputs=ode_dim,
+                                            n_outputs=base_dim,
+                                            n_layers=self.opt.n_layers,
+                                            n_units=base_dim // 2).to(self.device)
+            
+            ode_func_netD = create_convnet(n_inputs=ode_dim,
+                                            n_outputs=base_dim,
+                                            n_layers=self.opt.n_layers,
+                                            n_units=base_dim // 2).to(self.device)
+            return ode_func_netE, ode_func_netD
+        
+        elif self.opt.slot_attention is True:
+            if self.opt.pos == 1:
+                pass
+            
+            elif self.opt.pos == 2:
+                ode_func_netE = create_convnet(n_inputs=num_slots,
+                                                n_outputs=num_slots,
+                                                n_layers=self.opt.n_layers,
+                                                n_units=num_slots).to(self.device)
+
+                ode_func_netD = create_convnet(n_inputs=num_slots,
+                                                n_outputs=num_slots,
+                                                n_layers=self.opt.n_layers,
+                                                n_units=num_slots).to(self.device)
+                
+                return ode_func_netE, ode_func_netD
     
+    def set_Encoder_z0_ODE_ConvGRU(self, z0_diffeq_solver):
+        
+        init_dim = self.opt.init_dim
+        resize = 2 ** self.opt.n_downs
+        base_dim = init_dim * resize
+        input_size = (self.opt.input_size // resize, self.opt.input_size // resize)
+        ode_dim = base_dim
+        num_slots = self.opt.num_slots
+
+        if self.opt.slot_attention is False:
+
+            encoder_z0 = Encoder_z0_ODE_ConvGRU(input_size=input_size,
+                                                    input_dim=base_dim,
+                                                    hidden_dim=base_dim,
+                                                    kernel_size=(3, 3),
+                                                    num_layers=self.opt.n_layers,
+                                                    dtype=torch.cuda.FloatTensor if self.device == 'cuda' else torch.FloatTensor,
+                                                    batch_first=True,
+                                                    bias=True,
+                                                    return_all_layers=True,
+                                                    z0_diffeq_solver=z0_diffeq_solver,
+                                                    run_backwards=self.opt.run_backwards).to(self.device)
+
+        elif self.opt.slot_attention is True:
+            if self.opt.pos == 1:
+                pass
+            
+            elif self.opt.pos == 2:
+                encoder_z0 = Encoder_z0_ODE_ConvGRU(input_size=input_size,
+                                                    input_dim=num_slots,
+                                                    hidden_dim=num_slots,
+                                                    kernel_size=(3, 3),
+                                                    num_layers=self.opt.n_layers,
+                                                    dtype=torch.cuda.FloatTensor if self.device == 'cuda' else torch.FloatTensor,
+                                                    batch_first=True,
+                                                    bias=True,
+                                                    return_all_layers=True,
+                                                    z0_diffeq_solver=z0_diffeq_solver,
+                                                    run_backwards=self.opt.run_backwards).to(self.device)
+
+        return encoder_z0
+
     def build_model(self):
         
         # channels for encoder, ODE, init decoder
@@ -34,14 +114,13 @@ class VidODE(nn.Module):
         ##### Conv Encoder
         self.encoder = Encoder(input_dim=self.opt.input_dim,
                                ch=init_dim,
-                               n_downs=self.opt.n_downs).to(self.device)
+                               n_downs=self.opt.n_downs,
+                               opt=self.opt).to(self.device)
+        
+        # Get CNN Encoder and Decoder
+        ode_func_netE, ode_func_netD = self.set_ode_func_netED() # creates a CNN Encoding
         
         ##### ODE Encoder
-        ode_func_netE = create_convnet(n_inputs=ode_dim,
-                                       n_outputs=base_dim,
-                                       n_layers=self.opt.n_layers,
-                                       n_units=base_dim // 2).to(self.device)
-        
         rec_ode_func = ODEFunc(opt=self.opt,
                                input_dim=ode_dim,
                                latent_dim=base_dim,  # channels after encoder, & latent dimension
@@ -58,24 +137,10 @@ class VidODE(nn.Module):
                                         nru=self.opt.nru,
                                         nru2=self.opt.nru2)
         
-        self.encoder_z0 = Encoder_z0_ODE_ConvGRU(input_size=input_size,
-                                                 input_dim=base_dim,
-                                                 hidden_dim=base_dim,
-                                                 kernel_size=(3, 3),
-                                                 num_layers=self.opt.n_layers,
-                                                 dtype=torch.cuda.FloatTensor if self.device == 'cuda' else torch.FloatTensor,
-                                                 batch_first=True,
-                                                 bias=True,
-                                                 return_all_layers=True,
-                                                 z0_diffeq_solver=z0_diffeq_solver,
-                                                 run_backwards=self.opt.run_backwards).to(self.device)
+        self.encoder_z0 = self.set_Encoder_z0_ODE_ConvGRU(z0_diffeq_solver)
+        
         
         ##### ODE Decoder
-        ode_func_netD = create_convnet(n_inputs=ode_dim,
-                                       n_outputs=base_dim,
-                                       n_layers=self.opt.n_layers,
-                                       n_units=base_dim // 2).to(self.device)
-        
         gen_ode_func = ODEFunc(opt=self.opt,
                                input_dim=ode_dim,
                                latent_dim=base_dim,
@@ -92,8 +157,15 @@ class VidODE(nn.Module):
                                           nru2=self.opt.nru2)
         
         ##### Conv Decoder
-        self.decoder = Decoder(input_dim=base_dim * 2, output_dim=self.opt.input_dim + 3, n_ups=self.opt.n_downs).to(self.device)
+        if self.opt.slot_attention is False:
+            self.decoder = Decoder(input_dim=base_dim * 2, output_dim=self.opt.input_dim + 3, n_ups=self.opt.n_downs, opt=self.opt).to(self.device)
 
+        elif self.opt.slot_attention is True:
+            if self.opt.pos == 1:
+                pass
+            elif self.opt.pos == 2:
+                self.decoder = Decoder(input_dim=self.opt.num_slots * 2, output_dim=self.opt.input_dim + 3, n_ups=self.opt.n_downs, opt=self.opt).to(self.device)
+    
     def get_reconstruction(self, time_steps_to_predict, truth, truth_time_steps, mask=None, out_mask=None):
         
         truth = truth.to(self.device)
@@ -105,35 +177,31 @@ class VidODE(nn.Module):
         resize = 2 ** self.opt.n_downs
         b, t, c, h, w = truth.shape
         pred_t_len = len(time_steps_to_predict)
-        # print("Inside Get reconstruction", pred_t_len)
         
         ##### Skip connection forwarding
         skip_image = truth[:, -1, ...] if self.opt.extrap else truth[:, 0, ...]
         # print("skip image:", skip_image.size())
-        skip_conn_embed = self.encoder(skip_image).view(b, -1, h // resize, w // resize)
-        # print("skip_conn_embed (After encoder): ", skip_conn_embed.size())
+        skip_conn_embed = self.encoder(skip_image)
+        # print("skip_conn_embed (After encoder): ", skip_conn_embed.size(), "reshaped to", skip_conn_embed.view(b, -1, h // resize, w // resize).size())
+        if self.opt.slot_attention is False:
+            skip_conn_embed = skip_conn_embed.view(b, -1, h // resize, w // resize)
         
         ##### Conv encoding
         e_truth = self.encoder(truth.view(b * t, c, h, w)).view(b, t, -1, h // resize, w // resize)
         
-        # print("truth", truth.size())
-        # print("e_truth (after encoding truth): ", e_truth.size())
-        
         ##### ODE encoding
         first_point_mu, first_point_std = self.encoder_z0(input_tensor=e_truth, time_steps=truth_time_steps, mask=mask, tracker=self.tracker)
-        
+
         # Sampling latent features
         first_point_enc = first_point_mu.unsqueeze(0).repeat(1, 1, 1, 1, 1)
-        # print("first_point_enc", first_point_enc.size(), first_point_enc.squeeze(0).size())
         # ==================================================================================== #
         
-        ##### ODE decoding
+        # ODE decoding
         first_point_enc = first_point_enc.squeeze(0)
         sol_y = self.diffeq_solver(first_point_enc, time_steps_to_predict)
-        # print("Sol_y: ", type(sol_y), sol_y.size())
         self.tracker.write_info(key="sol_y", value=sol_y.clone().cpu())
         
-        ##### Conv decoding
+        # Conv decoding
         sol_y = sol_y.contiguous().view(b, pred_t_len, -1, h // resize, w // resize)
         # regular b, t, 6, h, w / irregular b, t * ratio, 6, h, w
         pred_outputs = self.get_flowmaps(sol_out=sol_y, first_prev_embed=skip_conn_embed, mask=out_mask) # b, t, 6, h, w
@@ -147,7 +215,7 @@ class VidODE(nn.Module):
         grid_y = torch.linspace(-1.0, 1.0, h).view(1, h, 1, 1).expand(b, -1, w, -1)
         grid = torch.cat([grid_x, grid_y], 3).float().to(self.device)  # [b, h, w, 2]
 
-        # Warping
+        # # Warping
         last_frame = truth[:, -1, ...] if self.opt.extrap else truth[:, 0, ...]
         warped_pred_x = self.get_warped_images(pred_flows=pred_flows, start_image=last_frame, grid=grid)
         warped_pred_x = torch.cat(warped_pred_x, dim=1)  # regular b, t, 6, h, w / irregular b, t * ratio, 6, h, w
@@ -163,7 +231,7 @@ class VidODE(nn.Module):
         extra_info["warped_pred_x"] = warped_pred_x
         extra_info["pred_intermediates"] = pred_intermediates
         extra_info["pred_masks"] = pred_masks
-        
+
         return pred_x, extra_info
     
     def get_mse(self, truth, pred_x, mask=None):
@@ -254,6 +322,10 @@ class VidODE(nn.Module):
         batch_dict["observed_mask"] = batch_dict["observed_mask"].to(self.device)
         batch_dict["data_to_predict"] = batch_dict["data_to_predict"].to(self.device)
         batch_dict["mask_predicted_data"] = batch_dict["mask_predicted_data"].to(self.device)
+
+        # for key in batch_dict.keys():
+        #     if type(batch_dict[key]) is not str:
+        #         print(key, batch_dict[key].size())
 
         pred_x, extra_info = self.get_reconstruction(
             time_steps_to_predict=batch_dict["tp_to_predict"],

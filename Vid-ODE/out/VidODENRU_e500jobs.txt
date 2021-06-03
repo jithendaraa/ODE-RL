@@ -1,0 +1,7 @@
+Train ID      Test ID      Output File      Log Folder\n
+19519156    19519159    out/VidODENRU/train/VidODENRU_e500_2l_1c_8b_64f_TRAIN-%j.out    out/VidODENRU/test/VidODENRU_e500_2l_1c_8b_64f_TEST-%j.out    storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+19519161    19519162    out/VidODENRU/train/VidODENRU_e500_2l_2c_8b_64f_TRAIN-%j.out    out/VidODENRU/test/VidODENRU_e500_2l_2c_8b_64f_TEST-%j.out    storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+19519169    19519170    out/VidODENRU/train/VidODENRU_e500_2l_3c_8b_64f_TRAIN-%j.out    out/VidODENRU/test/VidODENRU_e500_2l_3c_8b_64f_TEST-%j.out    storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+19519176    19519177    out/VidODENRU/train/VidODENRU_e500_3l_1c_8b_64f_TRAIN-%j.out    out/VidODENRU/test/VidODENRU_e500_3l_1c_8b_64f_TEST-%j.out    storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+19519178    19519180    out/VidODENRU/train/VidODENRU_e500_3l_2c_8b_64f_TRAIN-%j.out    out/VidODENRU/test/VidODENRU_e500_3l_2c_8b_64f_TEST-%j.out    storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+19519181    19519182    out/VidODENRU/train/VidODENRU_e500_3l_3c_8b_64f_TRAIN-%j.out    out/VidODENRU/test/VidODENRU_e500_3l_3c_8b_64f_TEST-%j.out    storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86

@@ -78,6 +78,8 @@ def main():
     # avg_ssim, avg_mse, avg_distance = Evaluation(opt, pred_list, gt_list)
     avg_ssim, avg_mse, avg_psnr = Evaluation(opt, pred_list, gt_list)
     print("Finish evaluate.py...")
+    os.chdir(opt.result_image_dir)
+    os.system('rm -rf *')
 
 
 if __name__ == '__main__':

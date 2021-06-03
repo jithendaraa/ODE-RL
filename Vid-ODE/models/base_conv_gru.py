@@ -6,6 +6,7 @@ import sys
 sys.path.append('../')
 sys.path.append('./')
 
+from slotAttention.slot_attention.slot_attention import SlotAttention
 import utils
 
 
@@ -157,7 +158,6 @@ class Encoder_z0_ODE_ConvGRU(nn.Module):
             time_points_iter = reversed(time_points_iter)
         
         for idx, i in enumerate(time_points_iter):
-    
             inc = self.z0_diffeq_solver.ode_func(prev_t, prev_input_tensor) * (t_i - prev_t)
             assert (not torch.isnan(inc).any())
             tracker.write_info(key=f"inc{idx}", value=inc.clone().cpu())
@@ -216,8 +216,11 @@ def get_norm_layer(ch):
 
 class Encoder(nn.Module):
     
-    def __init__(self, input_dim=3, ch=64, n_downs=2):
+    def __init__(self, input_dim=3, ch=64, n_downs=2, opt=None):
         super(Encoder, self).__init__()
+
+        self.opt = opt
+        self.slot_module = SlotAttention(self.opt.num_slots, self.opt.dim, iters=self.opt.slot_iters)
         
         model = []
         model += [nn.Conv2d(input_dim, ch, 3, 1, 1)]
@@ -233,28 +236,55 @@ class Encoder(nn.Module):
         self.model = nn.Sequential(*model)
     
     def forward(self, x):
+
         out = self.model(x)
+        # print(x.size(), "encoded into", out.size())
+        slot_dim = self.opt.dim
+        num_slots = self.num_slots
+
+        if self.opt.slot_attention is True:
+            
+            if self.opt.pos == 2:
+                b = out.size()[0]
+                ch = out.size()[1]
+                out = out.view(b, ch, -1)
+                # print("Reshaped to:", out.size())
+                out = self.slot_module(out)
+                # print("After slot attention:", out.size())
+                out = out.view(-1, num_slots, int(slot_dim**0.5), int(slot_dim**0.5))
+                # print("Reshaped to", out.size())
+                # print()
+
+
         return out
 
 
 class Decoder(nn.Module):
     
-    def __init__(self, input_dim=256, output_dim=3, n_ups=2):
+    def __init__(self, input_dim=256, output_dim=3, n_ups=2, opt=None):
         super(Decoder, self).__init__()
         
         model = []
         
         ch = input_dim
-        for i in range(n_ups):
-            model += [nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)]
-            model += [nn.Conv2d(ch, ch // 2, 3, 1, 1)]
-            model += [get_norm_layer(ch // 2)]
-            model += [nn.ReLU()]
-            ch = ch // 2
+        if opt.slot_attention is False:
+            for i in range(n_ups):
+                model += [nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)]
+                model += [nn.Conv2d(ch, ch // 2, 3, 1, 1)]
+                model += [get_norm_layer(ch // 2)]
+                model += [nn.ReLU()]
+                ch = ch // 2
+        else:
+            if opt.pos == 1:
+                pass
+            elif opt.pos == 2:
+                for i in range(n_ups):
+                    model += [nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)]
+                    model += [nn.Conv2d(ch, ch, 3, 1, 1)]
+                    model += [get_norm_layer(ch)]
+                    model += [nn.ReLU()]
         
         model += [nn.Conv2d(ch, output_dim, 3, 1, 1)]
-        # model += [nn.Tanh()]
-        
         self.model = nn.Sequential(*model)
     
     def forward(self, x):

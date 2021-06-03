@@ -27,10 +27,12 @@ class DiffeqSolver(nn.Module):
         # n_traj_samples, n_traj = first_point.size()[0], first_point.size()[1]
         # print("time_steps_to_predict: ", time_steps_to_predict, first_point.size())
 
+        memory = []
+        hidden_states = [first_point]
+        time_len = len(time_steps_to_predict.cpu())
+
         if self.nru is True:
-            memory = []
-            hidden_states = [first_point]
-            time_len = len(time_steps_to_predict.cpu())
+            
             for i in range(time_len):
                 time = time_steps_to_predict[i:i+1]
                 m_t = odeint(self.ode_func, hidden_states[-1], time,
@@ -44,10 +46,7 @@ class DiffeqSolver(nn.Module):
             pred_y = pred_y.permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]
         
         elif self.nru2 is True:
-            memory = []
-            hidden_states = [first_point]
-            time_len = len(time_steps_to_predict.cpu())
-
+            
             memory_pred = odeint(self.ode_func, first_point, time_steps_to_predict,
                         rtol=self.odeint_rtol, atol=self.odeint_atol, method=self.ode_method)
             

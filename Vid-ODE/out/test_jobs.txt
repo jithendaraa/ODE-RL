@@ -1,0 +1,109 @@
+VidODE 100 epochs
+[DONE] 19469202 -> sbatch --output out/VidODE/test/VidODE_e100_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruFalse_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19469218 -> sbatch --output out/VidODE/test/VidODE_e100_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruFalse_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19469305 -> sbatch --output out/VidODE/test/VidODE_e100_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruFalse_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19469346 -> sbatch --output out/VidODE/test/VidODE_e100_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruFalse_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19469359 -> sbatch --output out/VidODE/test/VidODE_e100_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruFalse_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19469363 -> sbatch --output out/VidODE/test/VidODE_e100_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruFalse_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19469394 -> sbatch --output out/VidODE/test/VidODE_e100_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruFalse_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19470201 -> sbatch --output out/VidODE/test/VidODE_e100_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruFalse_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19470202 -> sbatch --output out/VidODE/test/VidODE_e100_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruFalse_nru2False_e100_b8_unequalTrue_36_50_86
+
+VidODE 200 epcohs
+[DONE] 19470277 -> sbatch --output out/VidODE/test/VidODE_e200_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruFalse_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19470408 -> sbatch --output out/VidODE/test/VidODE_e200_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruFalse_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19470424 -> sbatch --output out/VidODE/test/VidODE_e200_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruFalse_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19470452 -> sbatch --output out/VidODE/test/VidODE_e200_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruFalse_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19470579 -> sbatch --output out/VidODE/test/VidODE_e200_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruFalse_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19470590 -> sbatch --output out/VidODE/test/VidODE_e200_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruFalse_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19470591 -> sbatch --output out/VidODE/test/VidODE_e200_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruFalse_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19470600 -> sbatch --output out/VidODE/test/VidODE_e200_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruFalse_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19470623 -> sbatch --output out/VidODE/test/VidODE_e200_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruFalse_nru2False_e200_b8_unequalTrue_36_50_86
+
+VidODE 500 epcohs
+[DONE] 19475489 -> sbatch --output out/VidODE/test/VidODE_e500_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruFalse_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] 19475517 -> sbatch --output out/VidODE/test/VidODE_e500_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruFalse_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] 19475573 -> sbatch --output out/VidODE/test/VidODE_e500_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruFalse_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] 19475577 -> sbatch --output out/VidODE/test/VidODE_e500_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruFalse_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] 19475814 -> sbatch --output out/VidODE/test/VidODE_e500_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruFalse_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] 19475815 -> sbatch --output out/VidODE/test/VidODE_e500_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruFalse_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] 19515142 -> sbatch --output out/VidODE/test/VidODE_e500_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruFalse_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] 19515198 -> sbatch --output out/VidODE/test/VidODE_e500_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruFalse_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] 19515376 -> sbatch --output out/VidODE/test/VidODE_e500_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruFalse_nru2False_e500_b8_unequalTrue_36_50_86
+
+VidODENRU 100 epochs
+[DONE] 19471171 -> sbatch --output out/VidODENRU/test/VidODENRU_e100_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruTrue_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19471210 -> sbatch --output out/VidODENRU/test/VidODENRU_e100_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruTrue_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19471211 -> sbatch --output out/VidODENRU/test/VidODENRU_e100_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruTrue_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19471356 -> sbatch --output out/VidODENRU/test/VidODENRU_e100_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruTrue_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19471434 -> sbatch --output out/VidODENRU/test/VidODENRU_e100_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruTrue_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19471435 -> sbatch --output out/VidODENRU/test/VidODENRU_e100_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruTrue_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19471436 -> sbatch --output out/VidODENRU/test/VidODENRU_e100_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruTrue_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19471470 -> sbatch --output out/VidODENRU/test/VidODENRU_e100_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruTrue_nru2False_e100_b8_unequalTrue_36_50_86
+[DONE] 19471471 -> sbatch --output out/VidODENRU/test/VidODENRU_e100_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruTrue_nru2False_e100_b8_unequalTrue_36_50_86
+
+VidODENRU 200 epochs
+[DELE] 19471992 -> sbatch --output out/VidODENRU/test/VidODENRU_e200_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruTrue_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19471995 -> sbatch --output out/VidODENRU/test/VidODENRU_e200_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruTrue_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19472014 -> sbatch --output out/VidODENRU/test/VidODENRU_e200_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruTrue_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19472016 -> sbatch --output out/VidODENRU/test/VidODENRU_e200_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruTrue_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19472058 -> sbatch --output out/VidODENRU/test/VidODENRU_e200_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruTrue_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19472068 -> sbatch --output out/VidODENRU/test/VidODENRU_e200_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruTrue_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19472095 -> sbatch --output out/VidODENRU/test/VidODENRU_e200_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruTrue_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19472097 -> sbatch --output out/VidODENRU/test/VidODENRU_e200_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruTrue_nru2False_e200_b8_unequalTrue_36_50_86
+[DONE] 19474193 -> sbatch --output out/VidODENRU/test/VidODENRU_e200_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruTrue_nru2False_e200_b8_unequalTrue_36_50_86
+
+VidODENRU 500 epochs
+[DELE]  -> sbatch --output out/VidODENRU/test/VidODENRU_e500_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+[DELE]  -> sbatch --output out/VidODENRU/test/VidODENRU_e500_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+[DELE]  -> sbatch --output out/VidODENRU/test/VidODENRU_e500_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+[DELE]  -> sbatch --output out/VidODENRU/test/VidODENRU_e500_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+[DELE]  -> sbatch --output out/VidODENRU/test/VidODENRU_e500_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+[DELE]  -> sbatch --output out/VidODENRU/test/VidODENRU_e500_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+[DELE] -> 19515463 -> sbatch --output out/VidODENRU/test/VidODENRU_e500_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] -> 19515482 -> sbatch --output out/VidODENRU/test/VidODENRU_e500_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+[DONE] -> 19515499 -> sbatch --output out/VidODENRU/test/VidODENRU_e500_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruTrue_nru2False_e500_b8_unequalTrue_36_50_86
+
+VidODENRU2 100 epochs
+19479532 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e100_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruFalse_nru2True_e100_b8_unequalTrue_36_50_86
+-> sbatch --output out/VidODENRU2/test/VidODENRU2_e100_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruFalse_nru2True_e100_b8_unequalTrue_36_50_86
+-> sbatch --output out/VidODENRU2/test/VidODENRU2_e100_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruFalse_nru2True_e100_b8_unequalTrue_36_50_86
+-> sbatch --output out/VidODENRU2/test/VidODENRU2_e100_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruFalse_nru2True_e100_b8_unequalTrue_36_50_86
+-> sbatch --output out/VidODENRU2/test/VidODENRU2_e100_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruFalse_nru2True_e100_b8_unequalTrue_36_50_86
+-> sbatch --output out/VidODENRU2/test/VidODENRU2_e100_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruFalse_nru2True_e100_b8_unequalTrue_36_50_86
+-> sbatch --output out/VidODENRU2/test/VidODENRU2_e100_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruFalse_nru2True_e100_b8_unequalTrue_36_50_86
+-> sbatch --output out/VidODENRU2/test/VidODENRU2_e100_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruFalse_nru2True_e100_b8_unequalTrue_36_50_86
+-> sbatch --output out/VidODENRU2/test/VidODENRU2_e100_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruFalse_nru2True_e100_b8_unequalTrue_36_50_86
+
+VidODENRU2 500 epochs
+[DONE] 19515507 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e500_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruFalse_nru2True_e500_b8_unequalTrue_36_50_86
+[DONE] 19515508 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e500_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruFalse_nru2True_e500_b8_unequalTrue_36_50_86
+[DONE] 19515510 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e500_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruFalse_nru2True_e500_b8_unequalTrue_36_50_86
+[DONE] 19515572 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e500_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruFalse_nru2True_e500_b8_unequalTrue_36_50_86
+[DONE] 19515707 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e500_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruFalse_nru2True_e500_b8_unequalTrue_36_50_86
+[DONE] 19515727 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e500_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruFalse_nru2True_e500_b8_unequalTrue_36_50_86
+[DONE] 19516010 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e500_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruFalse_nru2True_e500_b8_unequalTrue_36_50_86
+[DONE] 19516011 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e500_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruFalse_nru2True_e500_b8_unequalTrue_36_50_86
+[DONE] 19516013 -> sbatch --output out/VidODENRU2/test/VidODENRU2_e500_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruFalse_nru2True_e500_b8_unequalTrue_36_50_86
+
+VidODE 1000 epochs
+19679742 -> sbatch --output out/VidODE/test/VidODE_e1000_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruFalse_nru2False_e1000_b8_unequalTrue_36_50_86
+[] -> sbatch --output out/VidODE/test/VidODE_e1000_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruFalse_nru2False_e1000_b8_unequalTrue_36_50_86
+[] -> sbatch --output out/VidODE/test/VidODE_e1000_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruFalse_nru2False_e1000_b8_unequalTrue_36_50_86
+[] -> sbatch --output out/VidODE/test/VidODE_e1000_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruFalse_nru2False_e1000_b8_unequalTrue_36_50_86
+[] -> sbatch --output out/VidODE/test/VidODE_e1000_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruFalse_nru2False_e1000_b8_unequalTrue_36_50_86
+[] -> sbatch --output out/VidODE/test/VidODE_e1000_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruFalse_nru2False_e1000_b8_unequalTrue_36_50_86
+19679800 -> sbatch --output out/VidODE/test/VidODE_e1000_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruFalse_nru2False_e1000_b8_unequalTrue_36_50_86
+[] -> sbatch --output out/VidODE/test/VidODE_e1000_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruFalse_nru2False_e1000_b8_unequalTrue_36_50_86
+[] -> sbatch --output out/VidODE/test/VidODE_e1000_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruFalse_nru2False_e1000_b8_unequalTrue_36_50_86
+
+VidODENRU 1000 epochs
+[DONE] 19522913 -> sbatch --output out/VidODENRU/test/VidODENRU_e1000_2l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_2l_extrapTrue_f64_nruTrue_nru2False_e1000_b8_unequalTrue_36_50_86
+[DONE] 19522919 -> sbatch --output out/VidODENRU/test/VidODENRU_e1000_2l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_2l_extrapTrue_f64_nruTrue_nru2False_e1000_b8_unequalTrue_36_50_86
+[DONE] 19526092 -> sbatch --output out/VidODENRU/test/VidODENRU_e1000_2l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_2l_extrapTrue_f64_nruTrue_nru2False_e1000_b8_unequalTrue_36_50_86
+[DONE] 19526113 -> sbatch --output out/VidODENRU/test/VidODENRU_e1000_3l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_3l_extrapTrue_f64_nruTrue_nru2False_e1000_b8_unequalTrue_36_50_86
+[DONE] 19526148 -> sbatch --output out/VidODENRU/test/VidODENRU_e1000_3l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_3l_extrapTrue_f64_nruTrue_nru2False_e1000_b8_unequalTrue_36_50_86
+ -> sbatch --output out/VidODENRU/test/VidODENRU_e1000_3l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_3l_extrapTrue_f64_nruTrue_nru2False_e1000_b8_unequalTrue_36_50_86
+ -> sbatch --output out/VidODENRU/test/VidODENRU_e1000_4l_1c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_1c_4l_extrapTrue_f64_nruTrue_nru2False_e1000_b8_unequalTrue_36_50_86
+19681314 -> sbatch --output out/VidODENRU/test/VidODENRU_e1000_4l_2c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_2c_4l_extrapTrue_f64_nruTrue_nru2False_e1000_b8_unequalTrue_36_50_86
+ -> sbatch --output out/VidODENRU/test/VidODENRU_e1000_4l_3c_8b_64f_TEST-%j.out ./scripts/test_kth_vidode_job.sh storage/logs/datasetkth_3c_4l_extrapTrue_f64_nruTrue_nru2False_e1000_b8_unequalTrue_36_50_86
