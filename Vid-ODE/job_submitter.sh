@@ -9,10 +9,10 @@ framedims=64
 sample_size=$((is + os))
 jobnum=1
 
-models='VidODE VidODENRU VidODENRU2'
-epochs=(1000)
-nlayers=(2 3 4)
-convcells=(1 2 3)
+models='VidODE_SA'
+epochs=(100 200 500)
+nlayers=(2)
+convcells=(1)
 
  > out/job_logs.txt
 echo "Train ID      Test ID      Output File      Log Folder\n" > out/job_logs.txt
@@ -31,22 +31,27 @@ do
 
     elif [ $epoch -le 200 ]
     then
-        train_time="24:00:00"
+        train_time="12:00:00"
         test_time="0:30:00"
 
     elif [ $epoch -le 500 ]
     then
-        train_time="24:00:00"
+        train_time="19:00:00"
         test_time="0:30:00"
 
     elif [ $epoch -le 1000 ]
     then
-        train_time="45:00:00"
-        test_time="1:00:00"
+        train_time="36:00:00"
+        test_time="0:30:00"
     fi
 
     for model in ${models}
     do
+        $sa='False'
+        if [ $model == "VidODE_SA" ]
+            then
+                $sa='True'
+
         for nlayer in ${nlayers[@]}
         do
             for convcell in ${convcells[@]}
@@ -57,26 +62,18 @@ do
                 test_output_file="out/""$model""/test/""$model""_e""$epoch""_""$nlayer""l_""$convcell""c_""$batch""b_""$framedims""f_TEST-%j.out" 
                 exp_name="$model""_e""$epoch""_""$nlayer""l_""$convcell""c_""$batch""b_""$framedims""f" 
                 
-                ode_log_file="storage/logs/dataset""$dataset""_""$convcell""c_""$nlayer""l_extrapTrue_f""$framedims""_nruFalse_nru2False_e""$epoch""_b""$batch""_unequalTrue_""$is""_""$os""_""$sample_size"
-                nru_log_file="storage/logs/dataset""$dataset""_""$convcell""c_""$nlayer""l_extrapTrue_f""$framedims""_nruTrue_nru2False_e""$epoch""_b""$batch""_unequalTrue_""$is""_""$os""_""$sample_size"
-                nru2_log_file="dataset""$dataset""_""$convcell""c_""$nlayer""l_extrapTrue_f""$framedims""_nruFalse_nru2True_e""$epoch""_b""$batch""_unequalTrue_""$is""_""$os""_""$sample_size"
-                
-                log_file=""
-                if [ $model == "VidODE" ]
-                then
-                    log_file=$ode_log_file
-                elif [ $model == "VidODENRU" ]
+                if [ $model == "VidODENRU" ]
                 then
                     nru="True"
-                    log_file=$nru_log_file
                 elif [ $model == "VidODENRU2" ]
                 then   
                     nru2="True" 
-                    log_file=$nru2_log_file
                 fi
+
+                log_file="storage/logs/dataset""$dataset""_slotAtt""$sa""_""$convcell""c_""$nlayer""l_extrapTrue_f""$framedims""_nru""$nru""_nru2""$nru2""_e""$epoch""_b""$batch""_unequalTrue_""$is""_""$os""_""$sample_size"
                 
                 # Submit training job and get JOB_ID as `train_id` 
-                RES=$(sbatch --output $train_output_file --time $train_time --job-name $exp_name ./scripts/train_vidode_job.sh $batch $epoch $framedims $is $os $ckpt $img $nru $nru2 $nlayer $convcell $dataset) 
+                RES=$(sbatch --output $train_output_file --time $train_time --job-name $exp_name ./scripts/train_vidode_job.sh $batch $epoch $framedims $is $os $ckpt $img $nru $nru2 $nlayer $convcell $dataset $sa) 
                 train_id=${RES##* }
 
                 # Submit testing job for train_id job only if training was succesfully completed

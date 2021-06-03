@@ -21,11 +21,12 @@ nru2=$9
 nl=${10}
 cc=${11}
 dataset=${12}
+sa=${13}
 
 start=`date +%s`
-echo "python main.py --nru ${nru} -nl $nl -cc $cc --nru2 ${nru2} -b ${BATCH_SIZE} -e ${EPOCHS} -fd ${frame_dims} -is ${is} -os ${os} --ckpt_save_freq ${ckpt} --image_print_freq ${img} --unequal -d ${dataset} --extrap -p train"
+echo "python main.py --nru ${nru} -nl $nl -cc $cc --nru2 ${nru2} -b ${BATCH_SIZE} -e ${EPOCHS} -fd ${frame_dims} -is ${is} -os ${os} --ckpt_save_freq ${ckpt} --image_print_freq ${img} --unequal -d ${dataset} --extrap -p train -sa ${sa}"
 echo "Starting run at: `date`"
-python main.py --nru ${nru} --nru2 ${nru2} -nl $nl -cc $cc -b ${BATCH_SIZE} -e ${EPOCHS} -fd ${frame_dims} -is ${is} -os ${os} --ckpt_save_freq ${ckpt} --image_print_freq ${img} --unequal -d ${dataset} --extrap -p train
+python main.py --nru ${nru} --nru2 ${nru2} -nl $nl -cc $cc -b ${BATCH_SIZE} -e ${EPOCHS} -fd ${frame_dims} -is ${is} -os ${os} --ckpt_save_freq ${ckpt} --image_print_freq ${img} --unequal -d ${dataset} --extrap -p train -sa ${sa}
 echo "Ending run at: `date`"
 end=`date +%s`
 runtime=$((end-start))

@@ -40,7 +40,7 @@ def get_opt():
     # Model architectures
     parser.add_argument('--nru', default=False) # alternatively predict m_t and h_t
     parser.add_argument('--nru2', default=False) # predict all m_t at once, then use that to get h_t's
-    parser.add_argument('-sa', '--slot_attention', action='store_true', default=False) 
+    parser.add_argument('-sa', '--slot_attention', default=False) 
     
     # SLot attention network variants
     parser.add_argument('--pos', type=int, default=2) # For slot attention: pos 1 -> slot attention after Encoder before ConvGRU
