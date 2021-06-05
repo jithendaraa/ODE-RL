@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info
+./dist
+MUJOCO_LOG.TXT
+logs/
+out/**/
+scripts/**/
+scripts/*.sh
+wandb/
+.vscode/
+data/**/
