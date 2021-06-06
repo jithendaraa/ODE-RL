@@ -5,8 +5,6 @@ __pycache__/
 MUJOCO_LOG.TXT
 logs/
 out/**/
-scripts/**/
-scripts/*.sh
 wandb/
 .vscode/
 data/**/
