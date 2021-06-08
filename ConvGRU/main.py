@@ -20,8 +20,8 @@ from earlystopping import EarlyStopping
 from ConvRNN import ConvGRU
 
 EPOCHS          = 3 
-INPUT_FRAMES    = 10
-OUTPUT_FRAMES   = 10
+INPUT_FRAMES    = 12
+OUTPUT_FRAMES   = 8
 LR              = 1e-4
 BATCH_SIZE      = 4
 TIMESTAMP       = "2020-03-09T00-00-00"
@@ -40,6 +40,7 @@ validFolder = MovingMNIST(is_train=False, root='../data/', n_frames_input=INPUT_
 
 trainLoader = torch.utils.data.DataLoader(trainFolder, batch_size=BATCH_SIZE, shuffle=False)
 validLoader = torch.utils.data.DataLoader(validFolder, batch_size=BATCH_SIZE, shuffle=False)
+print(trainLoader.__len__(), validLoader.__len__())
 
 encoder_params = [
     [
@@ -73,8 +74,9 @@ decoder_params = [
 ]
 
 encoder = Encoder(encoder_params[0], encoder_params[1]).cuda()
-decoder = Decoder(decoder_params[0], decoder_params[1]).cuda()
+decoder = Decoder(decoder_params[0], decoder_params[1], OUTPUT_FRAMES).cuda()
 net = ED(encoder, decoder)
+print("ED Done")
 
 # If we have multiple GPUs
 if torch.cuda.device_count() > 1:   net = nn.DataParallel(net)
@@ -114,6 +116,7 @@ for epoch in range(cur_epoch, EPOCHS + 1):
         # targetVar --> batch_size x output_frames x 1 x 64 x 64; output first input_frames frames
         inputs = inputVar.to(device)  # B,S,C,H,W
         label = targetVar.to(device)  # B,S,C,H,W
+        print(inputs.size())
         
         optimizer.zero_grad()
         net.train()
@@ -146,7 +149,8 @@ for epoch in range(cur_epoch, EPOCHS + 1):
                 loss_aver = loss.item() / BATCH_SIZE
                 # record validation loss
                 valid_losses.append(loss_aver)
-                #print ("validloss: {:.6f},  epoch : {:02d}".format(loss_aver,epoch),end = '\r', flush=True)
+                print ("validloss: {:.6f},  epoch : {:02d}".format(loss_aver,epoch),end = '\r', flush=True)
+        
                 t.set_postfix({
                 'validloss': '{:.6f}'.format(loss_aver),
                 'epoch': '{:02d}'.format(epoch)

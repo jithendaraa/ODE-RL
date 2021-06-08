@@ -3,7 +3,6 @@ from collections import OrderedDict
 
 def make_layers(block):
     layers = []
-    print(block)
     for layer_name, v in block.items():
         if 'pool' in layer_name:
             layer = nn.MaxPool2d(kernel_size=v[0], stride=v[1], padding=v[2])

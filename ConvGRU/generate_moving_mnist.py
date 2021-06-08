@@ -7,9 +7,9 @@ import random
 import torch
 import torch.utils.data as data
 
-def load_mnist(root):
+def load_mnist(data_dir):
     # Load MNIST dataset for generating training data.
-    path = os.path.join(root, 'train-images-idx3-ubyte.gz')
+    path = os.path.join(data_dir, 'train-images-idx3-ubyte.gz')
     with gzip.open(path, 'rb') as f:
         mnist = np.frombuffer(f.read(), np.uint8, offset=16)
         mnist = mnist.reshape(-1, 28, 28)
@@ -41,6 +41,7 @@ class MovingMNIST(data.Dataset):
             else:
                 self.dataset = load_fixed_set(root, False)
         self.length = int(1e4) if self.dataset is None else self.dataset.shape[1]
+        print(self.length, self.dataset)
 
         self.is_train = is_train
         self.num_objects = num_objects
@@ -112,6 +113,7 @@ class MovingMNIST(data.Dataset):
         return data
 
     def __getitem__(self, idx):
+        print(self.length)
         length = self.n_frames_input + self.n_frames_output
         if self.is_train or self.num_objects[0] != 2:
             # Sample number of objects
@@ -120,9 +122,6 @@ class MovingMNIST(data.Dataset):
             images = self.generate_moving_mnist(num_digits)
         else:
             images = self.dataset[:, idx, ...]
-
-        # if self.transform is not None:
-        #     images = self.transform(images)
 
         r = 1
         w = int(64 / r)
@@ -135,21 +134,8 @@ class MovingMNIST(data.Dataset):
             output = []
 
         frozen = input[-1]
-        # add a wall to input data
-        # pad = np.zeros_like(input[:, 0])
-        # pad[:, 0] = 1
-        # pad[:, pad.shape[1] - 1] = 1
-        # pad[:, :, 0] = 1
-        # pad[:, :, pad.shape[2] - 1] = 1
-        #
-        # input = np.concatenate((input, np.expand_dims(pad, 1)), 1)
-
         output = torch.from_numpy(output / 255.0).contiguous().float()
         input = torch.from_numpy(input / 255.0).contiguous().float()
-        # print()
-        # print(input.size())
-        # print(output.size())
-
         out = [idx, output, input, frozen, np.zeros(1)]
         return out
 

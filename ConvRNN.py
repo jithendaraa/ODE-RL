@@ -32,14 +32,6 @@ class ConvGRU(nn.Module):
                       1, 
                       self.padding),
             nn.GroupNorm(self.num_features // 32, self.num_features))
-        
-        # if print_details:
-        #     print("CONV1: ", self.conv1)
-        #     print("shape:", shape, "\n",
-        #             "Input Channels: ", input_channels, "\n",
-        #             "Filter Size: ", filter_size, "\n",
-        #             "Num. Features: ", num_features, "\n", 
-        #             "Padding: ", self.padding, "\n")
 
     def forward(self, inputs=None, hidden_state=None, seq_len=10):
         # seq_len=10 for moving_mnist
@@ -66,8 +58,7 @@ class ConvGRU(nn.Module):
             z = torch.sigmoid(zgate)
             r = torch.sigmoid(rgate)
 
-            combined_2 = torch.cat((x, r * htprev),
-                                   1)  # h' = tanh(W*(x+r*H_t-1))
+            combined_2 = torch.cat((x, r * htprev), 1)  # h' = tanh(W*(x+r*H_t-1))
             
             ht = self.conv2(combined_2)
             ht = torch.tanh(ht)
@@ -75,12 +66,6 @@ class ConvGRU(nn.Module):
             output_inner.append(htnext)
             htprev = htnext
         
-        # print("____________________________________")
-        # print(combined_1.size(), "COMBINEd before conv1 of ConvGRU")
-        # print(gates.size(), "COMBINEd after conv1 of ConvGRU")
-        # print(combined_2.size(), "COMBINEd before conv2 of ConvGRU")
-        # print(ht.size(), "COMBINEd after conv2 of ConvGRU")
-        # print("____________________________________")
         return torch.stack(output_inner), htnext
 
 
