@@ -38,14 +38,14 @@ def get_opt():
     parser.add_argument('--lamb_adv', type=float, default=0.003, help="Adversarial Loss lambda")
 
     # Model architectures
-    parser.add_argument('--nru', default=False) # alternatively predict m_t and h_t
-    parser.add_argument('--nru2', default=False) # predict all m_t at once, then use that to get h_t's
-    parser.add_argument('-sa', '--slot_attention', default=False) 
+    parser.add_argument('--nru', type=bool, default=False) # alternatively predict m_t and h_t
+    parser.add_argument('--nru2', type=bool, default=False) # predict all m_t at once, then use that to get h_t's
+    parser.add_argument('-sa', '--slot_attention', type=bool, default=False) 
     
     # SLot attention network variants
     parser.add_argument('--pos', type=int, default=2) # For slot attention: pos 1 -> slot attention after Encoder before ConvGRU
     parser.add_argument('--num_slots', type=int, default=4)
-    parser.add_argument('--dim', type=int, default=256)
+    parser.add_argument('--dim', type=int, default=64)  # slot dim D: should be perfect square
     parser.add_argument('--slot_iters', type=int, default=3)
     
     # Network variants for experiment..
@@ -63,7 +63,7 @@ def get_opt():
     parser.add_argument("--sample_from_beg", type=bool, default=False)
 
     # Need to be tested...
-    parser.add_argument('--extrap', action='store_true', default=True, help="Set extrapolation mode. If this flag is not set, run interpolation mode.")
+    parser.add_argument('--extrap', action='store_true', default=False, help="Set extrapolation mode. If this flag is not set, run interpolation mode.")
 
     # Test argument:
     parser.add_argument('--split_time', default=10, type=int, help='Split time for extrapolation or interpolation ')
@@ -113,7 +113,7 @@ def get_opt():
         # Modify Desc
         # now = datetime.datetime.now()
         # month_day = f"{now.month:02d}{now.day:02d}"
-        opt.name = f"dataset{opt.dataset}_{opt.convGRU_cells}c_{opt.n_layers}l_extrap{opt.extrap}_f{opt.frame_dims}_nru{opt.nru}_nru2{opt.nru2}_e{opt.epoch}_b{opt.batch_size}_unequal{opt.unequal}_{opt.input_sequence}_{opt.output_sequence}_{opt.sample_size}"
+        opt.name = f"dataset{opt.dataset}_slotAtt{opt.slot_attention}_{opt.convGRU_cells}c_{opt.n_layers}l_extrap{opt.extrap}_f{opt.frame_dims}_nru{opt.nru}_nru2{opt.nru2}_e{opt.epoch}_b{opt.batch_size}_unequal{opt.unequal}_{opt.input_sequence}_{opt.output_sequence}_{opt.sample_size}"
         # opt.log_dir = utils.create_folder_ifnotexist(LOG_PATH / month_day / opt.name)
         # opt.checkpoint_dir = utils.create_folder_ifnotexist(CKPT_PATH / month_day / opt.name)
         opt.log_dir = utils.create_folder_ifnotexist(LOG_PATH / opt.name)
@@ -163,12 +163,12 @@ def main():
     # Model
     model = VidODE(opt, device)
     
-    # print("NRU:", opt.nru, opt.input_sequence, opt.output_sequence, opt.extrap)
-    # print("NRU2:", opt.nru2)
-    # print("Dataset:", opt.dataset)
-    # print("Batch size:", opt.batch_size)
-    # print("runback:", opt.run_backwards)
-    # print("Slot attention:", opt.slot_attention, opt.pos)
+    print("NRU:", opt.nru, opt.input_sequence, opt.output_sequence, opt.extrap)
+    print("NRU2:", opt.nru2)
+    print("Dataset:", opt.dataset)
+    print("Batch size:", opt.batch_size)
+    print("runback:", opt.run_backwards)
+    print("Slot attention:", opt.slot_attention, opt.pos)
     
     # Set tester
     if opt.phase != 'train':

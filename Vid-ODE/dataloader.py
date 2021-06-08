@@ -285,7 +285,7 @@ def parse_datasets(opt, device):
         
         images = torch.stack([b[0] for b in batch])
         mask = torch.stack([b[1] for b in batch])
-        
+
         data_dict = {"data": images, "time_steps": time_steps, "mask": mask}
 
         data_dict = utils.split_and_subsample_batch(data_dict, opt, data_type=data_type)

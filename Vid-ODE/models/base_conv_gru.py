@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 import sys
 
@@ -27,6 +28,7 @@ class ConvGRUCell(nn.Module):
         self.bias = bias
         self.dtype = dtype
         
+        # Outputs reset and update gate together; 1st hidden_dim channels are read 2nd hidden_dim dims are 
         self.conv_gates = nn.Conv2d(in_channels=input_dim + hidden_dim,
                                     out_channels=2 * self.hidden_dim,  # for update_gate,reset_gate respectively
                                     kernel_size=kernel_size,
@@ -45,33 +47,35 @@ class ConvGRUCell(nn.Module):
     def forward(self, input_tensor, h_cur, mask=None):
         """
         :param self:
-        :param input_tensor: (b, c, h, w) / input is actually the target_model
-        :param h_cur: (b, c_hidden, h, w) / current hidden and cell states respectively
+        :param input_tensor: (b, input_dim, h, w) / input is actually the target_model
+        :param h_cur: (b, hidden_dim, h, w) / current hidden and cell states respectively
         :return: h_next, next hidden state
         """
-        combined = torch.cat([input_tensor, h_cur], dim=1)
-        combined_conv = self.conv_gates(combined)
+        combined = torch.cat([input_tensor, h_cur], dim=1) # (b, input_dim + hidden_dim, h, w)
+        combined_conv = self.conv_gates(combined)   # (b, 2 * hidden_dim, h, w)
         
-        gamma, beta = torch.split(combined_conv, self.hidden_dim, dim=1)
-        reset_gate = torch.sigmoid(gamma)
-        update_gate = torch.sigmoid(beta)
+        reset_gate, update_gate = torch.split(combined_conv, self.hidden_dim, dim=1) # split into # (b, hidden_dim, h, w) and # (b, hidden_dim, h, w)
+        reset_gate = torch.sigmoid(reset_gate)      # (b, hidden_dim, h, w)
+        update_gate = torch.sigmoid(update_gate)    # (b, hidden_dim, h, w)
+
+        combined = torch.cat([input_tensor, reset_gate * h_cur], dim=1) # (b, input_dim + hidden_dim, h, w)
+        out_inputs = torch.tanh(self.conv_can(combined)) # (b, hidden_dim, h, w)
         
-        combined = torch.cat([input_tensor, reset_gate * h_cur], dim=1)
-        cc_cnm = self.conv_can(combined)
-        cnm = torch.tanh(cc_cnm)
-        
-        h_next = (1 - update_gate) * h_cur + update_gate * cnm
+        h_next = (1 - update_gate) * h_cur + update_gate * out_inputs    # (b, hidden_dim, h, w)
+
+        if mask is None:
+            return h_next
         
         mask = mask.view(-1, 1, 1, 1).expand_as(h_cur)
-        h_next = mask * h_next + (1 - mask) * h_cur
+        h_next = mask * h_next + (1 - mask) * h_cur # (b, hidden_dim, h, w)
         
-        return h_next
+        return h_next   # (b, hidden_dim, h, w)
 
 
 class Encoder_z0_ODE_ConvGRU(nn.Module):
     
     def __init__(self, input_size, input_dim, hidden_dim, kernel_size, num_layers, dtype, batch_first=False,
-                 bias=True, return_all_layers=False, z0_diffeq_solver=None, run_backwards=None):
+                 bias=True, return_all_layers=False, z0_diffeq_solver=None, run_backwards=None, opt=None):
         
         super(Encoder_z0_ODE_ConvGRU, self).__init__()
         
@@ -92,6 +96,7 @@ class Encoder_z0_ODE_ConvGRU(nn.Module):
         self.return_all_layers = return_all_layers
         self.z0_diffeq_solver = z0_diffeq_solver
         self.run_backwards = run_backwards
+        self.opt = opt
         
         ##### By product for visualization
         self.by_product = {}
@@ -142,6 +147,8 @@ class Encoder_z0_ODE_ConvGRU(nn.Module):
     def run_ode_conv_gru(self, input_tensor, mask, time_steps, run_backwards=True, tracker=None):
         
         b, t, c, h, w = input_tensor.size()
+        # print()
+        # print("START run_ode_conv_gru()", input_tensor.size())
         
         device = utils.get_device(input_tensor)
         
@@ -152,13 +159,13 @@ class Encoder_z0_ODE_ConvGRU(nn.Module):
         # Run ODE backwards and combine the y(t) estimates using gating
         prev_t, t_i = time_steps[-1] + 0.01, time_steps[-1]
         latent_ys = []
-        
         time_points_iter = range(0, time_steps.size(-1))
         if run_backwards:
             time_points_iter = reversed(time_points_iter)
         
         for idx, i in enumerate(time_points_iter):
             inc = self.z0_diffeq_solver.ode_func(prev_t, prev_input_tensor) * (t_i - prev_t)
+
             assert (not torch.isnan(inc).any())
             tracker.write_info(key=f"inc{idx}", value=inc.clone().cpu())
             
@@ -186,8 +193,10 @@ class Encoder_z0_ODE_ConvGRU(nn.Module):
             prev_t, t_i = time_steps[i], time_steps[i - 1]
             latent_ys.append(yi)
         
+        # print("For loop over")
         latent_ys = torch.stack(latent_ys, 1)
         
+        # print("END run_ode_conv_gru()")
         return yi, latent_ys
     
     def _init_hidden(self, batch_size):
@@ -213,48 +222,125 @@ def get_norm_layer(ch):
     norm_layer = nn.BatchNorm2d(ch)
     return norm_layer
 
+def build_grid(resolution):
+    ranges = [np.linspace(0., 1., num=res) for res in resolution]
+    grid = np.meshgrid(*ranges, sparse=False, indexing="ij")
+    grid = np.stack(grid, axis=-1)
+    grid = np.reshape(grid, [resolution[0], resolution[1], -1])
+    grid = np.expand_dims(grid, axis=0)
+    grid = grid.astype(np.float32)
+    grid = np.concatenate([grid, 1.0 - grid], axis=-1)
+    grid = torch.from_numpy(grid)
+    return grid
+
+def spatial_flatten(x):
+    b, ch, h, w = x.size()
+    x = x.view(b, ch, h*w)
+    return x
+
+def spatial_broadcast(slots, resolution):
+    """Broadcast slot features to a 2D grid and collapse slot dimension."""
+    # `slots` has shape: [batch_size, num_slots, slot_size].
+    slots = slots.view(-1, slots.size()[-1])[:, None, None, :] # [batch_size*num_slots, 1, 1, slot_size]
+    grid = torch.tile(slots, (1, resolution[0], resolution[1], 1)) # [batch_size*num_slots, resolution[0], resolution[0], slot_size]
+    return grid
+
+class SoftPositionEmbed(nn.Module):
+    """Adds soft positional embedding with learnable projection."""
+    
+    def __init__(self, hidden_size, resolution, device=None):
+        """Builds the soft position embedding layer.
+        Args:
+            hidden_size: Size of input feature dimension.
+            resolution: Tuple of integers specifying width and height of grid.
+        """
+        super().__init__()
+        self.dense = nn.Linear(4, hidden_size)
+        self.grid = build_grid(resolution).to(device)
+
+    def forward(self, inputs):
+        return inputs + self.dense(self.grid).permute(0, 3, 1, 2)
 
 class Encoder(nn.Module):
     
-    def __init__(self, input_dim=3, ch=64, n_downs=2, opt=None):
+    def __init__(self, input_dim=3, ch=64, n_downs=2, opt=None, device=None):
         super(Encoder, self).__init__()
 
         self.opt = opt
-        self.slot_module = SlotAttention(self.opt.num_slots, self.opt.dim, iters=self.opt.slot_iters)
-        
-        model = []
-        model += [nn.Conv2d(input_dim, ch, 3, 1, 1)]
-        model += [get_norm_layer(ch)]
-        model += [nn.ReLU()]
+        self.device = device
+        self.resize = 2 ** n_downs
+
+        cnn_encoder = []
+        cnn_encoder += [nn.Conv2d(input_dim, ch, 3, 1, 1)]
+        cnn_encoder += [get_norm_layer(ch)]
+        cnn_encoder += [nn.ReLU()]
         
         for _ in range(n_downs):
-            model += [nn.Conv2d(ch, ch * 2, 4, 2, 1)]
-            model += [get_norm_layer(ch * 2)]
-            model += [nn.ReLU()]
+            cnn_encoder += [nn.Conv2d(ch, ch * 2, 4, 2, 1)]
+            cnn_encoder += [get_norm_layer(ch * 2)]
+            cnn_encoder += [nn.ReLU()]
             ch *= 2
         
-        self.model = nn.Sequential(*model)
+        self.cnn_encoder = nn.Sequential(*cnn_encoder) # CNN Embedding
+
     
     def forward(self, x):
+        # x: (b*t, ch, h, w)
 
-        out = self.model(x)
-        # print(x.size(), "encoded into", out.size())
-        slot_dim = self.opt.dim
-        num_slots = self.num_slots
+        b, ch, H, W = x.size()
+        new_ch = self.opt.init_dim * self.resize # channels after cnn encoder
 
         if self.opt.slot_attention is True:
             
+            slot_dim = self.opt.dim
+            num_slots = self.opt.num_slots
+            h, w = H // self.resize, W // self.resize
+            input_dim = h*w
+            D = int(slot_dim ** 0.5)
+            encoder_resolution = (h, w)
+            decoder_resolution = (h, w)
+            
+            self.encoder_pos = SoftPositionEmbed(new_ch, encoder_resolution, device=self.device).to(self.device)
+
+            mlp = [
+                nn.LayerNorm([new_ch, input_dim]),
+                nn.Linear(input_dim, input_dim),
+                nn.ReLU(),
+                nn.Linear(input_dim, slot_dim)
+            ]
+            self.mlp = nn.Sequential(*mlp).to(self.device)
+            
+            self.slot_attention = SlotAttention(num_slots, slot_dim, iters=self.opt.slot_iters).to(self.device)
+
             if self.opt.pos == 2:
-                b = out.size()[0]
-                ch = out.size()[1]
-                out = out.view(b, ch, -1)
-                # print("Reshaped to:", out.size())
-                out = self.slot_module(out)
-                # print("After slot attention:", out.size())
-                out = out.view(-1, num_slots, int(slot_dim**0.5), int(slot_dim**0.5))
-                # print("Reshaped to", out.size())
+
+                # 1. CNN Encode
+                out = self.cnn_encoder(x) # CNN Encoding -> b * t, new_ch, h, w
+                # print("After CNN encoding", out.size())
+                
+                # 2. Positional Embedding
+                out = self.encoder_pos(out) # Posn Encoding -> b * t, new_ch, h, w
+                # print("After posn encoding", out.size())
+                
+                # 3. Flatten spatial dims
+                out = spatial_flatten(out) # Spatial flatten b*t, new_ch, h*w
+                # print("After flattening", out.size())
+                
+                # 4. Pass through LayerNorm, MLP
+                out = self.mlp(out) # MLP Layer b*t, new_ch, slot_dim
+                # print("After MLP", out.size())
+
+                # 5. Slot attention
+                slots = self.slot_attention(out) # SA: b*t, num_slots, slot_dim
+                # print("After slot attention", slots.size())
+                
+                # 6. Spatial broadcasting from K slot features to images of resolution `self.decoder_initial_size`
+                out = spatial_broadcast(slots, decoder_resolution).permute(0, 3, 1, 2)
+                # print("After spatial broadcast", out.size())
                 # print()
 
+        elif self.opt.slot_attention is False:
+            out = self.cnn_encoder(x)
 
         return out
 

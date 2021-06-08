@@ -9,10 +9,10 @@ framedims=64
 sample_size=$((is + os))
 jobnum=1
 
-models='VidODE_SA'
-epochs=(100 200 500)
+models='VidODENRU'
+epochs=(500)
 nlayers=(2)
-convcells=(1)
+convcells=(1 2 3)
 
  > out/job_logs.txt
 echo "Train ID      Test ID      Output File      Log Folder\n" > out/job_logs.txt
@@ -26,7 +26,7 @@ do
 
     if [ $epoch -le 100 ]
     then
-        train_time="12:00:00"
+        train_time="15:00:00"
         test_time="0:30:00"
 
     elif [ $epoch -le 200 ]
@@ -47,10 +47,11 @@ do
 
     for model in ${models}
     do
-        $sa='False'
+        sa="False"
         if [ $model == "VidODE_SA" ]
-            then
-                $sa='True'
+        then
+            sa="True"
+        fi
 
         for nlayer in ${nlayers[@]}
         do
