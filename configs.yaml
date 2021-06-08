@@ -1,14 +1,18 @@
 defaults:
-  id: ""
+  id: 'ConvGRU_mmnist_train'
   dataset: "mmnist"
   model: "ConvGRU"
   phase: "train"
-  epochs: 5
+  epochs: 100
   batch_size: 4
+  valid_batches: 5      # validate on x batches during training
   load_model: False
+  train_test_split: 0.8
+  total_frames: 2000000   # 2M frames as in CW-VAE paper
 
   # Directories
   logdir: "logs"
+  rundir: "runs"                      # Tensorboard outputs at runs/model_name/id.out
   user_dir: "/home/jithen"
   storage_dir: "scratch"
   data_dir: "datasets/MovingMNIST"    # user_dir/storage_dir/data_dir
@@ -16,19 +20,20 @@ defaults:
   model_params_logdir: "model_params" # has the form logs/<model_name>/model_params/<id>_00000xxxxx.pickle
   
   # Save & logs frequencies
-  ckpt_save_freq: 1             # Save model params every x steps
-  validate_freq: 1              # Validate every x steps
+  ckpt_save_freq: 5             # Save model params every x steps
+  validate_freq: 5              # Validate every x steps
   log_freq: 1                   # log every x epochs
-  log_video_freq: 40000         # log video every x steps
+  log_video_freq: 1             # log video every x steps
+  test_log_freq: 20000          # log test loss every x steps
 
   resolution: 64
   in_channels: 1
   train_seq: 100
-  test_seq: 100
-  train_in_seq: 30
-  train_out_seq: 70
-  test_in_seq: 30
-  test_out_seq: 70
+  test_seq: 200
+  train_in_seq: 50
+  train_out_seq: 50
+  test_in_seq: 50
+  test_out_seq: 150
 
   lr: 1e-3
   n_downs: 2
@@ -36,7 +41,7 @@ defaults:
   num_digits: 3
 
 train_mmnist_cgru:
-  id: 'ConvGRU_mmnist_train'
+  id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   data_dir: "datasets/MovingMNIST"
   ckpt_save_freq: 40000
   validate_freq: 40000
@@ -47,9 +52,14 @@ train_mmnist_cgru:
 
   
 test_mmnist_cgru:
-  data_dir: "/home/jithen/scratch/datasets/MovingMNIST"
-  in_channels: 1
+  id: 'ConvGRU_mmnist_test'
+  phase: "test"
+  load_model: True
+  data_dir: "datasets/MovingMNIST"
+  test_log_freq: 2000          # log test loss every x steps
+
   num_digits: 3
+  in_channels: 1
 
   
 

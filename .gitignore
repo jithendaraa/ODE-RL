@@ -4,6 +4,9 @@ data/
 save_model
 *.pth
 *.pth.tar
+logs/
+runs/
+out/
 # .ipynb_checkpoints
 # assets
 # runs

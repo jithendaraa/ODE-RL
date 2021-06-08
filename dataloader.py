@@ -9,7 +9,7 @@ import helpers.utils as utils
 
 class MovingMNIST(Dataset):
     def __init__(self, root, is_train, n_frames_input, n_frames_output, num_objects,
-                 transform=None):
+                 transform=None, instances=1e4):
         '''
         param num_objects: a list of number of possible objects.
         '''
@@ -23,7 +23,7 @@ class MovingMNIST(Dataset):
                 self.mnist = utils.load_mnist(root)
             else:
                 self.dataset = utils.load_fixed_set(root, False)
-        self.length = int(2e4) if self.dataset is None else self.dataset.shape[1]
+        self.length = int(instances) if self.dataset is None else self.dataset.shape[1]
 
         self.is_train = is_train
         self.num_objects = num_objects
@@ -130,10 +130,17 @@ class MovingMNIST(Dataset):
 
 def parse_datasets(opt, device):
     if opt.dataset == 'mmnist':
+
+        total_frames = opt.total_frames # 2M as in clockwork paper
+        total_instances = int(total_frames / opt.test_seq)
+        train_instances = int(opt.train_test_split * total_instances)
+        test_instances = total_instances - train_instances
+        print("Train frames:", opt.test_seq * train_instances)
+        print("Test frames:", opt.test_seq * test_instances)
         
-        trainFolder = MovingMNIST(is_train=True, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits])
+        trainFolder = MovingMNIST(is_train=True, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], instances=1e4)
         validFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits])
-        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits])
+        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits], instances=1e4)
     
         train_dataloader = DataLoader(trainFolder, batch_size=opt.batch_size, shuffle=False)
         valid_dataloader = DataLoader(validFolder, batch_size=opt.batch_size, shuffle=False)
