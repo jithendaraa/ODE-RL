@@ -1,0 +1,56 @@
+defaults:
+  id: ""
+  dataset: "mmnist"
+  model: "ConvGRU"
+  phase: "train"
+  epochs: 5
+  batch_size: 4
+  load_model: False
+
+  # Directories
+  logdir: "logs"
+  user_dir: "/home/jithen"
+  storage_dir: "scratch"
+  data_dir: "datasets/MovingMNIST"    # user_dir/storage_dir/data_dir
+  video_logdir: "videos"              # user_dir/storage_dir/videos/<model_name>/<id>_00000xxxxx.mp4
+  model_params_logdir: "model_params" # has the form logs/<model_name>/model_params/<id>_00000xxxxx.pickle
+  
+  # Save & logs frequencies
+  ckpt_save_freq: 1             # Save model params every x steps
+  validate_freq: 1              # Validate every x steps
+  log_freq: 1                   # log every x epochs
+  log_video_freq: 40000         # log video every x steps
+
+  resolution: 64
+  in_channels: 1
+  train_seq: 100
+  test_seq: 100
+  train_in_seq: 30
+  train_out_seq: 70
+  test_in_seq: 30
+  test_out_seq: 70
+
+  lr: 1e-3
+  n_downs: 2
+  
+  num_digits: 3
+
+train_mmnist_cgru:
+  id: 'ConvGRU_mmnist_train'
+  data_dir: "datasets/MovingMNIST"
+  ckpt_save_freq: 40000
+  validate_freq: 40000
+  log_video_freq: 40000
+
+  num_digits: 3
+  in_channels: 1
+
+  
+test_mmnist_cgru:
+  data_dir: "/home/jithen/scratch/datasets/MovingMNIST"
+  in_channels: 1
+  num_digits: 3
+
+  
+
+
