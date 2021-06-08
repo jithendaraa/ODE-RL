@@ -28,7 +28,6 @@ echo "Python File: ""$python_file"
 echo "ID: ""$ID"
 
 echo "Starting run at: `date`"
-# wandb offline
 command="python ${python_file} --logdir logs --id ${ID} --configs defaults ${dataset} --use_wandb False --steps ${steps} --batch_size ${batch_size}"
 echo "$command"
 python ${python_file} --logdir logs --id ${ID} --configs defaults ${dataset} --use_wandb False --steps ${steps} --batch_size ${batch_size}
