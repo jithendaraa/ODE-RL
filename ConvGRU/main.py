@@ -4,7 +4,7 @@ sys.path.append('../')
 import numpy as np
 from collections import OrderedDict
 import os
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import logging
 import matplotlib.pyplot as plt
