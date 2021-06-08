@@ -61,12 +61,12 @@ def train(opt, model, loader_objs, device):
             """
                 1. Validate model every `validate_freq` epochs
                 2. Save model params every `ckpt_save_freq` step
-                3. #TODO: Save video every `log_video_freq` step
+                3. #TODO: Save video every `log_video_freq` step. See save_video() in helpers/utils.py
             """
 
             validate_model(model, opt, loader_objs, metrics, pla_lr_scheduler, total_step, device, tb, opt.validate_freq)
             utils.save_model_params(model, optimizer, epoch, opt, total_step, opt.ckpt_save_freq)
-            utils.save_video(predicted_frames.cpu(), ground_truth.cpu(), total_step, opt.log_video_freq)
+            utils.save_video(predicted_frames.cpu(), ground_truth.cpu(), total_step, opt.log_video_freq, tb)
             tb.add_scalar('Train Loss', train_loss.item(), total_step)
 
         epoch_train_loss /= n_train_batches # Avg loss over all batches for this epoch
@@ -118,6 +118,8 @@ def test(opt, model, loader_objs, device, step=None, type_='test', metrics=None,
             if type_ == 'test': 
                 step += 1
                 utils.log_test_loss(opt, step, loss.item())
+                log_video_freq = batches // 20
+                utils.save_video(predicted_frames.cpu(), ground_truth.cpu(), total_step, log_video_freq, tb)
 
         if type_ == 'test': 
             test_loss /= batches # avg test loss over all batches

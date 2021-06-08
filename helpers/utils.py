@@ -206,7 +206,7 @@ def print_exp_details(opt, n_batches):
         print("Output frames:", opt.test_out_seq)
     print()
 
-def save_video(pred, truth, step, log_video_freq):
+def save_video(pred, truth, step, log_video_freq, tb):
 
     if (step % log_video_freq) == 0:
         pred, truth = pred[0], truth[0] # extract first batch
@@ -214,4 +214,9 @@ def save_video(pred, truth, step, log_video_freq):
         # TODO: send GIF to tensorboard
 
     pass
+
+def plot_psnr_vs_n_frames(ground_truth, predicted_frames, tb):
+    # TODO: plot PSNR vs. #frames
+    # TODO: send plot to tensorboard
+    # TODO: call this function in test() method of train_test.py
 
