@@ -78,9 +78,14 @@ def get_next_batch(data_dict, test_interp=False, opt=None, in_len=None, out_len=
     batch_dict = get_dict_template()
     batch_dict["observed_data"] = data_dict["observed_data"]
     batch_dict["data_to_predict"] = data_dict["data_to_predict"]
-    batch_dict["timesteps"] = data_dict["timesteps"]
-    batch_dict["observed_tp"] = data_dict["observed_tp"]
-    batch_dict["tp_to_predict"] = data_dict["tp_to_predict"]
+    
+    input_t = data_dict["observed_data"].size()[1]
+    output_t = data_dict["data_to_predict"].size()[1]
+    total_t = input_t + output_t
+    
+    batch_dict["timesteps"] = torch.tensor(np.arange(0, total_t) / total_t).to(device)
+    batch_dict["observed_tp"] = torch.tensor(batch_dict["timesteps"][:input_t]).to(device)
+    batch_dict["tp_to_predict"] = torch.tensor(batch_dict["timesteps"][input_t:]).to(device)
     return batch_dict
 # ______________________________________________________________________________
 
@@ -94,7 +99,7 @@ def get_norm_layer(ch):
     norm_layer = nn.BatchNorm2d(ch)
     return norm_layer
 
-def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, nonlinear='tanh'):
+def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False, nonlinear='tanh'):
     if nonlinear == 'tanh':
         nonlinear = nn.Tanh()
     elif nonlinear == 'relu':
@@ -107,10 +112,36 @@ def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, nonlinear='tanh
     
     for i in range(n_layers):
         layers.append(nonlinear)
-        layers.append(nn.Conv2d(n_units, n_units, 3, 1, 1, dilation=1))
+        if downsize is False:
+            layers.append(nn.Conv2d(n_units, n_units, 3, 1, 1, dilation=1))
+        else:
+            layers.append(nn.Conv2d(n_units, n_units, 4, 2, 1, dilation=1))
     
     layers.append(nonlinear)
     layers.append(nn.Conv2d(n_units, n_outputs, 3, 1, 1, dilation=1))
+
+    return nn.Sequential(*layers)
+
+def create_transpose_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, upsize=False, nonlinear='tanh'):
+    if nonlinear == 'tanh':
+        nonlinear = nn.Tanh()
+    elif nonlinear == 'relu':
+        nonlinear = nn.ReLU()
+    else:
+        raise NotImplementedError('There is no named')
+
+    layers = []
+    layers.append(nn.ConvTranspose2d(n_inputs, n_units, 3, 1, 1, dilation=1))
+    
+    for i in range(n_layers):
+        layers.append(nonlinear)
+        if upsize is False:
+            layers.append(nn.ConvTranspose2d(n_units, n_units, 3, 1, 1, dilation=1))
+        else:
+            layers.append(nn.ConvTranspose2d(n_units, n_units, 4, 2, 1, dilation=1))
+    
+    layers.append(nonlinear)
+    layers.append(nn.ConvTranspose2d(n_units, n_outputs, 3, 1, 1, dilation=1))
 
     return nn.Sequential(*layers)
 
