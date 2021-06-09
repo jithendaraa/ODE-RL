@@ -4,15 +4,18 @@ import torch
 import ruamel.yaml as yaml
 import sys
 import pathlib
+from tensorboardX import SummaryWriter
+import helpers.utils as utils
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
 from dataloader import parse_datasets
+# Models
 from models.ConvGRU import ConvGRU
-from train_test import train, test
-from tensorboardX import SummaryWriter
+from models.ODEConvGRU import ODEConvGRU
 
-import helpers.utils as utils
+from train_test import train, test
+
 
 
 def get_opt():
@@ -44,9 +47,14 @@ def main(opt):
     # Dataloader
     loader_objs = parse_datasets(opt, device)
     print("Loaded", opt.dataset, "dataset")
+    print("Args:", opt)
 
-    if opt.model == 'ConvGRU':
+    if opt.model in ['ConvGRU']:
       model = ConvGRU(opt, device)
+    
+    elif opt.model in ['ODEConv']:
+      model = ODEConvGRU(opt, device)
+      print("Initialised ODEConv model")
     
     if opt.load_model is True:
       model = utils.load_model_params(model, opt)

@@ -42,7 +42,7 @@ class ConvGRU(nn.Module):
         pred_x = self.decoder(encoded_inputs)
         return pred_x
 
-    def get_prediction(self, inputs):
+    def get_prediction(self, inputs, batch_dict=None):
         pred_x = self(inputs)
         return pred_x
     

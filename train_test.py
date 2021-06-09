@@ -47,21 +47,21 @@ def train(opt, model, loader_objs, device):
             input_frames = batch_dict['observed_data'].to(device)
             ground_truth = batch_dict['data_to_predict'].to(device)
 
-            predicted_frames = model.get_prediction(input_frames)
+            predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
             train_loss = model.get_loss(predicted_frames, ground_truth)
             epoch_train_loss += train_loss.item()
-
+            
             optimizer.zero_grad()
             train_loss.backward()
             torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
             optimizer.step()
             total_step += 1
-            print(it)
-
+            # print(it, (time.time()-a)/3600, "hours")
+            
             """
-                1. Validate model every `validate_freq` epochs
-                2. Save model params every `ckpt_save_freq` step
-                3. #TODO: Save video every `log_video_freq` step. See save_video() in helpers/utils.py
+                # 1. Validate model every `validate_freq` epochs
+                # 2. Save model params every `ckpt_save_freq` step
+                # 3. #TODO: Save video every `log_video_freq` step. See save_video() in helpers/utils.py
             """
 
             validate_model(model, opt, loader_objs, metrics, pla_lr_scheduler, total_step, device, tb, opt.validate_freq)
@@ -70,10 +70,9 @@ def train(opt, model, loader_objs, device):
             tb.add_scalar('Train Loss', train_loss.item(), total_step)
 
         epoch_train_loss /= n_train_batches # Avg loss over all batches for this epoch
-        
         # log epoch number and train_loss for every `log_freq` steps
         metrics = utils.log_after_epoch(epoch, epoch_train_loss, metrics, total_step, start_time, opt=opt)
-        
+
 
 def validate_model(model, opt, loader_objs, metrics, lr_schedule, step, device, tb, validate_freq, type_='validate'):
     if step % validate_freq == 0:
