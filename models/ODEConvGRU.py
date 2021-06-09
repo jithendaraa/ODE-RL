@@ -12,6 +12,7 @@ class ODEConvGRU(nn.Module):
     def __init__(self, opt, device, downsize=True):
         super(ODEConvGRU, self).__init__()
 
+        self.opt = opt
         self.device = device
         self.resize = 1
         h, w = opt.resolution, opt.resolution
@@ -71,12 +72,17 @@ class ODEConvGRU(nn.Module):
         encoded_inputs = self.conv_encoder(inputs.view(b*t, c, h, w))
         encoded_inputs = encoded_inputs.view(b, -1, encoded_inputs.size()[-3], encoded_inputs.size()[-2], encoded_inputs.size()[-1])
         
-        # ODEConvGRUCell to infer (first_point_mu, first_point_std) for z_0
+        # ODEConvGRUCell to predict (first_point_mu, first_point_std) for z_0
         first_point_mu, first_point_std = self.ode_convgru_cell(encoded_inputs, observed_tp)
         
         # Sampling latent features
-        # TODO: Instead of using `first_point_mu` as `first_point_enc`, try using first_point_enc = Gaussian(first_point_mu, first_point_std); might introduce stochasticity in the ODEConvGRU model
-        first_point_enc = first_point_mu.unsqueeze(0).repeat(1, 1, 1, 1, 1).squeeze(0)
+        if self.opt.z_sample is True:
+            # first_point_enc = Gaussian(first_point_mu, first_point_std) might introduce stochasticity in the ODEConvGRU model
+            sampled_z = torch.normal(mean=first_point_mu, std=first_point_std)
+            first_point_enc = sampled_z.unsqueeze(0).repeat(1, 1, 1, 1, 1).squeeze(0)
+        else:
+            # first_point_enc = first_point_mu
+            first_point_enc = first_point_mu.unsqueeze(0).repeat(1, 1, 1, 1, 1).squeeze(0)
 
         # ODE decoding: Given first_point_enc (z_0) and time_steps_to_predict([t_i,....t_(i+n)]), we predict sol_y([z_i,...z_(i+n)])
         sol_y = self.diffeq_solver(first_point_enc, time_steps_to_predict)

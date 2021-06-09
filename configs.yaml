@@ -1,7 +1,7 @@
 defaults:
   id: 'ConvGRU_mmnist_train'
   dataset: "mmnist"
-  model: "ConvGRU"      # Supports "ConvGRU"
+  model: "ConvGRU"      # Supports "ConvGRU", "ODEConv"
   phase: "train"
   epochs: 100
   batch_size: 4
@@ -73,6 +73,32 @@ train_mmnist_odecgru:
   neural_ode_n_units: 64          # n_units for the convnet in ode_encoder_func and ode_decoder_func
   n_ode_layers: 2                 # n_layers for the convnet in ode_encoder_func and ode_decoder_func
   decode_diff_method: 'dopri5'    # choices=['dopri5', 'euler', 'adams', 'rk4']
+  z_sample: False
+
+  ckpt_save_freq: 20000
+  validate_freq: 20000
+  log_video_freq: 20000
+
+  in_channels: 1
+  num_digits: 3
+
+train_mmnist_sample_odecgru:    # Samples z0 from N(z_mu, z_sigma) instead of doing z0 = z_mu
+  id: 'ODEConv_mmnist_train'
+  model: "ODEConv"
+  phase: "train"
+  data_dir: "datasets/MovingMNIST"
+  epochs: 10
+
+  downsize: True                  # if True, conv_encoder will 0.5x and conv_decoder will 2x the resolution for every layer in `n_layers`
+  conv_encoder_out_ch: 128        # output channels for conv encoder in models/ODEConvGRU.py
+  conv_n_units: 64                # n_units for conv encoder and conv decoder in models/ODEConvGRU.py
+  n_layers: 2                     # n_layers for conv encoder and conv decoder in models/ODEConvGRU.py
+  neural_ode_encoder_out_ch: 128  # output channels for ode_encoder_func in models/ODEConvGRU.py
+  neural_ode_decoder_out_ch: 128  # output channels for ode_decoder_func in models/ODEConvGRU.py
+  neural_ode_n_units: 64          # n_units for the convnet in ode_encoder_func and ode_decoder_func
+  n_ode_layers: 2                 # n_layers for the convnet in ode_encoder_func and ode_decoder_func
+  decode_diff_method: 'dopri5'    # choices=['dopri5', 'euler', 'adams', 'rk4']
+  z_sample: True
 
   ckpt_save_freq: 20000
   validate_freq: 20000
