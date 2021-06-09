@@ -68,13 +68,19 @@ def get_data_dict(dataloader):
 
 def get_dict_template():
     return {"observed_data": None,
-            "data_to_predict": None}
+            "data_to_predict": None,
+            'timesteps': None,
+            'observed_tp': None,
+            'tp_to_predict': None}
 
 def get_next_batch(data_dict, test_interp=False, opt=None, in_len=None, out_len=None):
     device = get_device(data_dict["observed_data"])
     batch_dict = get_dict_template()
     batch_dict["observed_data"] = data_dict["observed_data"]
     batch_dict["data_to_predict"] = data_dict["data_to_predict"]
+    batch_dict["timesteps"] = data_dict["timesteps"]
+    batch_dict["observed_tp"] = data_dict["observed_tp"]
+    batch_dict["tp_to_predict"] = data_dict["tp_to_predict"]
     return batch_dict
 # ______________________________________________________________________________
 
@@ -87,6 +93,26 @@ def update_learning_rate(optimizer, decay_rate=0.999, lowest=1e-3):
 def get_norm_layer(ch):
     norm_layer = nn.BatchNorm2d(ch)
     return norm_layer
+
+def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, nonlinear='tanh'):
+    if nonlinear == 'tanh':
+        nonlinear = nn.Tanh()
+    elif nonlinear == 'relu':
+        nonlinear = nn.ReLU()
+    else:
+        raise NotImplementedError('There is no named')
+
+    layers = []
+    layers.append(nn.Conv2d(n_inputs, n_units, 3, 1, 1, dilation=1))
+    
+    for i in range(n_layers):
+        layers.append(nonlinear)
+        layers.append(nn.Conv2d(n_units, n_units, 3, 1, 1, dilation=1))
+    
+    layers.append(nonlinear)
+    layers.append(nn.Conv2d(n_units, n_outputs, 3, 1, 1, dilation=1))
+
+    return nn.Sequential(*layers)
 
 def log_after_epoch(epoch_num, loss, metrics, step, start_time, opt=None):
     
@@ -219,4 +245,4 @@ def plot_psnr_vs_n_frames(ground_truth, predicted_frames, tb):
     # TODO: plot PSNR vs. #frames
     # TODO: send plot to tensorboard
     # TODO: call this function in test() method of train_test.py
-
+    pass

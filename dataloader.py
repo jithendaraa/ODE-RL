@@ -121,8 +121,12 @@ class MovingMNIST(Dataset):
             "idx": idx, 
             "observed_data": input, 
             "data_to_predict": output, 
+            "timesteps": np.arange(0, length) / length,
             "frozen": frozen, 
             "zeros": np.zeros(1)}
+        
+        out['observed_tp'] = out['timesteps'][:self.n_frames_input]
+        out['tp_to_predict'] = out['timesteps'][self.n_frames_input:]
         return out
 
     def __len__(self):
