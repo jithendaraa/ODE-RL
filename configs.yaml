@@ -1,7 +1,7 @@
 defaults:
   id: 'ConvGRU_mmnist_train'
   dataset: "mmnist"
-  model: "ConvGRU"
+  model: "ConvGRU"      # Supports "ConvGRU"
   phase: "train"
   epochs: 100
   batch_size: 4
@@ -13,7 +13,7 @@ defaults:
   # Directories
   logdir: "logs"
   rundir: "runs"                      # Tensorboard outputs at runs/model_name/id.out
-  user_dir: "/home/jithen"
+  user_dir: "/home/jithen"            
   storage_dir: "scratch"
   data_dir: "datasets/MovingMNIST"    # user_dir/storage_dir/data_dir
   video_logdir: "videos"              # user_dir/storage_dir/videos/<model_name>/<id>_00000xxxxx.mp4
@@ -26,8 +26,8 @@ defaults:
   log_video_freq: 1             # log video every x steps
   test_log_freq: 20000          # log test loss every x steps
 
+  # Image sequence details
   resolution: 64
-  in_channels: 1
   train_seq: 100
   test_seq: 200
   train_in_seq: 50
@@ -38,29 +38,48 @@ defaults:
   lr: 1e-3
   n_downs: 2
   
+  in_channels: 1
   num_digits: 3
 
 train_mmnist_cgru:
   id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   data_dir: "datasets/MovingMNIST"
-  ckpt_save_freq: 40000
-  validate_freq: 40000
-  log_video_freq: 40000
+  phase: "train"
+  epochs: 10
+  ckpt_save_freq: 20000
+  validate_freq: 20000
+  log_video_freq: 20000
 
-  num_digits: 3
-  in_channels: 1
-
-  
 test_mmnist_cgru:
   id: 'ConvGRU_mmnist_test'
+  data_dir: "datasets/MovingMNIST"
   phase: "test"
   load_model: True
-  data_dir: "datasets/MovingMNIST"
   test_log_freq: 2000          # log test loss every x steps
 
-  num_digits: 3
-  in_channels: 1
+train_mmnist_odecgru:
+  id: 'ODEConv_mmnist_train'
+  model: "ODEConv"
+  phase: "train"
+  data_dir: "datasets/MovingMNIST"
+  epochs: 10
 
-  
+  downsize: True                  # if True, conv_encoder will 0.5x and conv_decoder will 2x the resolution for every layer in `n_layers`
+  conv_encoder_out_ch: 128        # output channels for conv encoder in models/ODEConvGRU.py
+  conv_n_units: 64                # n_units for conv encoder and conv decoder in models/ODEConvGRU.py
+  n_layers: 2                     # n_layers for conv encoder and conv decoder in models/ODEConvGRU.py
+  neural_ode_encoder_out_ch: 128  # output channels for ode_encoder_func in models/ODEConvGRU.py
+  neural_ode_decoder_out_ch: 128  # output channels for ode_decoder_func in models/ODEConvGRU.py
+  neural_ode_n_units: 64          # n_units for the convnet in ode_encoder_func and ode_decoder_func
+  n_ode_layers: 2                 # n_layers for the convnet in ode_encoder_func and ode_decoder_func
+  decode_diff_method: 'dopri5'    # choices=['dopri5', 'euler', 'adams', 'rk4']
+
+  ckpt_save_freq: 20000
+  validate_freq: 20000
+  log_video_freq: 20000
+
+  in_channels: 1
+  num_digits: 3
+
 
 
