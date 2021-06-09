@@ -9,13 +9,14 @@ import helpers.utils as utils
 
 class MovingMNIST(Dataset):
     def __init__(self, root, is_train, n_frames_input, n_frames_output, num_objects,
-                 transform=None, instances=1e4):
+                 transform=None, instances=1e4, device=None):
         '''
         param num_objects: a list of number of possible objects.
         '''
         super(MovingMNIST, self).__init__()
 
         self.dataset = None
+        self.device = device
         if is_train:
             self.mnist = utils.load_mnist(root)
         else:
@@ -119,14 +120,11 @@ class MovingMNIST(Dataset):
         input = torch.from_numpy(input / 255.0).contiguous().float()
         out = {
             "idx": idx, 
-            "observed_data": input, 
-            "data_to_predict": output, 
-            "timesteps": np.arange(0, length) / length,
+            "observed_data": input.to(self.device), 
+            "data_to_predict": output.to(self.device), 
             "frozen": frozen, 
             "zeros": np.zeros(1)}
         
-        out['observed_tp'] = out['timesteps'][:self.n_frames_input]
-        out['tp_to_predict'] = out['timesteps'][self.n_frames_input:]
         return out
 
     def __len__(self):
@@ -142,9 +140,9 @@ def parse_datasets(opt, device):
         print("Train frames:", opt.test_seq * train_instances)
         print("Test frames:", opt.test_seq * test_instances)
         
-        trainFolder = MovingMNIST(is_train=True, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], instances=1e4)
-        validFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits])
-        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits], instances=1e4)
+        trainFolder = MovingMNIST(is_train=True, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], instances=1e4, device=device)
+        validFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], device=device)
+        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits], instances=1e4, device=device)
     
         train_dataloader = DataLoader(trainFolder, batch_size=opt.batch_size, shuffle=False)
         valid_dataloader = DataLoader(validFolder, batch_size=opt.batch_size, shuffle=False)
