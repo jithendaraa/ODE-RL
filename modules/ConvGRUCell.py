@@ -8,7 +8,7 @@ import numpy as np
 from helpers.utils import get_norm_layer
 
 class ConvGRUCell(nn.Module):
-    def __init__(self, input_size, input_dim, hidden_dim, kernel_size, bias, dtype, padding=None):
+    def __init__(self, input_size, input_dim, hidden_dim, kernel_size, bias, dtype=None, padding=None):
         """
         :param input_size: (int, int) / Height and width of input tensor as (height, width).
         :param input_dim: int / Number of channels of input tensor.
@@ -17,14 +17,19 @@ class ConvGRUCell(nn.Module):
         :param bias: bool / Whether or not to add the bias.
         :param dtype: torch.cuda.FloatTensor or torch.FloatTensor / Whether or not to use cuda.
         """
+
         super(ConvGRUCell, self).__init__()
         self.height, self.width = input_size
         self.hidden_dim = hidden_dim
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if padding is None:
             self.padding = kernel_size[0] // 2, kernel_size[1] // 2
         else:
             self.padding = padding
+        
+        if dtype is None:
+            dtype = torch.cuda.FloatTensor if self.device == 'cuda' else torch.FloatTensor
         
         self.bias = bias
         self.dtype = dtype
