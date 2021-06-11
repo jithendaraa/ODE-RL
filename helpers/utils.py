@@ -7,6 +7,8 @@ import pickle
 import time
 import datetime
 import re
+import matplotlib.pyplot as plt
+from skimage.metrics import structural_similarity as ssim
 
 def args_type(default):
   def parse_string(x):
@@ -145,7 +147,7 @@ def create_transpose_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, upsiz
 
     return nn.Sequential(*layers)
 
-def log_after_epoch(epoch_num, loss, metrics, step, start_time, opt=None):
+def log_after_epoch(epoch_num, loss, metrics, step, start_time, total_steps, opt=None):
     
     if (epoch_num % opt.log_freq) == 0:
         metrics['train_losses_x'].append(step)
@@ -153,7 +155,7 @@ def log_after_epoch(epoch_num, loss, metrics, step, start_time, opt=None):
         et = time.time() - start_time
         et = str(datetime.timedelta(seconds=et))[:-7]
         log = f"Elapsed [{et}] Epoch [{epoch_num:03d}/{opt.epochs:03d}]\t"\
-                        f"Iterations [{(step):6d}] \t"\
+                        f"Iterations [{(step):7d}/{(total_steps):7d}] \t"\
                         f"Mse [{loss:.10f}]\t"
         print(log)
         # TODO: Output train loss to tensorboard
@@ -264,16 +266,24 @@ def print_exp_details(opt, n_batches):
     print()
 
 def save_video(pred, truth, step, log_video_freq, tb):
-
-    if (step % log_video_freq) == 0:
-        pred, truth = pred[0], truth[0] # extract first batch
+    pass
+    # if (step % log_video_freq) == 0:
+        # pred, truth = pred[0], truth[0] # extract first batch
         # TODO: save as GIF
         # TODO: send GIF to tensorboard
 
     pass
 
-def plot_psnr_vs_n_frames(ground_truth, predicted_frames, tb):
-    # TODO: plot PSNR vs. #frames
-    # TODO: send plot to tensorboard
-    # TODO: call this function in test() method of train_test.py
-    pass
+def get_normalized_ssim(pred, gt):
+
+    pred_np = pred.cpu()    # b, t, c, h, w
+    gt_np = gt.cpu()
+    ssim_val = 0
+    b, t = pred_np.shape[0], pred_np.shape[1]
+
+    for pred_, gt_ in zip(pred_np, gt_np):  # For every batch
+        for pred_t, gt_t in zip(pred_, gt_):    # For every time step
+            ssim_val += ssim(pred_t, gt_t, data_range=255, gaussian_weights=True, use_sample_covariance=False, channel_axis=0)
+    
+    return (ssim_val / (b*t))
+
