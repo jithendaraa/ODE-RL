@@ -3,43 +3,64 @@ sys.path.append('../')
 
 import torch
 import torch.nn as nn
+import copy
 
 from modules.ConvGRUCell import ConvGRUCell
 
 class ConvGRU(nn.Module):
     
-    def __init__(self, opt, device, activation='relu', encoder_out_channels=96, decoder_out_channels=None):
+    def __init__(self, opt, device, activation='leaky_relu', decODE=False, decoder_out_channels=None):
         super(ConvGRU, self).__init__()
+        
         self.opt = opt
-
+        self.decODE = decODE
+        self.device = device
         h, w = opt.resolution, opt.resolution
-        encoder_resolution = h // 4, w // 4
+        resize = 2 ** opt.depth
+        encoder_resolution = h // resize, w // resize
+        dtype = torch.cuda.FloatTensor if self.device == 'cuda' else torch.FloatTensor
+        
+        encoder_out_channels = opt.conv_encoder_out_ch
 
         if decoder_out_channels is None:
-            self.decoder_out_channels = opt.in_channels
+            decoder_out_channels = opt.in_channels
+            self.decoder_out_channels = decoder_out_channels
         else:
             self.decoder_out_channels = decoder_out_channels
         
         if opt.phase == 'train':
             self.n_input_frames = self.opt.train_in_seq
             self.n_output_frames = self.opt.train_out_seq
-        
         else:
             self.n_input_frames = self.opt.test_in_seq
             self.n_output_frames = self.opt.test_out_seq
 
-        self.device = device
+        self.encoder = Encoder(in_channels=opt.in_channels, out_channels=encoder_out_channels, act=activation, dtype=dtype, opt=opt, device=device).to(device)
+        self.hidden_state_channels = self.encoder.get_hidden_state_channels()
         
-        kernel_size = (3, 3)
-        dtype = torch.cuda.FloatTensor if self.device == 'cuda' else torch.FloatTensor
-
-        self.encoder = Encoder(in_channels=opt.in_channels, out_channels=encoder_out_channels, act='leaky_relu', dtype=dtype, opt=opt, device=device).to(device)
-        self.decoder = Decoder(in_channels=encoder_out_channels, out_channels=decoder_out_channels, act='leaky_relu', dtype=dtype, opt=opt, device=device, resolution=encoder_resolution, n_frames=self.n_output_frames).to(device)
+        if decODE:
+            self.decODEr = DecODEr(in_channels=encoder_out_channels, 
+                                    out_channels=self.decoder_out_channels, 
+                                    act=activation, 
+                                    dtype=dtype, 
+                                    opt=opt, 
+                                    device=device, 
+                                    resolution=encoder_resolution, n_frames=self.n_output_frames).to(device)
+        else:
+            self.decoder = Decoder(in_channels=encoder_out_channels, 
+                                    out_channels=self.decoder_out_channels, 
+                                    hidden_state_channels=self.hidden_state_channels,
+                                    act=activation, dtype=dtype, opt=opt, device=device, resolution=encoder_resolution, n_frames=self.n_output_frames).to(device)
     
     def forward(self, inputs):
         encoded_inputs = self.encoder(inputs)
-        encoded_inputs = encoded_inputs[::-1] # reverse list
-        pred_x = self.decoder(encoded_inputs)
+        hidden_states = encoded_inputs[::-1] # reverse list which has length self.opt.depth
+        
+        if self.decODE is True:
+            pred_x = self.decODEr(hidden_states)
+        else:
+            pred_x = self.decoder(hidden_states)
+
         return pred_x
 
     def get_prediction(self, inputs, batch_dict=None):
@@ -60,6 +81,7 @@ class Encoder(nn.Module):
         
         self.opt = opt
         b = self.opt.batch_size
+        self.depth = opt.depth
         h, w = opt.resolution, opt.resolution
         self.out_channels = out_channels
         self.device = device
@@ -71,87 +93,134 @@ class Encoder(nn.Module):
         elif act == 'leaky_relu':
             nonlinear = nn.LeakyReLU(negative_slope=0.2, inplace=True)
 
-        self.e1 = nn.Sequential(
-                        nn.Conv2d(in_channels, 16, 3, 1, 1),
-                        nonlinear)
-        e1_res = (h, w)
+        chan = 16
+        self.conv_encoders = nn.ModuleList()
+        self.conv_gru_cells = nn.ModuleList()
+        self.hiddens = {}
+        resize = 2
+        self.hidden_state_channels = []
 
-        self.cgru1 = ConvGRUCell(e1_res, 16, 64, 5, bias=True, dtype=dtype, padding=2)
+        # Make pairs of conv_encoders and convGRU cells
+        if self.depth == 1:
+            conv_encoders = []
+            conv_encoders += [nn.Conv2d(in_channels, opt.conv_encoder_out_ch, 3, 2, 1)]
+            conv_encoders += [nonlinear]
+            conv_encoders = nn.Sequential(*conv_encoders).to(self.device)
+            self.conv_encoders.append(conv_encoders)
+
+            self.hiddens[0] = [torch.zeros((b, opt.convgru_out_ch, h // resize, w // resize)).to(self.device)]
+            conv_gru_cell = ConvGRUCell((h // resize, w // resize), opt.conv_encoder_out_ch, opt.convgru_out_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+            self.conv_gru_cells.append(conv_gru_cell)
+            self.hidden_state_channels.append(opt.convgru_out_ch)
+
+        else:
+            conv_encoders = []
+            conv_encoders += [nn.Conv2d(in_channels, chan, 3, 2, 1)]
+            conv_encoders += [nonlinear]
+            conv_encoders = nn.Sequential(*conv_encoders).to(self.device)
+            self.conv_encoders.append(conv_encoders)
+
+            self.hiddens[0] = [torch.zeros((b, chan*2, h // resize, w // resize)).to(self.device)]
+            conv_gru_cell = ConvGRUCell((h // resize, w // resize), chan, chan*2, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+            self.conv_gru_cells.append(conv_gru_cell)
+            self.hidden_state_channels.append(chan*2)
+            chan *= 2
+            
+            for i in range(1, self.depth):
+
+                conv_encoders, conv_gru_cell = [], []
+                
+                if i == (self.depth - 1):          # Final layer
+                    conv_encoders += [nn.Conv2d(chan, opt.conv_encoder_out_ch, 3, 2, 1)]  # half the resolution every time
+                    conv_encoders += [nonlinear]
+                    conv_encoders = nn.Sequential(*conv_encoders).to(self.device)
+                    self.conv_encoders.append(conv_encoders)
+                    
+                    resize *= 2
+                    conv_gru_cell = ConvGRUCell((h // resize, w // resize), opt.conv_encoder_out_ch, opt.convgru_out_ch, kernel_size=5, bias=True, dtype=dtype, padding=2).to(self.device)
+                    self.conv_gru_cells.append(conv_gru_cell)
+                    self.hiddens[i] = [torch.zeros((b, opt.convgru_out_ch, h // resize, w // resize)).to(self.device)]
+                    hidden_channels = opt.convgru_out_ch
+
+                else:
+                    conv_encoders += [nn.Conv2d(chan, chan, 3, 2, 1)]  # half the resolution every time
+                    conv_encoders += [nonlinear]
+                    conv_encoders = nn.Sequential(*conv_encoders).to(self.device)
+                    self.conv_encoders.append(conv_encoders)
+
+                    resize *= 2
+                    self.hiddens[i] = [torch.zeros((b, chan*2, h // resize, w // resize)).to(self.device)]
+
+                    conv_gru_cell = ConvGRUCell((h // resize, w // resize), chan, chan*2, kernel_size=5, bias=True, dtype=dtype, padding=2).to(self.device)       # twice the channel every time
+                    self.conv_gru_cells.append(conv_gru_cell)
+                    hidden_channels = chan*2
+                    chan *= 2
+                
+                self.hidden_state_channels.append(hidden_channels)
         
+        self.init_hiddens = copy.deepcopy(self.hiddens)
+        self.init_hidden_state_channels = self.hidden_state_channels.copy()
 
-        self.e2 = nn.Sequential(
-                        nn.Conv2d(64, 64, 3, 2, 1),
-                        nonlinear)
-        e2_res = (h // 2, w // 2)
 
-        self.cgru2 = ConvGRUCell(e2_res, 64, 96, 5, bias=True, dtype=dtype, padding=2)
-        
-
-        self.e3 = nn.Sequential(
-                        nn.Conv2d(96, 96, 3, 2, 1),
-                        nonlinear)
-        e3_res = (h // 4, w // 4)
-
-        self.cgru3 = ConvGRUCell(e3_res, 96, out_channels, 5, bias=True, dtype=dtype, padding=2)
-        
+    def get_hidden_state_channels(self):
+        return self.hidden_state_channels[::-1]
 
     def forward(self, inputs):
+        
+        self.hiddens = copy.deepcopy(self.init_hiddens)
+        self.hidden_state_channels = self.init_hidden_state_channels.copy()
+
         b, in_frames, c, h, w = inputs.size()
+        ins = [inputs]
+        device = self.device
 
-        self.h_1_t = [torch.zeros((b, 64, h, w)).to(self.device)]
-        self.h_2_t = [torch.zeros((b, 96, h // 2, w // 2)).to(self.device)]
-        self.h_3_t = [torch.zeros((b, self.out_channels, h // 4, w // 4)).to(self.device)]
+        for i in range(self.depth):
+            in_ = ins[-1]
 
-        device = inputs.device
+            if len(in_.size()) == 5:
+                in_ = in_.view(-1, in_.size()[-3], in_.size()[-2], in_.size()[-1])
 
-        e1 = self.e1(inputs.view(-1, c, h, w))
-        _, e1_ch, e1_h, e1_w = e1.size()
-        e1 = e1.view(b, in_frames, e1_ch, e1_h, e1_w).permute(1, 0, 2, 3, 4) # t, b, c, h, w
+            encoded_inputs_i = self.conv_encoders[i](in_)
 
-        for e1_input in e1:
-            h_prev = self.h_1_t[-1]
-            h_next = self.cgru1(e1_input, h_prev).to(device)
-            self.h_1_t.append(h_next)
+            _, ei_ch, ei_h, ei_w = encoded_inputs_i.size()
+            encoded_inputs_i = encoded_inputs_i.view(b, in_frames, ei_ch, ei_h, ei_w).permute(1, 0, 2, 3, 4) # t, b, c, h, w
+
+            for ei_input in encoded_inputs_i:
+                h_prev = self.hiddens[i][-1]
+                h_next = self.conv_gru_cells[i](ei_input, h_prev).to(device)
+                self.hiddens[i].append(h_next)
         
-        _, h_next_ch, h_next_h, h_next_w = h_next.size()
-        h_1_t = torch.stack(self.h_1_t[1:]).to(device).view(-1, h_next_ch, h_next_h, h_next_w)
-
-        e2 = self.e2(h_1_t)
-        _, e2_ch, e2_h, e2_w = e2.size()
-        e2 = e2.view(b, in_frames, e2_ch, e2_h, e2_w).permute(1, 0, 2, 3, 4) # t, b, c, h, w
-
-        for e2_input in e2:
-            h_prev = self.h_2_t[-1]
-            h_next = self.cgru2(e2_input, h_prev).to(device)
-            self.h_2_t.append(h_next)
-
-        _, h_next_ch, h_next_h, h_next_w = h_next.size()
-        h_2_t = torch.stack(self.h_2_t[1:]).to(device).view(-1, h_next_ch, h_next_h, h_next_w)
+            _, h_next_ch, h_next_h, h_next_w = h_next.size()
+            hiddens = torch.stack(self.hiddens[i][1:]).to(device).view(-1, h_next_ch, h_next_h, h_next_w)
+            ins.append(hiddens)
+            
+        hidden_states = []
+        for i in range(self.depth):
+            hidden_states.append(self.hiddens[i][-1])
         
-        e3 = self.e3(h_2_t)
-        _, e3_ch, e3_h, e3_w = e3.size()
-        e3 = e3.view(b, in_frames, e3_ch, e3_h, e3_w).permute(1, 0, 2, 3, 4) # t, b, c, h, w
-
-        for e3_input in e3:
-            h_prev = self.h_3_t[-1]
-            h_next = self.cgru3(e3_input, h_prev).to(device)
-            self.h_3_t.append(h_next)
-        
-        # final hidden states
-        return [self.h_1_t[-1], self.h_2_t[-1], self.h_3_t[-1]]
+        return hidden_states
 
 
 class Decoder(nn.Module):
     
-    def __init__(self, in_channels=96, out_channels=1, resolution=(16, 16), act='leaky_relu', dtype=None, opt=None, device=None, n_frames=None):
+    def __init__(self, in_channels, out_channels, hidden_state_channels, act='leaky_relu', dtype=None, opt=None, device=None, resolution=(16, 16), n_frames=None):
         super(Decoder, self).__init__()
+        
+        assert in_channels == hidden_state_channels[0]
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        hidden_state_channels.append(out_channels)
+        self.hidden_state_channels = hidden_state_channels
         self.opt = opt
         self.device = device
+
+        self.depth = opt.depth
         self.encoder_resolution = resolution
-        self.in_channels = in_channels
-        e_h, e_w = resolution # h,w after Encoder
-        h, w = opt.resolution, opt.resolution
         self.n_frames = n_frames
+
+        h, w = opt.resolution, opt.resolution
+        e_h, e_w = resolution # h,w after Encoder
+        resize = 1
 
         if act == 'relu':
             nonlinear = nn.ReLU()
@@ -160,64 +229,97 @@ class Decoder(nn.Module):
         elif act == 'leaky_relu':
             nonlinear = nn.LeakyReLU(negative_slope=0.2, inplace=True)
 
-        self.cgru3 = ConvGRUCell(resolution, 96, 96, 5, bias=True, dtype=dtype, padding=2)
-        
-        self.d3 = nn.Sequential(
-                        nn.ConvTranspose2d(in_channels, 96, 4, 2, 1),
-                        nonlinear)
-        d3_res = (e_h * 2, e_w * 2)
+        self.conv_decoders = nn.ModuleList()
+        self.conv_gru_cells = nn.ModuleList()
+        chan = 16           # value of chan from Encoder
 
-        self.cgru2 = ConvGRUCell(d3_res, 96, 96, 5, bias=True, dtype=dtype, padding=2)
-        self.d2 = nn.Sequential(
-                        nn.ConvTranspose2d(96, 96, 4, 2, 1),
-                        nonlinear)
-        d2_res = (e_h * 4, e_w * 4)
-        
-        self.cgru1 = ConvGRUCell(d2_res, 96, 64, 5, bias=True, dtype=dtype, padding=2)
-        self.d1 = nn.Sequential(
-                        nn.Conv2d(64, 16, 3, 1, 1),
-                        nonlinear,
-                        nn.Conv2d(16, opt.in_channels, 1, 1, 0),
-                        nonlinear)
+        if self.depth == 1:
+            conv_gru_ch = self.hidden_state_channels[0]
+            last_ch = self.hidden_state_channels[1]
+
+            conv_gru_cell = ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+            self.conv_gru_cells.append(conv_gru_cell)
+
+            conv_decoders = []
+            conv_decoders += [nn.ConvTranspose2d(conv_gru_ch, last_ch, 4, 2, 1)]
+            conv_decoders += [nonlinear]
+            conv_decoders = nn.Sequential(*conv_decoders).to(self.device)
+            self.conv_decoders.append(conv_decoders)
+
+        else:
+            conv_gru_ch = self.hidden_state_channels[0]
+            next_ch = self.hidden_state_channels[1]
+
+            conv_gru_cell = ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+            self.conv_gru_cells.append(conv_gru_cell)
+
+            conv_decoders = []
+            conv_decoders += [nn.ConvTranspose2d(conv_gru_ch, next_ch, 4, 2, 1)]
+            conv_decoders += [nonlinear]
+            conv_decoders = nn.Sequential(*conv_decoders).to(self.device)
+            self.conv_decoders.append(conv_decoders)
+
+            for i in range(1, self.depth):
+                
+                conv_gru_ch = self.hidden_state_channels[i]
+                next_ch = self.hidden_state_channels[i+1]
+                
+                if i == (self.depth - 1):
+                    conv_gru_cell = ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+                    self.conv_gru_cells.append(conv_gru_cell)
+
+                    conv_decoders = []
+                    conv_decoders += [nn.ConvTranspose2d(conv_gru_ch, next_ch, 4, 2, 1)]
+                    conv_decoders += [nonlinear]
+                    conv_decoders = nn.Sequential(*conv_decoders).to(self.device)
+                    self.conv_decoders.append(conv_decoders)
+                
+                else:
+                    conv_gru_cell = ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+                    self.conv_gru_cells.append(conv_gru_cell) 
+
+                    conv_decoders = []
+                    conv_decoders += [nn.ConvTranspose2d(conv_gru_ch, next_ch, 4, 2, 1)]
+                    conv_decoders += [nonlinear]
+                    conv_decoders = nn.Sequential(*conv_decoders).to(self.device)
+                    self.conv_decoders.append(conv_decoders)
+                    resize *= 2
 
     def forward(self, hidden_states):
-        
+
+        assert len(hidden_states) == self.depth
         e_h, e_w = self.encoder_resolution
-        h_3_t, h_2_t, h_1_t = hidden_states[0], hidden_states[1], hidden_states[2]
         b = self.opt.batch_size
-
-        inputs = torch.zeros((self.n_frames, b, self.in_channels, e_h, e_w)).to(self.device)
-
-        h_prev = h_3_t
-        new_inputs = []
-        for input_ in inputs:   # iterating over timesteps to decode
-            next_input = self.cgru3(input_, h_prev).to(self.device)
-            new_inputs.append(next_input)
-            h_prev = next_input
+        chan = self.hidden_state_channels[0]
         
-        new_inputs = torch.stack(new_inputs).to(self.device)
-        inputs = new_inputs.view(b*self.n_frames, -1, e_h, e_w)
-        inputs = self.d3(inputs).view(b, self.n_frames, -1, e_h*2, e_w*2).permute(1, 0, 2, 3, 4)
+        ins = [torch.zeros((self.n_frames, b, chan, e_h, e_w)).to(self.device)]
 
-        h_prev = h_2_t
-        new_inputs = []
-        for input_ in inputs:   # iterating over timesteps to decode
-            next_input = self.cgru2(input_, h_prev).to(self.device)
-            new_inputs.append(next_input)
-            h_prev = next_input
+        for i in range(self.depth):
+            in_ = ins[-1]
+            h_prev = hidden_states[i]
+            new_inputs = []
+            for input_ in in_:   # iterating over timesteps to decode
+                next_input = self.conv_gru_cells[i](input_, h_prev).to(self.device)
+                new_inputs.append(next_input)
+                h_prev = next_input
+            
+            new_inputs = torch.stack(new_inputs).to(self.device)
 
-        new_inputs = torch.stack(new_inputs).to(self.device)
-        inputs = new_inputs.view(b*self.n_frames, -1, e_h*2, e_w*2)
-        inputs = self.d2(inputs).view(b, self.n_frames, -1, e_h*4, e_w*4).permute(1, 0, 2, 3, 4)
+            inputs = new_inputs.view(b*self.n_frames, -1, e_h, e_w)
+            inputs = self.conv_decoders[i](inputs).view(b, self.n_frames, -1, e_h*2, e_w*2).permute(1, 0, 2, 3, 4)  # t, b, c, h , w
+            e_h, e_w = e_h * 2, e_w * 2
+            ins.append(inputs)
+        
+        pred_x = ins[-1].permute(1, 0, 2, 3, 4)  # Make batch dim first
+        predictions_size = [b, self.n_frames, self.opt.in_channels, self.opt.resolution, self.opt.resolution]
+        assert list(pred_x.size()) == predictions_size
 
-        h_prev = h_1_t
-        new_inputs = []
-        for input_ in inputs:   # iterating over timesteps to decode
-            next_input = self.cgru1(input_, h_prev).to(self.device)
-            new_inputs.append(next_input)
-            h_prev = next_input
+        return pred_x
 
-        new_inputs = torch.stack(new_inputs).to(self.device)
-        inputs = new_inputs.view(b*self.n_frames, -1, e_h*4, e_w*4)
-        decoded_state = self.d1(inputs).view(b, self.n_frames, -1, e_h*4, e_w*4)
-        return decoded_state
+
+class DecODEr(nn.Module):
+    def __init__(self, in_channels=96, out_channels=1, resolution=(16, 16), act='leaky_relu', dtype=None, opt=None, device=None, n_frames=None):
+        super(DecODEr, self).__init__()
+    
+    def forward(self, inputs):
+        print(inputs.size(), "DecODEr :D")

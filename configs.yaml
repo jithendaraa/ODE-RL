@@ -46,9 +46,15 @@ train_mmnist_cgru:
   data_dir: "datasets/MovingMNIST"
   phase: "train"
   epochs: 10
+  decODE: False
+
+  conv_encoder_out_ch: 128
+  convgru_out_ch: 128
+
   ckpt_save_freq: 20000
   validate_freq: 20000
   log_video_freq: 20000
+  depth: 3                              # num_pairs <ConvEncode, ConvGRUCell>
 
 test_mmnist_cgru:
   id: 'ConvGRU_mmnist_test'
@@ -56,6 +62,18 @@ test_mmnist_cgru:
   phase: "test"
   load_model: True
   test_log_freq: 2000          # log test loss every x steps
+
+train_mmnist_cgrudecODE:
+  id: 'cgrudecODE_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
+  model: "cgrudecODE"
+  data_dir: "datasets/MovingMNIST"
+  phase: "train"
+  epochs: 10
+  ckpt_save_freq: 20000
+  validate_freq: 20000
+  log_video_freq: 20000
+  decODE: True
+
 
 train_mmnist_odecgru:
   id: 'ODEConv_mmnist_train'
@@ -82,7 +100,7 @@ train_mmnist_odecgru:
   in_channels: 1
   num_digits: 3
 
-train_mmnist_sample_odecgru:    # Samples z0 from N(z_mu, z_sigma) instead of doing z0 = z_mu
+train_mmnist_sample_odecgru:      # Samples z0 from N(z_mu, z_sigma) instead of doing z0 = z_mu
   id: 'ODEConv_mmnist_train'
   model: "ODEConv"
   phase: "train"
@@ -106,6 +124,10 @@ train_mmnist_sample_odecgru:    # Samples z0 from N(z_mu, z_sigma) instead of do
 
   in_channels: 1
   num_digits: 3
+
+
+
+
 
 
 
