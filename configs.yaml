@@ -45,16 +45,21 @@ train_mmnist_cgru:
   id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   data_dir: "datasets/MovingMNIST"
   phase: "train"
-  epochs: 10
+  epochs: 20                            # 1 epcoh is 2500 steps
   decODE: False
+
+  train_in_seq: 50
+  train_out_seq: 50
+  test_in_seq: 50
+  test_out_seq: 150
 
   conv_encoder_out_ch: 128
   convgru_out_ch: 128
-
-  ckpt_save_freq: 20000
-  validate_freq: 20000
-  log_video_freq: 20000
   depth: 3                              # num_pairs <ConvEncode, ConvGRUCell>
+
+  ckpt_save_freq: 50
+  validate_freq: 50
+  log_video_freq: 50
 
 test_mmnist_cgru:
   id: 'ConvGRU_mmnist_test'
@@ -62,6 +67,12 @@ test_mmnist_cgru:
   phase: "test"
   load_model: True
   test_log_freq: 2000          # log test loss every x steps
+  step: 50                       # load saved model params for which step
+
+  train_in_seq: 50
+  train_out_seq: 50
+  test_in_seq: 50
+  test_out_seq: 150
 
 train_mmnist_cgrudecODE:
   id: 'cgrudecODE_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
@@ -73,6 +84,13 @@ train_mmnist_cgrudecODE:
   validate_freq: 20000
   log_video_freq: 20000
   decODE: True
+  z_sample: False
+  loss: 'MSE'
+
+  conv_encoder_out_ch: 128
+  convgru_out_ch: 128
+  depth: 1
+  latent_dim: 64                               # z0 channels
 
 
 train_mmnist_odecgru:

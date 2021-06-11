@@ -210,13 +210,18 @@ def load_model_params(model, opt):
     
     # Load model params of this exp id
     load_id = opt.model + '_' + opt.dataset + '_train_' + str(opt.train_in_seq) + '_' + str(opt.train_out_seq) + '_' 
-    saved_params_list = os.listdir(opt.model_params_logdir)
-    # Required saved_params_list shoudl start with load_id
-    r = re.compile(load_id + "*")
-    filtered_saved_params_list = list(filter(r.match, saved_params_list))
-    filtered_saved_params_list.sort()
+    padded_zeros = '0' * (10 - len(str(opt.step)))
+    padded_step = padded_zeros + str(opt.step)
+    file_to_load = load_id + padded_step + '.pickle'
 
-    model_params_file_path = os.path.join(opt.model_params_logdir, filtered_saved_params_list[-1])  # select params_file with highest steps
+    saved_params_list = os.listdir(opt.model_params_logdir)
+    # Required saved_params_list should start with load_id
+    # r = re.compile(load_id + "*")
+    # filtered_saved_params_list = list(filter(r.match, saved_params_list))
+    # filtered_saved_params_list.sort()
+
+    assert file_to_load in saved_params_list
+    model_params_file_path = os.path.join(opt.model_params_logdir, file_to_load)  # select params_file with highest steps
 
     objects = {}
     with (open(model_params_file_path, "rb")) as openfile:
