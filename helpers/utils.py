@@ -4,10 +4,7 @@ import os
 import gzip
 import numpy as np
 import pickle
-import time
-import datetime
 import re
-import matplotlib.pyplot as plt
 from skimage.metrics import structural_similarity as ssim
 
 def args_type(default):
@@ -204,7 +201,7 @@ def save_model_params(model, optimizer, epoch, opt, step, ckpt_save_freq):
 
         with open(model_params_file_name, 'wb') as handle:
             pickle.dump(model_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            print("Saved model parameters at step", step, "->", model_params_file_name)
+            print(f"Saved model parameters at step {step} -> {model_params_file_name}")
 
 def load_model_params(model, opt):
     
@@ -228,7 +225,7 @@ def load_model_params(model, opt):
         while True:
             try:
                 objects = pickle.load(openfile)
-                print("Loaded model at", model_params_file_path)
+                print(f"Loaded model at {model_params_file_path}")
                 break
             except EOFError:
                 print("Error reading params pickle at", model_params_file_path)
@@ -248,14 +245,14 @@ def save_video(pred, truth, step, log_video_freq, tb):
 
 def get_normalized_ssim(pred, gt):
 
-    pred_np = pred.cpu()    # b, t, c, h, w
-    gt_np = gt.cpu()
+    pred_np = pred.permute(0, 1, 3, 4, 2).cpu().numpy()    # b, t, c, h, w
+    gt_np = gt.permute(0, 1, 3, 4, 2).cpu().numpy()
     ssim_val = 0
     b, t = pred_np.shape[0], pred_np.shape[1]
 
     for pred_, gt_ in zip(pred_np, gt_np):  # For every batch
         for pred_t, gt_t in zip(pred_, gt_):    # For every time step
-            ssim_val += ssim(pred_t, gt_t, data_range=255, gaussian_weights=True, use_sample_covariance=False, channel_axis=0)
+            ssim_val += ssim(pred_t, gt_t, data_range=255, gaussian_weights=True, use_sample_covariance=False, multichannel=True)
     
     return (ssim_val / (b*t))
 

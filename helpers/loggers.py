@@ -1,6 +1,9 @@
 import os
 import numpy as np
 import json
+import matplotlib.pyplot as plt
+import time
+import datetime
 
 def print_exp_details(opt, n_batches):
     print()
