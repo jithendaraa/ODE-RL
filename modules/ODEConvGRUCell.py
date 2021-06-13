@@ -44,7 +44,6 @@ class ODEConvGRUCell(nn.Module):
         # Set initial inputs
         prev_input = torch.zeros((b, c, h, w)).to(self.device)
 
-        # Time configuration
         # Run ODE backwards and combine the y(t) estimates using gating
         prev_t, t_i = timesteps[-1] + 0.01, timesteps[-1]
         latent_ys = []

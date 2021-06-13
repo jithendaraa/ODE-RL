@@ -13,9 +13,7 @@ from dataloader import parse_datasets
 # Models
 from models.ConvGRU import ConvGRU
 from models.ODEConvGRU import ODEConvGRU
-
 from train_test import train, test
-
 
 
 def get_opt():
@@ -49,8 +47,8 @@ def main(opt):
     print("Loaded", opt.dataset, "dataset")
     print("Args:", opt)
 
-    if opt.model in ['ConvGRU']:
-      model = ConvGRU(opt, device)
+    if opt.model in ['ConvGRU', 'cgrudecODE']:
+      model = ConvGRU(opt, device, decODE=opt.decODE)
     
     elif opt.model in ['ODEConv']:
       model = ODEConvGRU(opt, device)

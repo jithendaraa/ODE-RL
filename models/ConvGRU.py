@@ -6,6 +6,7 @@ import torch.nn as nn
 import copy
 
 from modules.ConvGRUCell import ConvGRUCell
+from modules.DiffEqSolver import DiffEqSolver
 
 class ConvGRU(nn.Module):
     
@@ -52,26 +53,33 @@ class ConvGRU(nn.Module):
                                     hidden_state_channels=self.hidden_state_channels,
                                     act=activation, dtype=dtype, opt=opt, device=device, resolution=encoder_resolution, n_frames=self.n_output_frames).to(device)
     
-    def forward(self, inputs):
+    def forward(self, inputs, batch_dict=None):
         encoded_inputs = self.encoder(inputs)
         hidden_states = encoded_inputs[::-1] # reverse list which has length self.opt.depth
         
         if self.decODE is True:
-            pred_x = self.decODEr(hidden_states)
+            time_steps_to_predict = batch_dict['tp_to_predict']
+            pred_x = self.decODEr(hidden_states, time_steps_to_predict)
         else:
             pred_x = self.decoder(hidden_states)
 
         return pred_x
 
     def get_prediction(self, inputs, batch_dict=None):
-        pred_x = self(inputs)
+        pred_x = self(inputs, batch_dict)
         return pred_x
     
-    def get_loss(self, pred_frames, truth):
+    def get_loss(self, pred_frames, truth, loss='MSE'):
         """ Returns the reconstruction loss calculated as MSE Error """
-        b, t, c, h, w = truth.size()
-        loss_function = nn.MSELoss().cuda()
-        loss = loss_function(pred_frames, truth) / ( b * t )
+        if loss == 'MSE':
+            b, t, c, h, w = truth.size()
+            loss_function = nn.MSELoss().cuda()
+            loss = loss_function(pred_frames, truth) / ( b * t )
+        
+        elif loss == 'ELBO':            # ELBO loss if prediction were done as in variational inference: sum log prob(x_i|z_i) + log prob(z0) + 
+            loss = None
+            pass
+
         return loss
 
 
@@ -196,14 +204,18 @@ class Encoder(nn.Module):
             
         hidden_states = []
         for i in range(self.depth):
-            hidden_states.append(self.hiddens[i][-1])
+            if self.opt.decODE is False:
+                hidden_states.append(self.hiddens[i][-1])
+            else:
+                hiddens = torch.stack(self.hiddens[i][1:][::-1]).to(device) # Reversed for running backwards in time from h_(n-1) to h0 to infer z0
+                hidden_states.append(hiddens)                               # has self.depth elements with each element being t, b, c, h , w
         
         return hidden_states
 
 
 class Decoder(nn.Module):
     
-    def __init__(self, in_channels, out_channels, hidden_state_channels, act='leaky_relu', dtype=None, opt=None, device=None, resolution=(16, 16), n_frames=None):
+    def __init__(self, in_channels, out_channels, hidden_state_channels, n_frames, act='leaky_relu', dtype=None, opt=None, device=None, resolution=(16, 16)):
         super(Decoder, self).__init__()
         
         assert in_channels == hidden_state_channels[0]
@@ -318,8 +330,74 @@ class Decoder(nn.Module):
 
 
 class DecODEr(nn.Module):
-    def __init__(self, in_channels=96, out_channels=1, resolution=(16, 16), act='leaky_relu', dtype=None, opt=None, device=None, n_frames=None):
+    def __init__(self, in_channels, out_channels, n_frames, act='leaky_relu', dtype=None, opt=None, device=None, resolution=(16, 16)):
         super(DecODEr, self).__init__()
+        
+        self.n_frames = n_frames
+        self.depth = opt.depth
+        self.device = device
+
+        # ConvGRU to run backwards in time
+        self.convgru_cell = ConvGRUCell(resolution, opt.conv_encoder_out_ch, opt.latent_dim, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+
+        # last conv layer for generating mu, sigma
+        z0_dim = opt.latent_dim
+        self.z0_dim = z0_dim
+        self.transform_z0 = nn.Sequential(
+            nn.Conv2d(z0_dim, z0_dim, 1, 1, 0),
+            nn.ReLU(),
+            nn.Conv2d(z0_dim, z0_dim * 2, 1, 1, 0), )
+
+        # ODE Solver to obtain z_(n+1)...z(n+m) from z0
+        # self.diffeq_solver = DiffEqSolver(self.ode_func)
+        
+        self.hiddens = [torch.zeros(opt.batch_size, opt.latent_dim, resolution[0], resolution[1]).to(self.device)]
+        self.init_hiddens = self.hiddens.copy()
     
-    def forward(self, inputs):
-        print(inputs.size(), "DecODEr :D")
+    def forward(self, inputs, time_steps_to_predict):
+        
+        # Run ConvGRU backwards in time to predict y0
+        latent_ys, y0_s = self.run_convgru_backwards(inputs)        # returns 2 lists of len self.depth
+        y0 = y0_s[-1]
+        
+        # Use y0 to get mu and std for z0's normal distribution
+        trans_last_yi = self.transform_z0(y0)
+        mean_z0, std_z0 = torch.split(trans_last_yi, self.z0_dim, dim=1)
+        std_z0 = std_z0.abs()
+
+        if self.opt.z_sample is True:
+            # Dont sample from Normal, use z0 = mu instead; and use MSE Loss
+            z0 = first_point_mu.unsqueeze(0).repeat(1, 1, 1, 1, 1).squeeze(0)
+        
+        elif self.opt.z_sample is False:
+            # z0 ~ N(mu, std) and use ELBO loss (sum prediction log prob + KL(q(z0 | input frames) and p(z0)) ); q is decoder and p(z0) ~ N(0, 1)
+            pass
+        
+        return None, None
+    
+    def run_convgru_backwards(self, inputs):
+        latent_ys, y0_s = [], []        # will have self.depth latent_ys and y_0 at the end of this method
+
+        for i, input_ in enumerate(inputs):             # iterating over the `self.depth` hidden states that we receive from Encoder: list of len `self.depth`
+            # Input timesteps: n; Output timesteps: m
+            # Each input_ has (n, b, c, h, w) tensor
+            print(input_.size())
+            self.hiddens = self.init_hiddens.copy()
+            # Run backwards in time from h_(n-1)....h_0 (Encoder returns the hidden states in reversed time) to use ConvGRU to estimate H_(n-1)...H_0 and use H_0 to estimate z0
+            for in_ in input_:      
+                # H_(n-1) -> ConvGRU(h_{n-1}, H_{N}); H_x is ConvGRU estimate of h_x
+                next_H = self.hiddens[-1]
+                curr_h = in_
+                prev_H = self.convgru_cell(curr_h, next_H).to(self.device)
+                self.hiddens.append(prev_H)
+            
+            assert len(self.hiddens[1:]) == self.n_frames
+            y0 = prev_H                                                # Same as H0
+            H_s = torch.stack(self.hiddens[1:]).to(self.device)
+            y0_s.append(y)
+            latent_ys.append(H_s)                                       # saved as n, b, c, h, w
+        
+        return latent_ys, y0_s
+
+
+

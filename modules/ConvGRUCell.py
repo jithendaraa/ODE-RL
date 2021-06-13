@@ -110,11 +110,3 @@ class ConvEncoder(nn.Module):
 
     def forward(self, x):
         return self.layers(x)
-
-class ConvDecoder(nn.Module):
-    
-    def __init__(self):
-        super(ConvDecoder, self).__init__()
-    
-    def forward(self, x):
-        pass

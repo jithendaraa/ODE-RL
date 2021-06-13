@@ -68,18 +68,20 @@ class ODEConvGRU(nn.Module):
         time_steps_to_predict = batch_dict['tp_to_predict']
         pred_t_len = len(time_steps_to_predict)
 
-        # ConvEncode the input frames
+        # 1. ConvEncode the input frames
         encoded_inputs = self.conv_encoder(inputs.view(b*t, c, h, w))
         encoded_inputs = encoded_inputs.view(b, -1, encoded_inputs.size()[-3], encoded_inputs.size()[-2], encoded_inputs.size()[-1])
         
-        # ODEConvGRUCell to predict (first_point_mu, first_point_std) for z_0
+        # 2. ODEConvGRUCell to predict (first_point_mu, first_point_std) for z_0
         first_point_mu, first_point_std = self.ode_convgru_cell(encoded_inputs, observed_tp)
         
         # Sampling latent features
         if self.opt.z_sample is True:
             # first_point_enc = Gaussian(first_point_mu, first_point_std) might introduce stochasticity in the ODEConvGRU model
-            sampled_z = torch.normal(mean=first_point_mu, std=first_point_std)
-            first_point_enc = sampled_z.unsqueeze(0).repeat(1, 1, 1, 1, 1).squeeze(0)
+            # TODO: reparametrization trick or this might not work
+            # sampled_z = torch.normal(mean=first_point_mu, std=first_point_std)
+            # first_point_enc = sampled_z.unsqueeze(0).repeat(1, 1, 1, 1, 1).squeeze(0)
+            pass
         else:
             # first_point_enc = first_point_mu
             first_point_enc = first_point_mu.unsqueeze(0).repeat(1, 1, 1, 1, 1).squeeze(0)
