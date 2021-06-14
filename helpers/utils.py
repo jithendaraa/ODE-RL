@@ -244,15 +244,13 @@ def save_video(pred, truth, step, log_video_freq, tb):
     pass
 
 def get_normalized_ssim(pred, gt):
-
-    pred_np = pred.permute(0, 1, 3, 4, 2).cpu().numpy()    # b, t, c, h, w
-    gt_np = gt.permute(0, 1, 3, 4, 2).cpu().numpy()
+    pred_np = pred.permute(0, 2, 3, 1).cpu().numpy()    # b, c, h, w
+    gt_np = gt.permute(0, 2, 3, 1).cpu().numpy()
     ssim_val = 0
     b, t = pred_np.shape[0], pred_np.shape[1]
 
     for pred_, gt_ in zip(pred_np, gt_np):  # For every batch
-        for pred_t, gt_t in zip(pred_, gt_):    # For every time step
-            ssim_val += ssim(pred_t, gt_t, data_range=255, gaussian_weights=True, use_sample_covariance=False, multichannel=True)
+        ssim_val += ssim(pred_, gt_, data_range=255, gaussian_weights=True, use_sample_covariance=False, multichannel=True)
     
-    return (ssim_val / (b*t))
+    return (ssim_val / (b))
 
