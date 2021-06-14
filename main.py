@@ -15,7 +15,6 @@ from models.ConvGRU import ConvGRU
 from models.ODEConvGRU import ODEConvGRU
 from train_test import train, test
 
-
 def get_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--configs', nargs='+', required=True)
@@ -32,20 +31,21 @@ def get_opt():
       parser.add_argument(f'--{key}', type=arg_type, default=arg_type(value))
     
     opt = parser.parse_args(remaining)
-    print()
     opt = utils.set_opts(opt)
+
+    exp_config = {}
+
+    for arg in vars(opt):
+      val = getattr(opt, arg)
+      exp_config[arg] = val
+      # print(arg, val)
+
     print()
-    return opt
+    return opt, exp_config
     
+def init_model(opt, device):
 
-def main(opt):
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    # Dataloader
-    loader_objs = parse_datasets(opt, device)
-    print("Loaded", opt.dataset, "dataset")
-    print("Args:", opt)
+    implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv']
 
     if opt.model in ['ConvGRU', 'cgrudecODE']:
       model = ConvGRU(opt, device, decODE=opt.decODE)
@@ -54,15 +54,31 @@ def main(opt):
       model = ODEConvGRU(opt, device)
       print("Initialised ODEConv model")
     
+    else: 
+      raise NotImplementedError(f'Model {opt.model} is not implemented. Try one of {implemented_models}')
+
+    return model
+
+def main(opt, exp_config):
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Dataloader
+    loader_objs = parse_datasets(opt, device)
+    print("Loaded", opt.dataset, "dataset")
+    print("Args:", opt)
+
+    model = init_model(opt, device)
+
     if opt.load_model is True:
       model = utils.load_model_params(model, opt)
 
     if opt.phase == 'train':
-      train(opt, model, loader_objs, device)
+      train(opt, model, loader_objs, device, exp_config)
       
     elif opt.phase == 'test':
-      test(opt, model, loader_objs, device)
+      test(opt, model, loader_objs, device, exp_config)
 
 if __name__ == '__main__':
-    opt = get_opt()
-    main(opt)
+    opt, exp_config = get_opt()
+    main(opt, exp_config)
