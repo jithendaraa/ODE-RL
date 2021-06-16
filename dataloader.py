@@ -182,9 +182,10 @@ def parse_datasets(opt, device):
         test_instances = total_instances - train_instances
         print("Train frames:", opt.test_seq * train_instances)
         print("Test frames:", opt.test_seq * test_instances)
+        print(f"Train instances {train_instances}; Test instances {test_instances}")
         
         trainFolder = MovingMNIST(is_train=True, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], instances=train_instances, device=device, frozen=opt.frozen)
-        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits], instances=test_instances, device=device, frozen=opt.frozen, offset=train_instances)
+        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits], instances=test_instances, device=device, frozen=opt.frozen, offset=8000)
     
         train_dataloader = DataLoader(trainFolder, batch_size=opt.batch_size, shuffle=False)
         test_dataloader = DataLoader(testFolder, batch_size=opt.batch_size, shuffle=False)
