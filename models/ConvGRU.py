@@ -74,7 +74,7 @@ class ConvGRU(nn.Module):
         if loss == 'MSE':
             b, t, c, h, w = truth.size()
             loss_function = nn.MSELoss().cuda()
-            loss = loss_function(pred_frames, truth) / ( b * t )
+            loss = loss_function(pred_frames.view(b*t, c, h, w), truth.view(b*t, c, h, w)) 
         
         elif loss == 'ELBO':            # ELBO loss if prediction were done as in variational inference: sum log prob(x_i|z_i) + log prob(z0) + 
             loss = None

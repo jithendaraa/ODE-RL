@@ -104,5 +104,5 @@ class ODEConvGRU(nn.Module):
         """ Returns the reconstruction loss calculated as MSE Error """
         b, t, c, h, w = truth.size()
         loss_function = nn.MSELoss().cuda()
-        loss = loss_function(pred_frames, truth) / ( b * t )
+        loss = loss_function(pred_frames.view(b*t, c, h, w), truth.view(b*t, c, h, w))
         return loss
