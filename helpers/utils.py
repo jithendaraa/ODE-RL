@@ -40,13 +40,6 @@ def set_opts(opt):
         opt.id += '_' +  str(opt.test_in_seq) + '_' + str(opt.test_out_seq) 
     print("ID:", opt.id, '\n')
 
-    # Set run directory
-    if os.path.isdir(opt.rundir) is False: os.mkdir(opt.rundir)     # create runs/ if needed
-    opt.rundir = os.path.join(opt.rundir, opt.model)                
-    if os.path.isdir(opt.rundir) is False: os.mkdir(opt.rundir)     # create runs/ConvGRU if needed
-    opt.rundir = os.path.join(opt.rundir, opt.id)
-    print("rundir:", opt.rundir)
-
     # Set logdir and create dirs along the way
     if os.path.isdir(opt.logdir) is False:  os.mkdir(opt.logdir)    # mkdir logs
     opt.logdir = os.path.join(opt.logdir, opt.model)                # logs/ConvGRU
@@ -56,13 +49,6 @@ def set_opts(opt):
     opt.storage_dir = os.path.join(opt.user_dir, opt.storage_dir)
     opt.data_dir = os.path.join(opt.storage_dir, opt.data_dir)
     print("data_dir:", opt.data_dir)
-
-    # Set video logdir and create dirs along the way
-    opt.video_logdir = os.path.join(opt.storage_dir, opt.video_logdir)          # /home/jithen/scratch/videos
-    if os.path.isdir(opt.video_logdir) is False:  os.mkdir(opt.video_logdir)    
-    opt.video_logdir = os.path.join(opt.video_logdir, opt.model)                # /home/jithen/scratch/videos/ConvGRU
-    if os.path.isdir(opt.video_logdir) is False:  os.mkdir(opt.video_logdir)
-    print("video_dir:", opt.video_logdir)
 
     # Set model_params_logdir and create dirs along the way
     opt.model_params_logdir = os.path.join(opt.logdir, opt.model_params_logdir)     # logs/ConvGRU/model_params
@@ -198,33 +184,26 @@ def save_model_params(model, optimizer, epoch, opt, step, ckpt_save_freq):
     if step > 0 and (step % ckpt_save_freq == 0):
         padded_zeros = '0' * (10 - len(str(step)))
         padded_step = padded_zeros + str(step)
-        model_params_file_name = os.path.join(opt.model_params_logdir, opt.id + '_' + padded_step + '.pickle')
+        model_params_file_name = os.path.join(opt.model_params_logdir, opt.ckpt_id + '_' + padded_step + '.pickle')
 
         model_dict = {
             'epoch': epoch,
             'step': step,
             'state_dict': model.state_dict(),
-            'optimizer': optimizer.state_dict()
-        }
+            'optimizer': optimizer.state_dict()}
 
         with open(model_params_file_name, 'wb') as handle:
             pickle.dump(model_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
             print(f"Saved model parameters at step {step} -> {model_params_file_name}")
 
 def load_model_params(model, opt):
-    
     # Load model params of this exp id
-    load_id = opt.load_id + '_' 
+    load_id = opt.ckpt_id + '_' 
     padded_zeros = '0' * (10 - len(str(opt.step)))
     padded_step = padded_zeros + str(opt.step)
     file_to_load = load_id + padded_step + '.pickle'
 
     saved_params_list = os.listdir(opt.model_params_logdir)
-    # Required saved_params_list should start with load_id
-    # r = re.compile(load_id + "*")
-    # filtered_saved_params_list = list(filter(r.match, saved_params_list))
-    # filtered_saved_params_list.sort()
-
     assert file_to_load in saved_params_list
     model_params_file_path = os.path.join(opt.model_params_logdir, file_to_load)  # select params_file with highest steps
 
