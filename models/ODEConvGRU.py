@@ -89,7 +89,7 @@ class ODEConvGRU(nn.Module):
 
     def get_prediction(self, inputs, batch_dict=None):
         pred_x = self(inputs, batch_dict) # Range in [-1, 1] due to last tanh activation
-        return pred_x / 2.0
+        return pred_x 
         
     def get_loss(self, pred_frames, truth):
         """ Returns the reconstruction loss calculated as MSE Error """
