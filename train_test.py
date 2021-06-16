@@ -28,14 +28,13 @@ def train(opt, model, loader_objs, device, exp_config_dict):
 
     if opt.offline is True: os.system('wandb offline')
 
-    # 1. Start a new run
-    wandb.init(project=opt.wandb_project, entity=opt.wandb_entity, config=exp_config_dict)
-    
-    # 2. Save model inputs and hyperparameters
-    config = wandb.config
-    
-    # 3. Log gradients and model parameters
-    wandb.watch(model)
+    if opt.off_wandb is False:
+        # 1. Start a new run
+        wandb.init(project=opt.wandb_project, entity=opt.wandb_entity, config=exp_config_dict)
+        # 2. Save model inputs and hyperparameters
+        config = wandb.config
+        # 3. Log gradients and model parameters
+        wandb.watch(model)
 
     print(f"Logging to {opt.logdir}")
     optimizer = optim.Adamax(model.parameters(), lr=opt.lr)
@@ -50,20 +49,23 @@ def train(opt, model, loader_objs, device, exp_config_dict):
             pred_gt = torch.cat((pred.detach().cpu(), gt.cpu()), 0).numpy()
             epoch_loss += step_loss
             step += 1
-            
-            # Log losses and pred, gt videos
-            if step % opt.loss_log_freq == 0:
-                wandb.log( {'Per Step Loss': step_loss}, step=step)
 
-            if step % opt.video_log_freq == 0:
-                wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)
+            if opt.off_wandb is False:
+                # Log losses and pred, gt videos
+                if step % opt.loss_log_freq == 0:
+                    wandb.log( {'Per Step Loss': step_loss}, step=step)
+
+                if step % opt.video_log_freq == 0:
+                    wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)
+                
+            else:   print(f"step {step}")
 
             # Save model params
-            if step > (total_steps // 2):
+            if step > (3 * total_steps // 4):
                 utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
             
         epoch_loss /= n_train_batches # Avg loss over all batches for this epoch
-        wandb.log({"Per Epoch Loss": epoch_loss})
+        # wandb.log({"Per Epoch Loss": epoch_loss})
             
         loggers.log_after_epoch(epoch, epoch_loss, step, start_time, total_steps, opt=opt)
 
@@ -83,14 +85,13 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
 
     if opt.offline is True: os.system('wandb offline')
     
-    # 1. Start a new run
-    wandb.init(project=opt.wandb_project, entity=opt.wandb_entity, config=exp_config_dict)
-    
-    # 2. Save model inputs and hyperparameters
-    config = wandb.config
-    
-    # 3. Log gradients and model parameters
-    wandb.watch(model)
+    if opt.off_wandb is False:
+        # 1. Start a new run
+        wandb.init(project=opt.wandb_project, entity=opt.wandb_entity, config=exp_config_dict)
+        # 2. Save model inputs and hyperparameters
+        config = wandb.config
+        # 3. Log gradients and model parameters
+        wandb.watch(model)
 
     with torch.no_grad():
         model.eval()
@@ -111,7 +112,7 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
             loggers.log_test_loss(opt, step, loss)
             pred_gt = torch.cat((pred.cpu(), gt.cpu()), 0).numpy()
 
-            if step % 200 == 0:
+            if step % 200 == 0 and opt.off_wandb is False:
                 wandb.log({'Pred_GT': wandb.Video(pred_gt)}, step=it+1)
 
         test_loss /= batches # avg test loss over all batches
@@ -125,9 +126,10 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
             avg_ssims[i] /= (batches * (i+1))   # normalize by batches and pred_len
             avg_psnrs[i] = 10 * math.log10(1 / avg_mses[i])
 
-            wandb.log({"PSNR": avg_psnrs[i],
-                        "MSE": avg_mses[i], 
-                        "SSIM": avg_ssims[i]}, step=i+1)
+            if opt.off_wandb is False:
+                wandb.log({"PSNR": avg_psnrs[i],
+                            "MSE": avg_mses[i], 
+                            "SSIM": avg_ssims[i]}, step=i+1)
 
         avg_mse, avg_psnr, avg_ssim = avg_mses[-1], avg_psnrs[-1], avg_ssims[-1]
         loggers.log_final_test_metrics(test_loss, avg_mse, avg_psnr, avg_ssim, opt.id)    # Logs final MSE, PSNR, SSIM
@@ -159,7 +161,7 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     # Backward pass
     optimizer.zero_grad()
     train_loss.backward()
-    # torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
+    torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
 
     # Step with optimizer
     optimizer.step()

@@ -1,12 +1,12 @@
 # ODE-RL
 
-Using <a href="https://arxiv.org/abs/1806.07366">Neural Ordinary Differential Equations</a> to model continuous time dynamics for sample-efficient Reinforcement Learning
+Using <a href="https://arxiv.org/abs/1806.07366">Neural Ordinary Differential Equations</a> to model continuous time dynamics.
 
 ## Dataset generation
 
 ### Moving MNIST
 
-- Download the MNIST file <b>train-images-idx3-ubyte.gz</b> from <a href="http://yann.lecun.com/exdb/mnist/">here</a> and move it to where you store your datasets (eg. ~/scratch/datasets/MovingMNIST/train-images-idx3-ubyte.gz).
+- Download the MNIST file <b>train-images-idx3-ubyte.gz</b> from <a href="http://yann.lecun.com/exdb/mnist/">here</a> and move it to where you store your datasets (eg. ~/scratch/datasets/MovingMNIST/train-images-idx3-ubyte.gz). Alternatively, cd into where you want to save the dataset and run `wget http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz && tar -xf train-images-idx3-ubyte.gz`
 
 ## Models
 

@@ -8,20 +8,22 @@ defaults:
   load_model: False
   train_test_split: 0.8
   total_frames: 2000000   # 2M frames as in CW-VAE paper
+  decODE: False
+  off_wandb: False
 
   # Directories
   logdir: "logs"
   rundir: "runs"                      # Tensorboard outputs at runs/model_name/id.out
   user_dir: "/home/jithen"            
   storage_dir: "scratch"
-  data_dir: "datasets/MovingMNIST"    # user_dir/storage_dir/data_dir
-  video_logdir: "videos"              # user_dir/storage_dir/videos/<model_name>/<id>_00000xxxxx.mp4
-  model_params_logdir: "model_params" # has the form logs/<model_name>/model_params/<id>_00000xxxxx.pickle
+  data_dir: "datasets/MovingMNIST_video/train"    # user_dir/storage_dir/data_dir
+  video_logdir: "videos"                          # user_dir/storage_dir/videos/<model_name>/<id>_00000xxxxx.mp4
+  model_params_logdir: "model_params"             # has the form logs/<model_name>/model_params/<id>_00000xxxxx.pickle
   
   # Save & logs frequencies
-  ckpt_save_freq: 5000            # Save model params every x steps
-  log_video_freq: 2000            # log video every x steps
+  ckpt_save_freq: 2000            # Save model params every x steps
   test_log_freq: 50               # log test loss every x steps
+  video_log_freq: 5000
 
   # Image sequence details
   resolution: 64
@@ -34,7 +36,7 @@ defaults:
   in_channels: 3
   num_digits: 3
 
-  lr: 1e-3
+  lr: 8e-4
   n_downs: 2
   decode_diff_method: 'dopri5'          # choices=['dopri5', 'euler', 'adams', 'rk4']
   frozen: True
@@ -43,32 +45,103 @@ defaults:
   wandb_entity: 'jithendaraa'
   offline: True                         # Beluga does not have internet; can set to False on cedar
 
+experiemntal:
+  off_wandb: True
+
 # Experiment 1: Train and test ConvGRU on Moving MNIST with 2M frames, 50000 steps, batch size 4
 train_mmnist_cgru:
   id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
-  data_dir: "datasets/MovingMNIST_video/train"
-  model: "ConvGRU"
-  phase: "train"
-  epochs: 25                            # 1 epoch is 2000 steps
-  decODE: False
-  load_model: False
+  ckpt_id: 'train_mmnist_cgru'
+  lr: 6e-4
+
+  ckpt_save_freq: 2000
+  loss_log_freq: 100
+
+  train_seq: 20
+  train_in_seq: 10
+  train_out_seq: 10
 
   conv_encoder_out_ch: 64
   convgru_out_ch: 64
   depth: 1                              # num_pairs <ConvEncode, ConvGRUCell>
 
+train_mmnist_cgru_depth3:
+  id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
+  ckpt_id: 'train_mmnist_cgru_depth3'
+  lr: 6e-4
+
+  ckpt_save_freq: 1000
+  loss_log_freq: 100
+
+  train_seq: 20
+  train_in_seq: 10
+  train_out_seq: 10
+
+  conv_encoder_out_ch: 64
+  convgru_out_ch: 64
+  depth: 3
+
 test_mmnist_cgru:
   id: 'ConvGRU_mmnist_test'
+  ckpt_id: 'train_mmnist_cgru'
   data_dir: "datasets/MovingMNIST_video/test"
   model: "ConvGRU"
   phase: "test"
   load_model: True
-  step: 50000                       # load saved model params for which step
-  decODE: False
+  step: 49000                       # load saved model params for which step
+  
+
+  train_seq: 20
+  train_in_seq: 10
+  train_out_seq: 10
+  test_seq: 20
+  test_in_seq: 10
+  test_out_seq: 10
   
   conv_encoder_out_ch: 64
   convgru_out_ch: 64
   depth: 1                          # num_pairs <ConvEncode, ConvGRUCell>
+
+test_mmnist_cgru_depth3:
+  id: 'ConvGRU_mmnist_test'
+  ckpt_id: 'test_mmnist_cgru_depth3'
+  data_dir: "datasets/MovingMNIST_video/test"
+  model: "ConvGRU"
+  phase: "test"
+  load_model: True
+  step: 49000                       # load saved model params for which step
+  decODE: False
+
+  train_seq: 20
+  train_in_seq: 10
+  train_out_seq: 10
+  test_seq: 20
+  test_in_seq: 10
+  test_out_seq: 10
+  
+  conv_encoder_out_ch: 64
+  convgru_out_ch: 64
+  depth: 3                          # num_pairs <ConvEncode, ConvGRUCell>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Experiment 2: Train and test ODEConvGRU on Moving MNIST with 50000 steps

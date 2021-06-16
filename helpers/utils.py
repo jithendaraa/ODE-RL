@@ -214,7 +214,7 @@ def save_model_params(model, optimizer, epoch, opt, step, ckpt_save_freq):
 def load_model_params(model, opt):
     
     # Load model params of this exp id
-    load_id = opt.model + '_' + opt.dataset + '_train_' + str(opt.train_in_seq) + '_' + str(opt.train_out_seq) + '_' 
+    load_id = opt.load_id + '_' 
     padded_zeros = '0' * (10 - len(str(opt.step)))
     padded_step = padded_zeros + str(opt.step)
     file_to_load = load_id + padded_step + '.pickle'

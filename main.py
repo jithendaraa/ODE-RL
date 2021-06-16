@@ -4,7 +4,6 @@ import torch
 import ruamel.yaml as yaml
 import sys
 import pathlib
-from tensorboardX import SummaryWriter
 import helpers.utils as utils
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -78,6 +77,7 @@ def main(opt, exp_config):
       
     elif opt.phase == 'test':
       test(opt, model, loader_objs, device, exp_config)
+
 
 if __name__ == '__main__':
     opt, exp_config = get_opt()

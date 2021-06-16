@@ -9,6 +9,7 @@ runs/
 out/
 wandb/
 plots/
+metrics/
 # .ipynb_checkpoints
 # assets
 # runs
