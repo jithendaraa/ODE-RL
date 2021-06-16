@@ -111,7 +111,9 @@ class Encoder(nn.Module):
         # Make pairs of conv_encoders and convGRU cells
         if self.depth == 1:
             conv_encoders = []
-            conv_encoders += [nn.Conv2d(in_channels, opt.conv_encoder_out_ch, 3, 2, 1)]
+            conv_encoders += [nn.Conv2d(in_channels, chan, 3, 2, 1)]
+            conv_encoders += [nonlinear]
+            conv_encoders += [nn.Conv2d(chan, opt.conv_encoder_out_ch, 3, 1, 1)]
             conv_encoders += [nonlinear]
             conv_encoders = nn.Sequential(*conv_encoders).to(self.device)
             self.conv_encoders.append(conv_encoders)
@@ -129,7 +131,9 @@ class Encoder(nn.Module):
             self.conv_encoders.append(conv_encoders)
 
             self.hiddens[0] = [torch.zeros((b, chan*2, h // resize, w // resize)).to(self.device)]
-            conv_gru_cell = ConvGRUCell((h // resize, w // resize), chan, chan*2, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+            conv_gru_cell = [ConvGRUCell((h // resize, w // resize), chan, chan*2, 5, bias=True, dtype=dtype, padding=2).to(self.device)]
+            conv_gru_cell += [nonlinear]
+            conv_gru_cell = nn.Sequential(*conv_gru_cell).to(self.device)
             self.conv_gru_cells.append(conv_gru_cell)
             self.hidden_state_channels.append(chan*2)
             chan *= 2
@@ -145,7 +149,9 @@ class Encoder(nn.Module):
                     self.conv_encoders.append(conv_encoders)
                     
                     resize *= 2
-                    conv_gru_cell = ConvGRUCell((h // resize, w // resize), opt.conv_encoder_out_ch, opt.convgru_out_ch, kernel_size=5, bias=True, dtype=dtype, padding=2).to(self.device)
+                    conv_gru_cell = [ConvGRUCell((h // resize, w // resize), opt.conv_encoder_out_ch, opt.convgru_out_ch, kernel_size=5, bias=True, dtype=dtype, padding=2).to(self.device)]
+                    conv_gru_cell += [nonlinear]
+                    conv_gru_cell = nn.Sequential(*conv_gru_cell).to(self.device)
                     self.conv_gru_cells.append(conv_gru_cell)
                     self.hiddens[i] = [torch.zeros((b, opt.convgru_out_ch, h // resize, w // resize)).to(self.device)]
                     hidden_channels = opt.convgru_out_ch
@@ -159,7 +165,9 @@ class Encoder(nn.Module):
                     resize *= 2
                     self.hiddens[i] = [torch.zeros((b, chan*2, h // resize, w // resize)).to(self.device)]
 
-                    conv_gru_cell = ConvGRUCell((h // resize, w // resize), chan, chan*2, kernel_size=5, bias=True, dtype=dtype, padding=2).to(self.device)       # twice the channel every time
+                    conv_gru_cell = [ConvGRUCell((h // resize, w // resize), chan, chan*2, kernel_size=5, bias=True, dtype=dtype, padding=2).to(self.device)]       # twice the channel every time
+                    conv_gru_cell += [nonlinear]
+                    conv_gru_cell = nn.Sequential(*conv_gru_cell).to(self.device)
                     self.conv_gru_cells.append(conv_gru_cell)
                     hidden_channels = chan*2
                     chan *= 2
@@ -168,7 +176,6 @@ class Encoder(nn.Module):
         
         self.init_hiddens = copy.deepcopy(self.hiddens)
         self.init_hidden_state_channels = self.hidden_state_channels.copy()
-
 
     def get_hidden_state_channels(self):
         return self.hidden_state_channels[::-1]
@@ -249,12 +256,16 @@ class Decoder(nn.Module):
             conv_gru_ch = self.hidden_state_channels[0]
             last_ch = self.hidden_state_channels[1]
 
-            conv_gru_cell = ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+            conv_gru_cell = [ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)]
+            conv_gru_cell += [nonlinear]
+            conv_gru_cell = nn.Sequential(*conv_gru_cell).to(self.device)
             self.conv_gru_cells.append(conv_gru_cell)
 
             conv_decoders = []
-            conv_decoders += [nn.ConvTranspose2d(conv_gru_ch, last_ch, 4, 2, 1)]
+            conv_decoders += [nn.ConvTranspose2d(conv_gru_ch, chan, 4, 2, 1)]
             conv_decoders += [nonlinear]
+            conv_decoders += [nn.ConvTranspose2d(chan, last_ch, 3, 1, 1)]
+            conv_decoders += [nn.Sigmoid()]
             conv_decoders = nn.Sequential(*conv_decoders).to(self.device)
             self.conv_decoders.append(conv_decoders)
 
@@ -262,7 +273,9 @@ class Decoder(nn.Module):
             conv_gru_ch = self.hidden_state_channels[0]
             next_ch = self.hidden_state_channels[1]
 
-            conv_gru_cell = ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+            conv_gru_cell = [ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)]
+            conv_gru_cell += [nonlinear]
+            conv_gru_cell = nn.Sequential(*conv_gru_cell).to(self.device)
             self.conv_gru_cells.append(conv_gru_cell)
 
             conv_decoders = []
@@ -277,17 +290,21 @@ class Decoder(nn.Module):
                 next_ch = self.hidden_state_channels[i+1]
                 
                 if i == (self.depth - 1):
-                    conv_gru_cell = ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+                    conv_gru_cell = [ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)]
+                    conv_gru_cell += [nonlinear]
+                    conv_gru_cell = nn.Sequential(*conv_gru_cell).to(self.device)
                     self.conv_gru_cells.append(conv_gru_cell)
 
                     conv_decoders = []
                     conv_decoders += [nn.ConvTranspose2d(conv_gru_ch, next_ch, 4, 2, 1)]
-                    conv_decoders += [nonlinear]
+                    conv_decoders += [nn.Sigmoid()]
                     conv_decoders = nn.Sequential(*conv_decoders).to(self.device)
                     self.conv_decoders.append(conv_decoders)
                 
                 else:
-                    conv_gru_cell = ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
+                    conv_gru_cell = [ConvGRUCell((e_h * resize, e_w * resize), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)]
+                    conv_gru_cell += [nonlinear]
+                    conv_gru_cell = nn.Sequential(*conv_gru_cell).to(self.device)
                     self.conv_gru_cells.append(conv_gru_cell) 
 
                     conv_decoders = []
@@ -398,6 +415,3 @@ class DecODEr(nn.Module):
             latent_ys.append(H_s)                                       # saved as n, b, c, h, w
         
         return latent_ys, y0_s
-
-
-
