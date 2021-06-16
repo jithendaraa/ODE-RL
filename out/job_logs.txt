@@ -1,9 +1,4 @@
-On frozen data:
-train_job_id 21148399 -> train_mmnist_cgru 50 in 50 out, depth 1, log every 5k (Completed)
-
-train_job_id 21248357 -> train_mmnist_cgru 10 in 10 out, depth 1, log every 2k steps
-train_job_id 21248528 -> train_mmnist_cgru 10 in 10 out, depth 1, log every 5k steps/ no clip LR 1e-3
-train_job_id 21248621 -> train_mmnist_cgru 10 in 10 out, d1, log every 2.5k steps, no clip LR 8e-4
-train_job_id 21248726 -> train_mmnist_cgru 10 in 10 out, d1, log every 1k steps, no clip LR 3e-3
-train_job_id 21290561 -> train_mmnist_cgru
-train_job_id 21290621 -> train_mmnist_cgru_depth3
+train_job_id 5194104 -> train_mmnist_odecgru
+train_job_id 5194336 -> train_mmnist_cgru
+train_job_id 5200055 -> train_mmnist_cgru
+train_job_id 5200060 -> train_mmnist_odecgru

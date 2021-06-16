@@ -226,6 +226,7 @@ class Decoder(nn.Module):
         self.hidden_state_channels = hidden_state_channels
         self.opt = opt
         self.device = device
+        self.final_nonlinear = nn.Tanh()
 
         self.depth = opt.depth
         self.encoder_resolution = resolution
@@ -257,7 +258,7 @@ class Decoder(nn.Module):
             conv_decoders += [nn.ConvTranspose2d(conv_gru_ch, chan, 4, 2, 1)]
             conv_decoders += [nonlinear]
             conv_decoders += [nn.ConvTranspose2d(chan, last_ch, 3, 1, 1)]
-            conv_decoders += [nn.Sigmoid()]
+            conv_decoders += [self.final_nonlinear]
             conv_decoders = nn.Sequential(*conv_decoders).to(self.device)
             self.conv_decoders.append(conv_decoders)
 
@@ -285,7 +286,7 @@ class Decoder(nn.Module):
 
                     conv_decoders = []
                     conv_decoders += [nn.ConvTranspose2d(conv_gru_ch, next_ch, 4, 2, 1)]
-                    conv_decoders += [nn.Sigmoid()]
+                    conv_decoders += [self.final_nonlinear]
                     conv_decoders = nn.Sequential(*conv_decoders).to(self.device)
                     self.conv_decoders.append(conv_decoders)
                 
@@ -313,7 +314,8 @@ class Decoder(nn.Module):
             in_ = ins[-1]
             h_prev = hidden_states[i]
             new_inputs = []
-            for input_ in in_:   # iterating over timesteps to decode
+            
+            for input_ in in_:              # iterating over timesteps to decode
                 next_input = self.conv_gru_cells[i](input_, h_prev).to(self.device)
                 new_inputs.append(next_input)
                 h_prev = next_input
@@ -332,6 +334,7 @@ class Decoder(nn.Module):
         return pred_x
 
 
+# TODO: Incomplete
 class DecODEr(nn.Module):
     def __init__(self, in_channels, out_channels, n_frames, act='leaky_relu', dtype=None, opt=None, device=None, resolution=(16, 16)):
         super(DecODEr, self).__init__()

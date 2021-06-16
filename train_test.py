@@ -15,10 +15,8 @@ import helpers.loggers as loggers
 
 
 def train(opt, model, loader_objs, device, exp_config_dict):
-
     step = 0
     start_time = time.time()
-    losses = []
 
     # Data loaders
     train_dataloader = loader_objs['train_dataloader']
@@ -27,6 +25,7 @@ def train(opt, model, loader_objs, device, exp_config_dict):
     loggers.print_exp_details(opt, n_train_batches)
 
     if opt.offline is True: os.system('wandb offline')
+    else:   os.system('wandb online')
 
     if opt.off_wandb is False:
         # 1. Start a new run
@@ -58,11 +57,10 @@ def train(opt, model, loader_objs, device, exp_config_dict):
                 if step % opt.video_log_freq == 0:
                     wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)
                 
-            else:   print(f"step {step}")
+            print(f"step {step}")
 
             # Save model params
-            if step > (3 * total_steps // 4):
-                utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
+            utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
             
         epoch_loss /= n_train_batches # Avg loss over all batches for this epoch
         # wandb.log({"Per Epoch Loss": epoch_loss})
@@ -144,7 +142,7 @@ def test_batch(model, test_dataloader, opt, device):
     predicted_frames = model.get_prediction(input_frames)
     loss = model.get_loss(predicted_frames, ground_truth).item()
 
-    return predicted_frames * 255.0, ground_truth * 255.0, loss
+    return ((predicted_frames/2.0) + 0.5) * 255.0, (ground_truth + 0.5) * 255.0, loss
 
 def train_batch(model, train_dataloader, optimizer, opt, device):
     # Get bacth data
@@ -166,4 +164,4 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     # Step with optimizer
     optimizer.step()
 
-    return predicted_frames * 255.0, ground_truth * 255.0, train_loss.item()
+    return ((predicted_frames/2.0) + 0.5) * 255.0, (ground_truth + 0.5) * 255.0, train_loss.item()

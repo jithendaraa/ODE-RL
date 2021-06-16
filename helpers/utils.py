@@ -147,8 +147,7 @@ def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False,
     layers.append(nonlinear)
     layers.append(nn.Conv2d(n_units, n_outputs, 3, 1, 1, dilation=1))
     layers.append(get_norm_layer(n_outputs))
-    layers.append(nonlinear)
-
+    layers.append(nn.Tanh())
     return nn.Sequential(*layers)
 
 def create_transpose_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, upsize=False, nonlinear='tanh'):
@@ -174,8 +173,7 @@ def create_transpose_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, upsiz
     layers.append(nonlinear)
     layers.append(nn.ConvTranspose2d(n_units, n_outputs, 3, 1, 1, dilation=1))
     layers.append(get_norm_layer(n_outputs))
-    layers.append(nn.Sigmoid())
-
+    layers.append(nn.Tanh())
     return nn.Sequential(*layers)
 
 # Save model params every `ckpt_save_freq` steps as model_params_logdir/ID_00000xxxxx.pickle

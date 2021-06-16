@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --time=18:00:00
-#SBATCH --account=rrg-ebrahimi
+#SBATCH --account=def-ebrahimi
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:v100:1
+#SBATCH --gres=gpu:v100l:1
 #SBATCH --job-name=MovingMNIST
 #SBATCH --cpus-per-task=6
 #SBATCH --mail-user=jithen.subra@gmail.com

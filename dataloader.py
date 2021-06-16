@@ -102,6 +102,7 @@ class MovingMNIST(Dataset):
         return data
 
     def get_item(self, idx):
+        
         video_filename = 'video_' + str(idx+1+self.offset) + '.mp4'
         video_filename = os.path.join(self.root, video_filename)
         vidcap = cv2.VideoCapture(video_filename)
@@ -123,8 +124,8 @@ class MovingMNIST(Dataset):
 
         in_frames = required_frames[:self.n_frames_input]
         out_frames = required_frames[self.n_frames_input:]
-        in_frames = torch.from_numpy( in_frames / 255.0).contiguous().float().to(self.device).permute(0, 3, 1, 2)
-        out_frames = torch.from_numpy( out_frames / 255.0).contiguous().float().to(self.device).permute(0, 3, 1, 2)
+        in_frames = torch.from_numpy( (in_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
+        out_frames = torch.from_numpy( (out_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
 
         out = {
             "idx": idx, 
@@ -137,6 +138,12 @@ class MovingMNIST(Dataset):
     def __getitem__(self, idx):
         
         if self.frozen is True:
+            
+            if self.is_train is True:
+                if idx > 8000: idx = idx % 8000
+            else:
+                if idx > 2000: idx = idx % 2000
+            
             out = self.get_item(idx)
             return out
 
@@ -160,8 +167,8 @@ class MovingMNIST(Dataset):
             output = []
 
         frozen = input[-1]
-        output = torch.from_numpy(output / 255.0).contiguous().float()
-        input = torch.from_numpy(input / 255.0).contiguous().float()
+        output = torch.from_numpy((output / 255.0) - 0.5).contiguous().float()
+        input = torch.from_numpy((input / 255.0) - 0.5).contiguous().float()
         out = {
             "idx": idx, 
             "observed_data": input.to(self.device), 
@@ -177,9 +184,9 @@ def parse_datasets(opt, device):
     if opt.dataset == 'mmnist':
 
         total_frames = opt.total_frames # 2M as in clockwork paper
-        total_instances = int(total_frames / opt.test_seq)
-        train_instances = int(opt.train_test_split * total_instances)
-        test_instances = total_instances - train_instances
+        total_instances = 1e4
+        train_instances = int(opt.train_test_split * total_instances)       # 8000
+        test_instances = total_instances - train_instances                  # 2000
         print("Train frames:", opt.test_seq * train_instances)
         print("Test frames:", opt.test_seq * test_instances)
         print(f"Train instances {train_instances}; Test instances {test_instances}")
