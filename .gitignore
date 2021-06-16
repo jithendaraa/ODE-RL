@@ -10,6 +10,7 @@ out/
 wandb/
 plots/
 metrics/
+scripts/
 # .ipynb_checkpoints
 # assets
 # runs

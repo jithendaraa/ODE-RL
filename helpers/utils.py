@@ -130,7 +130,7 @@ def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False,
     elif nonlinear == 'relu':
         nonlinear = nn.ReLU()
     else:
-        raise NotImplementedError('There is no named')
+        raise NotImplementedError('Wrong activation function')
 
     layers = []
     layers.append(nn.Conv2d(n_inputs, n_units, 3, 1, 1, dilation=1))

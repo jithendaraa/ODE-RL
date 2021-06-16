@@ -63,8 +63,7 @@ def train(opt, model, loader_objs, device, exp_config_dict):
             utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
             
         epoch_loss /= n_train_batches # Avg loss over all batches for this epoch
-        # wandb.log({"Per Epoch Loss": epoch_loss})
-            
+        wandb.log({"Per Epoch Loss": epoch_loss})
         loggers.log_after_epoch(epoch, epoch_loss, step, start_time, total_steps, opt=opt)
 
 
@@ -159,7 +158,7 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     # Backward pass
     optimizer.zero_grad()
     train_loss.backward()
-    torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
+    # torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
 
     # Step with optimizer
     optimizer.step()

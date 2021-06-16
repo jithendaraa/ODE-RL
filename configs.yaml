@@ -66,7 +66,7 @@ long_frames:
 train_mmnist_cgru:
   id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   ckpt_id: 'train_mmnist_cgru'
-  lr: 6e-4
+  lr: 8e-4
 
   ckpt_save_freq: 2000
   loss_log_freq: 50
@@ -82,7 +82,7 @@ train_mmnist_cgru:
 train_mmnist_cgru_depth3:
   id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   ckpt_id: 'train_mmnist_cgru_depth3'
-  lr: 6e-4
+  lr: 8e-4
 
   ckpt_save_freq: 1000
   loss_log_freq: 50
@@ -148,6 +148,7 @@ train_mmnist_odecgru:
   model: "ODEConv"
   ckpt_id: 'train_mmnist_odecgru'
   load_model: False
+  lr: 1e-3
 
   ckpt_save_freq: 1000
   loss_log_freq: 50
@@ -159,11 +160,10 @@ train_mmnist_odecgru:
   test_seq: 20
   test_in_seq: 10
   test_out_seq: 10
+  n_downs: 2                            # reducing/increasing resolution per encoder/decoder layer
 
-  downsize: True                        # if True, conv_encoder will 0.5x and conv_decoder will 2x the resolution for every layer in `n_layers`
-  conv_encoder_out_ch: 128              # output channels for conv encoder in models/ODEConvGRU.py
-  conv_n_units: 64                      # n_units for conv encoder and conv decoder in models/ODEConvGRU.py
-  n_layers: 3                           # n_layers for conv encoder and conv decoder in models/ODEConvGRU.py
+  conv_encoder_n_units: 32              # Out ch at end of ConvEncoder is conv_encoder_n_units * (2^n_downs)
+  n_layers: 3                           # n_layers whenever create_convnet is called for ODE Func nets
   neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
   neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
@@ -225,13 +225,3 @@ train_mmnist_cgrudecODE:          # Not completed
   convgru_out_ch: 128
   depth: 1
   latent_dim: 64                               # z0 channels
-
-
-
-
-
-
-
-
-
-

@@ -9,30 +9,26 @@ from modules.DiffEqSolver import ODEFunc, DiffEqSolver
 import helpers.utils as utils
 
 class ODEConvGRU(nn.Module):
-    def __init__(self, opt, device, downsize=True):
+    def __init__(self, opt, device):
         super(ODEConvGRU, self).__init__()
 
         self.opt = opt
         self.device = device
         self.resize = 1
         h, w = opt.resolution, opt.resolution
-        upsize = downsize
-        if downsize is True:    self.resize = 2 ** opt.n_layers
+        self.resize = 2 ** opt.n_downs
         resolution_after_encoder = (h // self.resize, w // self.resize)
+        conv_encoder_out_ch = opt.conv_encoder_n_units * (2 ** opt.n_downs)
         
         # 1. `conv_encoder` encodes input frames
         # 2. `ODEConvGRUCell` uses encoded inputs and `ode_encoder_func` to find z0 in latent space
         # 3. `diffeq_solver` solves IVP: Given z0 and [t_i,....t_(i+n)], it uses Neural ODE Decoder (`ode_decoder_func`) to predict [z_i,...z_(i+n)] in latent space
         # 4. `conv_decoder` to decode [z_i,...z_(i+n)] back to pixel space
-        self.conv_encoder = utils.create_convnet(opt.in_channels, 
-                                                opt.conv_encoder_out_ch, 
-                                                n_layers=opt.n_layers, 
-                                                n_units=opt.conv_n_units, 
-                                                downsize=downsize, 
-                                                nonlinear='relu').to(device)
+
+        self.conv_encoder = Encoder(opt.in_channels, opt.conv_encoder_n_units, opt.n_downs, nonlinear='relu').to(device)
         
         # Init encoder ODE with a convnet
-        self.ode_encoder_func = ODEFunc(n_inputs=opt.conv_encoder_out_ch, 
+        self.ode_encoder_func = ODEFunc(n_inputs=conv_encoder_out_ch, 
                             n_outputs=opt.neural_ode_encoder_out_ch, 
                             n_layers=opt.n_ode_layers, 
                             n_units=opt.neural_ode_n_units,
@@ -41,7 +37,7 @@ class ODEConvGRU(nn.Module):
                             device=device)
         
         # Encoding using ODEConvGRU: Feed self.ode_func to ODEConvGRU cell to solve diff equations and to find z0
-        self.ode_convgru_cell = ODEConvGRUCell(self.ode_encoder_func, opt, resolution_after_encoder, device=device)
+        self.ode_convgru_cell = ODEConvGRUCell(self.ode_encoder_func, opt, resolution_after_encoder, conv_encoder_out_ch, device=device)
 
         # Init decoder neural ODE with a convnet
         self.ode_decoder_func = ODEFunc(n_inputs=opt.neural_ode_encoder_out_ch, 
@@ -51,16 +47,11 @@ class ODEConvGRU(nn.Module):
                             downsize=False,
                             nonlinear='relu',
                             device=device)
-        
+
         # Neural ODE decoding: uses `self.ode_decoder_func` to solve IVP differential equation in latent space
         self.diffeq_solver = DiffEqSolver(self.ode_decoder_func, opt.decode_diff_method, device=device)
-
-        self.conv_decoder = utils.create_transpose_convnet(opt.neural_ode_decoder_out_ch, 
-                                                opt.in_channels, 
-                                                n_layers=opt.n_layers, 
-                                                n_units=opt.conv_n_units, 
-                                                upsize=upsize, 
-                                                nonlinear='relu').to(device)
+        
+        self.conv_decoder = Decoder(opt.neural_ode_decoder_out_ch, opt.in_channels, opt.n_downs, nonlinear='relu', final_act='tanh').to(device)
 
     def forward(self, inputs, batch_dict):
         b, t, c, h, w = inputs.size()
@@ -106,3 +97,64 @@ class ODEConvGRU(nn.Module):
         loss_function = nn.MSELoss().cuda()
         loss = loss_function(pred_frames.view(b*t, c, h, w), truth.view(b*t, c, h, w))
         return loss
+
+class Encoder(nn.Module):
+    def __init__(self, n_inputs, n_units, n_downs, nonlinear='relu'):
+        super(Encoder, self).__init__()
+
+        if nonlinear == 'relu':
+            nonlinear = nn.ReLU()
+        else:
+            raise NotImplementedError('Wrong activation function')
+
+        layers = []
+        layers.append(nn.Conv2d(n_inputs, n_units, 3, 1, 1, dilation=1))
+        layers.append(utils.get_norm_layer(n_units))
+        layers.append(nonlinear)
+
+        for i in range(n_downs):
+            layers.append(nn.Conv2d(n_units, n_units * 2, 4, 2, 1, dilation=1))
+            layers.append(utils.get_norm_layer(n_units * 2))
+            layers.append(nonlinear)
+            n_units *= 2
+        
+        self.encoder = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        return self.encoder(x)
+
+
+class Decoder(nn.Module):
+    def __init__(self, n_units, n_outputs, n_ups, nonlinear='relu', final_act='tanh'):
+        super(Decoder, self).__init__()
+
+        if nonlinear == 'relu':
+            nonlinear = nn.ReLU()
+        else:
+            raise NotImplementedError('Wrong activation function')
+
+        if final_act == 'tanh':
+            final_act = nn.Tanh()
+        elif final_act == 'sigmoid':
+            final_act = nn.Sigmoid()
+        else:
+            raise NotImplementedError('Wrong activation function')
+
+        layers = []
+        for i in range(n_ups):
+            layers.append(nn.ConvTranspose2d(n_units, n_units // 2, 4, 2, 1, dilation=1))
+            layers.append(utils.get_norm_layer(n_units // 2))
+            layers.append(nonlinear)
+            n_units = n_units // 2
+        
+        layers.append(nn.ConvTranspose2d(n_units, n_outputs, 3, 1, 1, dilation=1))
+        layers.append(utils.get_norm_layer(n_outputs))
+        layers.append(final_act)
+        
+        self.decoder = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        return self.decoder(x)
+
+
+
