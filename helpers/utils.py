@@ -150,14 +150,18 @@ def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False,
     layers.append(nn.Conv2d(n_inputs, n_units, 3, 1, 1, dilation=1))
     
     for i in range(n_layers):
+        layers.append(get_norm_layer(n_units))
         layers.append(nonlinear)
         if downsize is False:
             layers.append(nn.Conv2d(n_units, n_units, 3, 1, 1, dilation=1))
         else:
             layers.append(nn.Conv2d(n_units, n_units, 4, 2, 1, dilation=1))
     
+    layers.append(get_norm_layer(n_units))
     layers.append(nonlinear)
     layers.append(nn.Conv2d(n_units, n_outputs, 3, 1, 1, dilation=1))
+    layers.append(get_norm_layer(n_outputs))
+    layers.append(nonlinear)
 
     return nn.Sequential(*layers)
 
@@ -173,14 +177,18 @@ def create_transpose_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, upsiz
     layers.append(nn.ConvTranspose2d(n_inputs, n_units, 3, 1, 1, dilation=1))
     
     for i in range(n_layers):
+        layers.append(get_norm_layer(n_units))
         layers.append(nonlinear)
         if upsize is False:
             layers.append(nn.ConvTranspose2d(n_units, n_units, 3, 1, 1, dilation=1))
         else:
             layers.append(nn.ConvTranspose2d(n_units, n_units, 4, 2, 1, dilation=1))
     
+    layers.append(get_norm_layer(n_units))
     layers.append(nonlinear)
     layers.append(nn.ConvTranspose2d(n_units, n_outputs, 3, 1, 1, dilation=1))
+    layers.append(get_norm_layer(n_outputs))
+    layers.append(nn.Sigmoid())
 
     return nn.Sequential(*layers)
 
@@ -233,15 +241,6 @@ def load_model_params(model, opt):
     print()
     model.load_state_dict(objects['state_dict'])
     return model
-
-def save_video(pred, truth, step, log_video_freq, tb):
-    pass
-    # if (step % log_video_freq) == 0:
-        # pred, truth = pred[0], truth[0] # extract first batch
-        # TODO: save as GIF
-        # TODO: send GIF to tensorboard
-
-    pass
 
 def get_normalized_ssim(pred, gt):
     pred_np = pred.permute(0, 2, 3, 1).cpu().numpy()    # b, c, h, w
