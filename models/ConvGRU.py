@@ -63,10 +63,10 @@ class ConvGRU(nn.Module):
         else:
             pred_x = self.decoder(hidden_states)
 
-        return pred_x
+        return pred_x / 2.0
 
     def get_prediction(self, inputs, batch_dict=None):
-        pred_x = self(inputs, batch_dict)
+        pred_x = self(inputs, batch_dict) # Range in [-1, 1] due to last tanh activation
         return pred_x
     
     def get_loss(self, pred_frames, truth, loss='MSE'):
