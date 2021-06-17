@@ -4,9 +4,9 @@
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:v100:1
 #SBATCH --job-name=MovingMNIST
-#SBATCH --output=out/%x/%A_%a.out
+#SBATCH --output=%A_%a.out
 #SBATCH --cpus-per-task=6
-#SBATCH --mail-user=jithen.subra@gmail.com
+#SBATCH --mail-user=pranav2109@hotmail.com
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL
@@ -18,7 +18,7 @@ dataset=$3
 python_file=$4 # usually points to dreamerv2/dreamer.py
 ID=original_dreamer_bs_${batch_size}_steps_${steps}
 
-act_env
+source ~/tf_env/bin/activate
 
 echo "Running RSSM.."
 echo "Batch size: ""$batch_size"
