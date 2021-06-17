@@ -49,7 +49,7 @@ class ODEConvGRU(nn.Module):
                             device=device)
 
         # Neural ODE decoding: uses `self.ode_decoder_func` to solve IVP differential equation in latent space
-        self.diffeq_solver = DiffEqSolver(self.ode_decoder_func, opt.decode_diff_method, device=device)
+        self.diffeq_solver = DiffEqSolver(self.ode_decoder_func, opt.decode_diff_method, device=device, memory=self.opt.mem)
         
         self.conv_decoder = Decoder(opt.neural_ode_decoder_out_ch, opt.in_channels, opt.n_downs, nonlinear='relu', final_act='tanh').to(device)
 
@@ -74,7 +74,6 @@ class ODEConvGRU(nn.Module):
             # first_point_enc = sampled_z.unsqueeze(0).repeat(1, 1, 1, 1, 1).squeeze(0)
             pass
         else:
-            # first_point_enc = first_point_mu
             first_point_enc = first_point_mu.unsqueeze(0).repeat(1, 1, 1, 1, 1).squeeze(0)
 
         # ODE decoding: Given first_point_enc (z_0) and time_steps_to_predict([t_i,....t_(i+n)]), we predict sol_y([z_i,...z_(i+n)])

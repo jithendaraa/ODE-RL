@@ -10,12 +10,13 @@ from torchdiffeq import odeint as odeint
 
 
 class DiffEqSolver(nn.Module):
-    def __init__(self, ode_func, method, odeint_rtol=1e-4, odeint_atol=1e-5, device=torch.device("cpu")):
+    def __init__(self, ode_func, method, odeint_rtol=1e-4, odeint_atol=1e-5, device=torch.device("cpu"), memory=False):
         super(DiffEqSolver, self).__init__()
         
         self.ode_func = ode_func
         self.ode_method = method
         self.device = device
+        self.memory = memory
         
         self.odeint_rtol = odeint_rtol
         self.odeint_atol = odeint_atol
@@ -24,9 +25,26 @@ class DiffEqSolver(nn.Module):
         """
 		# Decode the trajectory through ODE Solver
 		"""
-        pred_y = odeint(self.ode_func, first_point, time_steps_to_predict,
+        pred_y = None
+        if self.memory is True:
+            y_is = [first_point]
+            b, c, h, w = first_point.size()
+        
+            for i in range(len(time_steps_to_predict)):
+                h_prev = y_is[-1]
+                timestep = time_steps_to_predict[i:i+1]
+                pred_m = odeint(self.ode_func, h_prev, timestep, rtol=self.odeint_rtol, atol=self.odeint_atol, method=self.ode_method)
+                pred_m = pred_m.view(b, c, h, w)
+                h_next = h_prev + pred_m
+                y_is.append(h_next)
+            
+            pred_y = torch.stack(y_is[1:]).permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]
+        
+        else:
+            pred_y = odeint(self.ode_func, first_point, time_steps_to_predict,
                         rtol=self.odeint_rtol, atol=self.odeint_atol, method=self.ode_method)
-        pred_y = pred_y.permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]
+            pred_y = pred_y.permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]
+        
         return pred_y
 
 
