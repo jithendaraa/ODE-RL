@@ -9,6 +9,8 @@ import datetime
 import re
 import matplotlib.pyplot as plt
 from skimage.metrics import structural_similarity as ssim
+from torchvision.utils import save_image
+from torchvision.utils import make_grid
 
 def args_type(default):
   def parse_string(x):
@@ -43,34 +45,10 @@ def set_opts(opt):
         opt.id += '_' +  str(opt.test_in_seq) + '_' + str(opt.test_out_seq) 
     print("ID:", opt.id, '\n')
 
-    # Set run directory
-    if os.path.isdir(opt.rundir) is False: os.mkdir(opt.rundir)     # create runs/ if needed
-    opt.rundir = os.path.join(opt.rundir, opt.model)                
-    if os.path.isdir(opt.rundir) is False: os.mkdir(opt.rundir)     # create runs/ConvGRU if needed
-    opt.rundir = os.path.join(opt.rundir, opt.id)
-    print("rundir:", opt.rundir)
-
-    # Set logdir and create dirs along the way
-    if os.path.isdir(opt.logdir) is False:  os.mkdir(opt.logdir)    # mkdir logs
-    opt.logdir = os.path.join(opt.logdir, opt.model)                # logs/ConvGRU
-    if os.path.isdir(opt.logdir) is False:  os.mkdir(opt.logdir)    # mkdir logs/ConvGRU
-    print("logdir:", opt.logdir)
-
-    opt.storage_dir = os.path.join(opt.user_dir, opt.storage_dir)
-    opt.data_dir = os.path.join(opt.storage_dir, opt.data_dir)
-    print("data_dir:", opt.data_dir)
-
-    # Set video logdir and create dirs along the way
-    opt.video_logdir = os.path.join(opt.storage_dir, opt.video_logdir)          # /home/jithen/scratch/videos
-    if os.path.isdir(opt.video_logdir) is False:  os.mkdir(opt.video_logdir)    
-    opt.video_logdir = os.path.join(opt.video_logdir, opt.model)                # /home/jithen/scratch/videos/ConvGRU
-    if os.path.isdir(opt.video_logdir) is False:  os.mkdir(opt.video_logdir)
-    print("video_dir:", opt.video_logdir)
-
-    # Set model_params_logdir and create dirs along the way
-    opt.model_params_logdir = os.path.join(opt.logdir, opt.model_params_logdir)     # logs/ConvGRU/model_params
-    if os.path.isdir(opt.model_params_logdir) is False:  os.mkdir(opt.model_params_logdir)
-    print("model_params_logdir:", opt.model_params_logdir)
+    # # Set model_params_logdir and create dirs along the way
+    # opt.model_params_logdir = os.path.join(opt.logdir, opt.model_params_logdir)     # logs/ConvGRU/model_params
+    # if os.path.isdir(opt.model_params_logdir) is False:  os.mkdir(opt.model_params_logdir)
+    # print("model_params_logdir:", opt.model_params_logdir)
 
     return opt
 
@@ -153,14 +131,18 @@ def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False,
     layers.append(nn.Conv2d(n_inputs, n_units, 3, 1, 1, dilation=1))
     
     for i in range(n_layers):
+        layers.append(get_norm_layer(n_units))
         layers.append(nonlinear)
         if downsize is False:
             layers.append(nn.Conv2d(n_units, n_units, 3, 1, 1, dilation=1))
         else:
             layers.append(nn.Conv2d(n_units, n_units, 4, 2, 1, dilation=1))
     
+    layers.append(get_norm_layer(n_units))
     layers.append(nonlinear)
     layers.append(nn.Conv2d(n_units, n_outputs, 3, 1, 1, dilation=1))
+    layers.append(get_norm_layer(n_outputs))
+    layers.append(nonlinear)
 
     return nn.Sequential(*layers)
 
@@ -176,14 +158,18 @@ def create_transpose_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, upsiz
     layers.append(nn.ConvTranspose2d(n_inputs, n_units, 3, 1, 1, dilation=1))
     
     for i in range(n_layers):
+        layers.append(get_norm_layer(n_units))
         layers.append(nonlinear)
         if upsize is False:
             layers.append(nn.ConvTranspose2d(n_units, n_units, 3, 1, 1, dilation=1))
         else:
             layers.append(nn.ConvTranspose2d(n_units, n_units, 4, 2, 1, dilation=1))
     
+    layers.append(get_norm_layer(n_units))
     layers.append(nonlinear)
     layers.append(nn.ConvTranspose2d(n_units, n_outputs, 3, 1, 1, dilation=1))
+    layers.append(get_norm_layer(n_outputs))
+    layers.append(nn.Tanh())
 
     return nn.Sequential(*layers)
 
@@ -236,15 +222,6 @@ def load_model_params(model, opt):
     print()
     model.load_state_dict(objects['state_dict'])
     return model
-
-def save_video(pred, truth, step, log_video_freq, tb):
-    pass
-    # if (step % log_video_freq) == 0:
-        # pred, truth = pred[0], truth[0] # extract first batch
-        # TODO: save as GIF
-        # TODO: send GIF to tensorboard
-
-    pass
 
 def get_normalized_ssim(pred, gt):
 

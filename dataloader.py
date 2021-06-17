@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import random
+import cv2
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -9,21 +10,26 @@ import helpers.utils as utils
 
 class MovingMNIST(Dataset):
     def __init__(self, root, is_train, n_frames_input, n_frames_output, num_objects,
-                 transform=None, instances=1e4, device=None):
+                 transform=None, instances=1e4, device=None, frozen=False, offset=0):
         '''
         param num_objects: a list of number of possible objects.
         '''
         super(MovingMNIST, self).__init__()
 
+        self.frozen = frozen
         self.dataset = None
         self.device = device
-        if is_train:
+        self.offset = offset
+
+        if is_train and self.frozen is False:
             self.mnist = utils.load_mnist(root)
-        else:
+        elif self.frozen is False:
             if num_objects[0] != 2:
                 self.mnist = utils.load_mnist(root)
             else:
                 self.dataset = utils.load_fixed_set(root, False)
+
+        self.root = root
         self.length = int(instances) if self.dataset is None else self.dataset.shape[1]
 
         self.is_train = is_train
@@ -95,7 +101,51 @@ class MovingMNIST(Dataset):
         data = data[..., np.newaxis]
         return data
 
+    def get_item(self, idx):
+        sub_dir = 'MovingMNIST_video'
+        video_filename = 'video_' + str(idx+1+self.offset) + '.mp4'
+        video_filename = os.path.join(self.root, sub_dir, video_filename)
+        vidcap = cv2.VideoCapture(video_filename)
+        success,image = vidcap.read()
+        success = True
+        frames = []
+        count = 0
+        while success:
+            frames.append(image)
+            success,image = vidcap.read()
+            count += 1
+        frames = np.array(frames)
+        frames_in_video = frames.shape[0]
+        total_frames_to_sample = self.n_frames_total
+
+        first_frame = np.random.randint(0, frames_in_video - total_frames_to_sample + 1)
+        required_frames = frames[first_frame:first_frame+total_frames_to_sample]
+
+        in_frames = required_frames[:self.n_frames_input]
+        out_frames = required_frames[self.n_frames_input:]
+        in_frames = torch.from_numpy( (in_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
+        out_frames = torch.from_numpy( (out_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
+
+        out = {
+            "idx": idx, 
+            "observed_data": in_frames, 
+            "data_to_predict": out_frames, 
+            "zeros": np.zeros(1)}
+
+        return out
+
     def __getitem__(self, idx):
+        
+        if self.frozen is True:
+            
+            if self.is_train is True:
+                if idx > 8000: idx = idx % 8000
+            else:
+                if idx > 2000: idx = idx % 2000
+            
+            out = self.get_item(idx)
+            return out
+
         length = self.n_frames_input + self.n_frames_output
         if self.is_train or self.num_objects[0] != 2:
             # Sample number of objects
@@ -116,13 +166,12 @@ class MovingMNIST(Dataset):
             output = []
 
         frozen = input[-1]
-        output = torch.from_numpy(output / 255.0).contiguous().float()
-        input = torch.from_numpy(input / 255.0).contiguous().float()
+        output = torch.from_numpy((output / 255.0) - 0.5).contiguous().float()
+        input = torch.from_numpy((input / 255.0) - 0.5).contiguous().float()
         out = {
             "idx": idx, 
             "observed_data": input.to(self.device), 
             "data_to_predict": output.to(self.device), 
-            "frozen": frozen, 
             "zeros": np.zeros(1)}
         
         return out
@@ -134,28 +183,25 @@ def parse_datasets(opt, device):
     if opt.dataset == 'mmnist':
 
         total_frames = opt.total_frames # 2M as in clockwork paper
-        total_instances = int(total_frames / opt.test_seq)
-        train_instances = int(opt.train_test_split * total_instances)
-        test_instances = total_instances - train_instances
+        total_instances = 1e4
+        train_instances = int(opt.train_test_split * total_instances)       # 8000
+        test_instances = total_instances - train_instances                  # 2000
         print("Train frames:", opt.test_seq * train_instances)
         print("Test frames:", opt.test_seq * test_instances)
+        print(f"Train instances {train_instances}; Test instances {test_instances}")
         
-        trainFolder = MovingMNIST(is_train=True, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], instances=1e4, device=device)
-        validFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], device=device)
-        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits], instances=1e4, device=device)
+        trainFolder = MovingMNIST(is_train=True, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], instances=train_instances, device=device, frozen=opt.frozen)
+        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits], instances=test_instances, device=device, frozen=opt.frozen, offset=8000)
     
         train_dataloader = DataLoader(trainFolder, batch_size=opt.batch_size, shuffle=False)
-        valid_dataloader = DataLoader(validFolder, batch_size=opt.batch_size, shuffle=False)
         test_dataloader = DataLoader(testFolder, batch_size=opt.batch_size, shuffle=False)
 
     else:
         raise NotImplementedError(f"There is no dataset named {opt.dataset}")
 
     data_objects = {"train_dataloader": utils.inf_generator(train_dataloader),
-                    "valid_dataloader": utils.inf_generator(valid_dataloader),
                     "test_dataloader": utils.inf_generator(test_dataloader),
                     "n_train_batches": len(train_dataloader),
-                    "n_valid_batches": len(valid_dataloader) // 4,
                     "n_test_batches": len(test_dataloader)}
     
     return data_objects
