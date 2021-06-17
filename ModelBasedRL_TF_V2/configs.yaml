@@ -15,7 +15,7 @@ defaults:
   precision: 16
   debug: False
   expl_gifs: False
-  use_wandb: True
+  use_wandb: False
 
   # Environment
   task: 'dmc_walker_walk'
@@ -159,6 +159,7 @@ moving_mnist:
   task: 'MovingMNIST_0'
   steps: 50000
   dataset_size: 10000
+  video_data_dir: '..'
   dyn_cell: 'convgru'
   size: [64, 64]
   grayscale: True

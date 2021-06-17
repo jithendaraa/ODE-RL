@@ -18,7 +18,7 @@ import ruamel.yaml as yaml
 import tensorflow as tf
 from tensorflow.keras.mixed_precision import experimental as prec
 from tqdm import tqdm
-import wandb
+#import wandb
 
 tf.get_logger().setLevel('ERROR')
 

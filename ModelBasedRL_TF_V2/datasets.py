@@ -114,7 +114,7 @@ def get_mm_data(task, config):
 
 def get_mm_gen_data(task, config):
   assert task == '0', 'Only video prediction task available.'
-  dataset_dir = os.path.join('data', 'MovingMNIST')
+  dataset_dir = os.path.join(config.video_data_dir, 'data', 'MovingMNIST')
   train_eps_path = os.path.join(dataset_dir, 'train_eps_mm.pkl')
   eval_eps_path = os.path.join(dataset_dir, 'eval_eps_mm.pkl')
 
