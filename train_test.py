@@ -94,22 +94,26 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
         model.eval()
             
         for it in range(batches):
-            pred, gt, loss = test_batch(model, dataloader, opt, device)
+            pred, gt, loss = test_batch(model, dataloader, opt, device) # pred, gt are in -0.5, 0.5
+            pred_gt = torch.cat(((pred.cpu() + 0.5) * 255.0, (gt.cpu() + 0.5) * 255.0), 0).numpy()
             b, _, c, h, w = pred.size()
             test_loss += loss
             step += 1
 
             for i in range(pred_timesteps):
-                pred_ = pred[:, i:i+1, :, :, :].view(b, c, h, w)
-                gt_ = gt[:, i:i+1, :, :, :].view(b, c, h, w)
-                
-                avg_mses[i] += F.mse_loss(pred_, gt_).item()         # normalized by b
-                avg_ssims[i] = utils.get_normalized_ssim(pred_, gt_)   # normalized by b
-                
-            loggers.log_test_loss(opt, step, loss)
-            pred_gt = torch.cat((pred.cpu(), gt.cpu()), 0).numpy()
+                pred_ = pred[:, i:i+1, :, :, :].view(b, 1, c, h, w)
+                gt_ = gt[:, i:i+1, :, :, :].view(b, 1, c, h, w)
 
-            if step % 200 == 0 and opt.off_wandb is False:
+                mse_loss = model.get_loss(pred_, gt_).item()
+                avg_mses[i] += mse_loss          # normalized by b
+
+                pred_255, gt_255 = (pred_ + 0.5) * 255.0, (gt_ + 0.5) * 255.0
+                pred_255, gt_255 = pred_255.view(b, c, h, w), gt_255.view(b, c, h, w)
+                avg_ssims[i] += utils.get_normalized_ssim(pred_255, gt_255)   # normalized by b
+                
+            print(f'Testing step {step}....')
+
+            if step % 500 == 0 and opt.off_wandb is False:
                 wandb.log({'Pred_GT': wandb.Video(pred_gt)}, step=it+1)
 
         test_loss /= batches # avg test loss over all batches
@@ -123,10 +127,12 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
             avg_ssims[i] /= (batches * (i+1))   # normalize by batches and pred_len
             avg_psnrs[i] = 10 * math.log10(1 / avg_mses[i])
 
+            print(avg_mses[i], avg_psnrs[i], avg_ssims[i])
+
             if opt.off_wandb is False:
                 wandb.log({"PSNR": avg_psnrs[i],
                             "MSE": avg_mses[i], 
-                            "SSIM": avg_ssims[i]}, step=i+1)
+                            "SSIM": avg_ssims[i]})
 
         avg_mse, avg_psnr, avg_ssim = avg_mses[-1], avg_psnrs[-1], avg_ssims[-1]
         loggers.log_final_test_metrics(test_loss, avg_mse, avg_psnr, avg_ssim, opt.id)    # Logs final MSE, PSNR, SSIM
@@ -141,7 +147,7 @@ def test_batch(model, test_dataloader, opt, device):
     predicted_frames = model.get_prediction(input_frames)
     loss = model.get_loss(predicted_frames, 2.0*ground_truth).item()
 
-    return ((predicted_frames/2.0) + 0.5) * 255.0, (ground_truth + 0.5) * 255.0, loss
+    return predicted_frames/2.0, ground_truth, loss
 
 def train_batch(model, train_dataloader, optimizer, opt, device):
     # Get bacth data

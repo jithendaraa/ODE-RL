@@ -7,7 +7,7 @@ import torch.nn as nn
 from modules.ConvGRUCell import ConvGRUCell
 
 class ODEConvGRUCell(nn.Module):
-    def __init__(self, ode_func, opt, resolution, device=None, kernel_size=(3, 3)):
+    def __init__(self, ode_func, opt, resolution, ch, device=None, kernel_size=(3, 3)):
         super(ODEConvGRUCell, self).__init__()
 
         self.ode_func = ode_func
@@ -15,14 +15,14 @@ class ODEConvGRUCell(nn.Module):
         self.z0_diffeq_solver = None
 
         self.cgru_cell = ConvGRUCell(input_size=resolution, 
-                                        input_dim=opt.conv_encoder_out_ch, 
-                                        hidden_dim=opt.conv_encoder_out_ch,     # also the num_out_channels of the ConvGRU cell
+                                        input_dim=ch, 
+                                        hidden_dim=ch,     # also the num_out_channels of the ConvGRU cell
                                         kernel_size=kernel_size,
                                         bias=True).to(device)
 
         # last conv layer for generating mu, sigma
-        self.z0_dim = opt.conv_encoder_out_ch
-        z = opt.conv_encoder_out_ch
+        self.z0_dim = ch
+        z = ch
         self.transform_z0 = nn.Sequential(
             nn.Conv2d(z, z, 1, 1, 0),
             nn.ReLU(),
