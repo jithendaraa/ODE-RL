@@ -10,7 +10,7 @@ import helpers.utils as utils
 
 class MovingMNIST(Dataset):
     def __init__(self, root, is_train, n_frames_input, n_frames_output, num_objects,
-                 transform=None, instances=1e4, device=None, frozen=False, offset=0):
+                 transform=None, instances=1e4, device=None, frozen=False, offset=0, ch=1):
         '''
         param num_objects: a list of number of possible objects.
         '''
@@ -20,6 +20,7 @@ class MovingMNIST(Dataset):
         self.dataset = None
         self.device = device
         self.offset = offset
+        self.channels = ch
 
         if is_train and self.frozen is False:
             self.mnist = utils.load_mnist(root)
@@ -111,7 +112,11 @@ class MovingMNIST(Dataset):
         frames = []
         count = 0
         while success:
-            frames.append(image)
+            if self.channels == 1:
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).reshape(64, 64, 1)
+                frames.append(gray)
+            else:
+                frames.append(image)
             success,image = vidcap.read()
             count += 1
 
@@ -130,8 +135,7 @@ class MovingMNIST(Dataset):
         out = {
             "idx": idx, 
             "observed_data": in_frames, 
-            "data_to_predict": out_frames, 
-            "zeros": np.zeros(1)}
+            "data_to_predict": out_frames}
 
         return out
 
@@ -191,8 +195,8 @@ def parse_datasets(opt, device):
         print("Test frames:", opt.test_seq * test_instances)
         print(f"Train instances {train_instances}; Test instances {test_instances}")
         
-        trainFolder = MovingMNIST(is_train=True, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], instances=train_instances, device=device, frozen=opt.frozen)
-        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits], instances=test_instances, device=device, frozen=opt.frozen, offset=8000)
+        trainFolder = MovingMNIST(is_train=True, root=opt.data_dir, n_frames_input=opt.train_in_seq, n_frames_output=opt.train_out_seq, num_objects=[opt.num_digits], instances=train_instances, device=device, frozen=opt.frozen, ch=opt.in_channels)
+        testFolder = MovingMNIST(is_train=False, root=opt.data_dir, n_frames_input=opt.test_in_seq, n_frames_output=opt.test_out_seq, num_objects=[opt.num_digits], instances=test_instances, device=device, frozen=opt.frozen, offset=8000, ch=opt.in_channels)
     
         train_dataloader = DataLoader(trainFolder, batch_size=opt.batch_size, shuffle=False)
         test_dataloader = DataLoader(testFolder, batch_size=opt.batch_size, shuffle=False)
