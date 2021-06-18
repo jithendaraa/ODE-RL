@@ -15,14 +15,14 @@ class ODEConvGRUCell(nn.Module):
         self.z0_diffeq_solver = None
 
         self.cgru_cell = ConvGRUCell(input_size=resolution, 
-                                        input_dim=opt.conv_encoder_out_ch, 
-                                        hidden_dim=opt.conv_encoder_out_ch,     # also the num_out_channels of the ConvGRU cell
+                                        input_dim=opt.conv_n_units[-1], 
+                                        hidden_dim=opt.conv_n_units[-1],     # also the num_out_channels of the ConvGRU cell
                                         kernel_size=kernel_size,
                                         bias=True).to(device)
 
         # last conv layer for generating mu, sigma
-        self.z0_dim = opt.conv_encoder_out_ch
-        z = opt.conv_encoder_out_ch
+        self.z0_dim = opt.conv_n_units[-1]
+        z = opt.conv_n_units[-1]
         self.transform_z0 = nn.Sequential(
             nn.Conv2d(z, z, 1, 1, 0),
             nn.ReLU(),

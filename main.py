@@ -13,7 +13,7 @@ from dataloader import parse_datasets
 # Models
 from models.ConvGRU import ConvGRU
 from models.ODEConvGRU import ODEConvGRU
-from train_test import train, test
+from train_test import train
 
 def get_opt():
     parser = argparse.ArgumentParser()

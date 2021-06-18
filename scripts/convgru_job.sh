@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:v100:1
 #SBATCH --job-name=MovingMNIST
 #SBATCH --cpus-per-task=6
-#SBATCH --mail-user=jithen.subra@gmail.com
+#SBATCH --mail-user=pranav2109@hotmail.com
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL

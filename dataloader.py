@@ -102,9 +102,8 @@ class MovingMNIST(Dataset):
         return data
 
     def get_item(self, idx):
-        sub_dir = 'MovingMNIST_video'
         video_filename = 'video_' + str(idx+1+self.offset) + '.mp4'
-        video_filename = os.path.join(self.root, sub_dir, video_filename)
+        video_filename = os.path.join(self.root, video_filename)
         vidcap = cv2.VideoCapture(video_filename)
         success,image = vidcap.read()
         success = True
@@ -117,14 +116,14 @@ class MovingMNIST(Dataset):
         frames = np.array(frames)
         frames_in_video = frames.shape[0]
         total_frames_to_sample = self.n_frames_total
-
+        
         first_frame = np.random.randint(0, frames_in_video - total_frames_to_sample + 1)
         required_frames = frames[first_frame:first_frame+total_frames_to_sample]
 
         in_frames = required_frames[:self.n_frames_input]
         out_frames = required_frames[self.n_frames_input:]
-        in_frames = torch.from_numpy( (in_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
-        out_frames = torch.from_numpy( (out_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
+        in_frames = torch.from_numpy((in_frames / 255.0) - 0.5).contiguous().float().to(self.device).permute(0, 3, 1, 2)
+        out_frames = torch.from_numpy((out_frames / 255.0) - 0.5).contiguous().float().to(self.device).permute(0, 3, 1, 2)
 
         out = {
             "idx": idx, 

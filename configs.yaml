@@ -26,14 +26,9 @@ defaults:
 
   # Image sequence details
   resolution: 64
-  train_seq: 100
-  test_seq: 200
-  train_in_seq: 50
-  train_out_seq: 50
-  test_in_seq: 50
-  test_out_seq: 150
   in_channels: 3
   num_digits: 3
+  n_layers: 4
 
   lr: 8e-4
   n_downs: 2
@@ -44,122 +39,22 @@ defaults:
   wandb_entity: 'pranav2109'
   offline: True                         # Beluga does not have internet; can set to False on cedar
 
-experiemntal:
-  off_wandb: True
-
-# Experiment 1: Train and test ConvGRU on Moving MNIST with 2M frames, 50000 steps, batch size 4
-train_mmnist_cgru:
-  id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
-  ckpt_id: 'train_mmnist_cgru'
-  lr: 6e-4
-
-  ckpt_save_freq: 2000
-  loss_log_freq: 100
-
-  train_seq: 20
-  train_in_seq: 10
-  train_out_seq: 10
-
-  conv_encoder_out_ch: 64
-  convgru_out_ch: 64
-  depth: 1                              # num_pairs <ConvEncode, ConvGRUCell>
-
-train_mmnist_cgru_depth3:
-  id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
-  ckpt_id: 'train_mmnist_cgru_depth3'
-  lr: 6e-4
-
-  ckpt_save_freq: 1000
-  loss_log_freq: 100
-
-  train_seq: 20
-  train_in_seq: 10
-  train_out_seq: 10
-
-  conv_encoder_out_ch: 64
-  convgru_out_ch: 64
-  depth: 3
-
-test_mmnist_cgru:
-  id: 'ConvGRU_mmnist_test'
-  ckpt_id: 'train_mmnist_cgru'
-  data_dir: "datasets/MovingMNIST_video/test"
-  model: "ConvGRU"
-  phase: "test"
-  load_model: True
-  step: 49000                       # load saved model params for which step
-  
-
-  train_seq: 20
-  train_in_seq: 10
-  train_out_seq: 10
-  test_seq: 20
-  test_in_seq: 10
-  test_out_seq: 10
-  
-  conv_encoder_out_ch: 64
-  convgru_out_ch: 64
-  depth: 1                          # num_pairs <ConvEncode, ConvGRUCell>
-
-test_mmnist_cgru_depth3:
-  id: 'ConvGRU_mmnist_test'
-  ckpt_id: 'test_mmnist_cgru_depth3'
-  data_dir: "datasets/MovingMNIST_video/test"
-  model: "ConvGRU"
-  phase: "test"
-  load_model: True
-  step: 49000                       # load saved model params for which step
-  decODE: False
-
-  train_seq: 20
-  train_in_seq: 10
-  train_out_seq: 10
-  test_seq: 20
-  test_in_seq: 10
-  test_out_seq: 10
-  
-  conv_encoder_out_ch: 64
-  convgru_out_ch: 64
-  depth: 3                          # num_pairs <ConvEncode, ConvGRUCell>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Experiment 2: Train and test ODEConvGRU on Moving MNIST with 50000 steps
+# Experiment: Train ODEConvGRU on Moving MNIST with 50000 steps
 train_mmnist_odecgru:
   id: 'ODEConv_mmnist_train'
-  data_dir: "datasets/MovingMNIST_video/train"
+  data_dir: "datasets/MovingMNIST_video/"
   model: "ODEConv"
   phase: "train"
   epochs: 25                            # 1 epoch is 2000 steps
   load_model: False
 
   downsize: True                        # if True, conv_encoder will 0.5x and conv_decoder will 2x the resolution for every layer in `n_layers`
-  conv_encoder_out_ch: 128              # output channels for conv encoder in models/ODEConvGRU.py
-  conv_n_units: 64                      # n_units for conv encoder and conv decoder in models/ODEConvGRU.py
-  n_layers: 3                           # n_layers for conv encoder and conv decoder in models/ODEConvGRU.py
+  conv_n_units: [16,32,64,128]          # n_units for conv encoder and conv decoder in models/ODEConvGRU.py
   neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
   neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
-  neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
+  neural_ode_n_units: [64,128]                # n_units for the convnet in ode_encoder_func and ode_decoder_func
   n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
+  deconv_n_units: [64,32,16,3]
 
   train_seq: 20
   train_in_seq: 10
@@ -170,63 +65,6 @@ train_mmnist_odecgru:
   
   z_sample: False
   memory: True
-
-test_mmnist_odecgru:
-  id: 'ODEConv_mmnist_test'
-  data_dir: "datasets/MovingMNIST_video/test"
-  model: "ODEConv"
-  phase: "test"
-  load_model: True
-  frozen: True
-  step: 50000
-
-  downsize: True                        # if True, conv_encoder will 0.5x and conv_decoder will 2x the resolution for every layer in `n_layers`
-  conv_encoder_out_ch: 128              # output channels for conv encoder in models/ODEConvGRU.py
-  conv_n_units: 64                      # n_units for conv encoder and conv decoder in models/ODEConvGRU.py
-  n_layers: 2                           # n_layers for conv encoder and conv decoder in models/ODEConvGRU.py
-  neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
-  neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
-  neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
-  n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
-  z_sample: False
-
-
-train_mmnist_sample_odecgru:      # (Not completed) Samples z0 from N(z_mu, z_sigma) instead of doing z0 = z_mu
-  id: 'ODEConv_mmnist_train'
-  model: "ODEConv"
-  phase: "train"
-  data_dir: "datasets/MovingMNIST"
-  epochs: 25
-
-  downsize: True                  # if True, conv_encoder will 0.5x and conv_decoder will 2x the resolution for every layer in `n_layers`
-  conv_encoder_out_ch: 128        # output channels for conv encoder in models/ODEConvGRU.py
-  conv_n_units: 64                # n_units for conv encoder and conv decoder in models/ODEConvGRU.py
-  n_layers: 2                     # n_layers for conv encoder and conv decoder in models/ODEConvGRU.py
-  neural_ode_encoder_out_ch: 128  # output channels for ode_encoder_func in models/ODEConvGRU.py
-  neural_ode_decoder_out_ch: 128  # output channels for ode_decoder_func in models/ODEConvGRU.py
-  neural_ode_n_units: 64          # n_units for the convnet in ode_encoder_func and ode_decoder_func
-  n_ode_layers: 2                 # n_layers for the convnet in ode_encoder_func and ode_decoder_func
-  z_sample: True
-
-train_mmnist_cgrudecODE:          # Not completed
-  id: 'cgrudecODE_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
-  model: "cgrudecODE"
-  data_dir: "datasets/MovingMNIST"
-  phase: "train"
-  epochs: 10
-  ckpt_save_freq: 20000
-  validate_freq: 20000
-  log_video_freq: 20000
-  decODE: True
-  z_sample: False
-  loss: 'MSE'
-
-  conv_encoder_out_ch: 128
-  convgru_out_ch: 128
-  depth: 1
-  latent_dim: 64                               # z0 channels
-
-
 
 
 

@@ -119,56 +119,52 @@ def get_norm_layer(ch):
     norm_layer = nn.BatchNorm2d(ch)
     return norm_layer
 
-def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False, nonlinear='tanh'):
-    if nonlinear == 'tanh':
-        nonlinear = nn.Tanh()
-    elif nonlinear == 'relu':
-        nonlinear = nn.ReLU()
-    else:
-        raise NotImplementedError('There is no named')
-
+def create_convnet(n_inputs, n_units):
+    n_units=[16,32,64,128]
     layers = []
-    layers.append(nn.Conv2d(n_inputs, n_units, 3, 1, 1, dilation=1))
-    
-    for i in range(n_layers):
-        layers.append(get_norm_layer(n_units))
-        layers.append(nonlinear)
-        if downsize is False:
-            layers.append(nn.Conv2d(n_units, n_units, 3, 1, 1, dilation=1))
-        else:
-            layers.append(nn.Conv2d(n_units, n_units, 4, 2, 1, dilation=1))
-    
-    layers.append(get_norm_layer(n_units))
-    layers.append(nonlinear)
-    layers.append(nn.Conv2d(n_units, n_outputs, 3, 1, 1, dilation=1))
-    layers.append(get_norm_layer(n_outputs))
-    layers.append(nonlinear)
+    layers.append(nn.Conv2d(n_inputs, n_units[0], 4, 2, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    layers.append(nn.Conv2d(n_units[0], n_units[1], 4, 2, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    layers.append(nn.Conv2d(n_units[1], n_units[2], 4, 2, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    layers.append(nn.Conv2d(n_units[2], n_units[3], 4, 2, 1, dilation=1))
+    layers.append(nn.ReLU())
 
     return nn.Sequential(*layers)
 
-def create_transpose_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, upsize=False, nonlinear='tanh'):
-    if nonlinear == 'tanh':
-        nonlinear = nn.Tanh()
-    elif nonlinear == 'relu':
-        nonlinear = nn.ReLU()
-    else:
-        raise NotImplementedError('There is no named')
-
+def create_odeconvnet(n_inputs, n_units):
     layers = []
-    layers.append(nn.ConvTranspose2d(n_inputs, n_units, 3, 1, 1, dilation=1))
+    layers.append(nn.Conv2d(n_inputs, n_units[0], 3, 1, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    layers.append(nn.Conv2d(n_units[0], n_units[0], 3, 1, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    layers.append(nn.Conv2d(n_units[0], n_units[0], 3, 1, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    layers.append(nn.Conv2d(n_units[0], n_units[1], 3, 1, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    return nn.Sequential(*layers)
+
+def create_transpose_convnet(n_inputs, n_units):
     
-    for i in range(n_layers):
-        layers.append(get_norm_layer(n_units))
-        layers.append(nonlinear)
-        if upsize is False:
-            layers.append(nn.ConvTranspose2d(n_units, n_units, 3, 1, 1, dilation=1))
-        else:
-            layers.append(nn.ConvTranspose2d(n_units, n_units, 4, 2, 1, dilation=1))
-    
-    layers.append(get_norm_layer(n_units))
-    layers.append(nonlinear)
-    layers.append(nn.ConvTranspose2d(n_units, n_outputs, 3, 1, 1, dilation=1))
-    layers.append(get_norm_layer(n_outputs))
+    layers = []
+    layers.append(nn.ConvTranspose2d(n_inputs, n_units[0], 4, 2, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    layers.append(nn.ConvTranspose2d(n_units[0], n_units[1], 4, 2, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    layers.append(nn.ConvTranspose2d(n_units[1], n_units[2], 4, 2, 1, dilation=1))
+    layers.append(nn.ReLU())
+
+    layers.append(nn.ConvTranspose2d(n_units[2], n_units[3], 4, 2, 1, dilation=1))
     layers.append(nn.Tanh())
 
     return nn.Sequential(*layers)
@@ -232,7 +228,7 @@ def get_normalized_ssim(pred, gt):
 
     for pred_, gt_ in zip(pred_np, gt_np):  # For every batch
         for pred_t, gt_t in zip(pred_, gt_):    # For every time step
-            ssim_val += ssim(pred_t, gt_t, data_range=255, gaussian_weights=True, use_sample_covariance=False, channel_axis=0)
+            ssim_val += ssim(pred_t, gt_t, data_range=255, gaussian_weights=True, use_sample_covariance=False, channel_axis=0,multichannel=True)
     
     return (ssim_val / (b*t))
 
