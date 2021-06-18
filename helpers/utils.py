@@ -4,7 +4,6 @@ import os
 import gzip
 import numpy as np
 import pickle
-import re
 from skimage.metrics import structural_similarity as ssim
 
 def args_type(default):
@@ -230,3 +229,14 @@ def get_normalized_ssim(pred, gt):
     
     return (ssim_val / (b))
 
+def orthogonal_init(module, gain=nn.init.calculate_gain('relu')):
+    if isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d):
+        nn.init.orthogonal_(module.weight.data, gain)
+        nn.init.constant_(module.bias.data, 0)
+    return module
+
+def xavier_uniform_init(module, gain=1.0):
+    if isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d):
+        nn.init.xavier_uniform_(module.weight.data, gain)
+        nn.init.constant_(module.bias.data, 0)
+    return module
