@@ -54,17 +54,18 @@ def train(opt, model, loader_objs, device, exp_config_dict):
                 if step % opt.loss_log_freq == 0:
                     wandb.log( {'Per Step Loss': step_loss}, step=step)
 
-                if step % opt.video_log_freq == 0:
+                if step == 1 or step % opt.video_log_freq == 0:
                     wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)
+                    print("Logged video")
                 
             print(f"step {step}")
 
             # Save model params
-            utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
+            # utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
             
-        epoch_loss /= n_train_batches # Avg loss over all batches for this epoch
-        wandb.log({"Per Epoch Loss": epoch_loss})
-        loggers.log_after_epoch(epoch, epoch_loss, step, start_time, total_steps, opt=opt)
+        # epoch_loss /= n_train_batches # Avg loss over all batches for this epoch
+        # wandb.log({"Per Epoch Loss": epoch_loss})
+        # loggers.log_after_epoch(epoch, epoch_loss, step, start_time, total_steps, opt=opt)
 
 
 def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=None, lr_schedule=None):
@@ -144,7 +145,7 @@ def test_batch(model, test_dataloader, opt, device):
     input_frames = batch_dict['observed_data'].to(device) 
     ground_truth = batch_dict['data_to_predict'].to(device) 
 
-    predicted_frames = model.get_prediction(input_frames)
+    predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
     loss = model.get_loss(predicted_frames, 2.0*ground_truth).item()
 
     return predicted_frames/2.0, ground_truth, loss
