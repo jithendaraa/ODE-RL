@@ -102,8 +102,8 @@ train_mmnist_cgru_len20:
   train_seq: 20
   train_in_seq: 10
   train_out_seq: 10
-  conv_encoder_out_ch: 64
-  convgru_out_ch: 64
+  conv_encoder_out_ch: 128
+  convgru_out_ch: 128
   depth: 1                              # num_pairs <ConvEncode, ConvGRUCell>
 
 test_mmnist_cgru_len20:
@@ -164,9 +164,6 @@ train_mmnist_odecgru:
   train_seq: 20
   train_in_seq: 10
   train_out_seq: 10
-  test_seq: 200
-  test_in_seq: 150
-  test_out_seq: 50
   n_downs: 2                            # reducing/increasing resolution per encoder/decoder layer
   conv_encoder_n_units: 32              # Out ch at end of ConvEncoder is conv_encoder_n_units * (2^n_downs)
   n_layers: 3                           # n_layers whenever create_convnet is called for ODE Func nets
@@ -215,6 +212,7 @@ test_mmnist_odecgru_len20:
   id: 'ODEConv_mmnist_test'
   model: "ODEConv"
   ckpt_id: 'train_mmnist_odecgru_len20'
+  data_dir: "datasets/MovingMNIST_video/test"
   phase: 'test'
   load_model: True
   test_seq: 100
@@ -250,6 +248,7 @@ test_mmnist_odecgru_len100:
   id: 'ODEConv_mmnist_test'
   model: "ODEConv"
   ckpt_id: 'train_mmnist_odecgru_len100'
+  data_dir: "datasets/MovingMNIST_video/test"
   phase: 'test'
   load_model: True
   test_seq: 200
@@ -282,6 +281,26 @@ train_mmnist_odecgrumem_len20:
   n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
   z_sample: False
 
+test_mmnist_odecgrumem_len20:
+  id: 'ODEConv_mmnist_test'
+  model: "ODEConv"
+  ckpt_id: 'train_mmnist_odecgrumem_len20'
+  data_dir: "datasets/MovingMNIST_video/test"
+  phase: 'test'
+  load_model: True
+  train_seq: 100
+  train_in_seq: 50
+  train_out_seq: 50
+  test_seq: 100
+  test_in_seq: 10
+  test_out_seq: 90
+  n_downs: 2                            # reducing/increasing resolution per encoder/decoder layer
+  conv_encoder_n_units: 32              # Out ch at end of ConvEncoder is conv_encoder_n_units * (2^n_downs)
+  neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
+  neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
+  neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
+  n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
+  z_sample: False
 
 
 
