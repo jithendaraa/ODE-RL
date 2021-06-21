@@ -131,11 +131,17 @@ class MovingMNIST(Dataset):
         out_frames = required_frames[self.n_frames_input:]
         in_frames = torch.from_numpy( (in_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
         out_frames = torch.from_numpy( (out_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
-
+        
+        sample_size = self.n_frames_input + self.n_frames_output
+        mask = torch.ones((sample_size, 1))
+        mask = mask.type(torch.FloatTensor).to(self.device)
+        
         out = {
             "idx": idx, 
             "observed_data": in_frames, 
-            "data_to_predict": out_frames}
+            "data_to_predict": out_frames,
+            'mask': mask
+            }
 
         return out
 
@@ -170,7 +176,6 @@ class MovingMNIST(Dataset):
         else:
             output = []
 
-        frozen = input[-1]
         output = torch.from_numpy((output / 255.0) - 0.5).contiguous().float()
         input = torch.from_numpy((input / 255.0) - 0.5).contiguous().float()
         out = {
