@@ -29,15 +29,15 @@ class ODEConvGRUCell(nn.Module):
             nn.Conv2d(z, z * 2, 1, 1, 0)).to(device)
         
 
-    def forward(self, inputs, timesteps):
-        last_yi, latent_ys = self.run_ode_conv_gru(inputs, timesteps)
+    def forward(self, inputs, timesteps, mask=None):
+        last_yi, latent_ys = self.run_ode_conv_gru(inputs, timesteps, mask=mask)
         trans_last_yi = self.transform_z0(last_yi)  # (b, self.z0_dim*2, h, w)
 
         mean_z0, std_z0 = torch.split(trans_last_yi, self.z0_dim, dim=1)
         std_z0 = std_z0.abs()
         return mean_z0, std_z0
 
-    def run_ode_conv_gru(self, inputs, timesteps, run_backwards=True):
+    def run_ode_conv_gru(self, inputs, timesteps, run_backwards=True, mask=None):
         b, t, c, h, w = inputs.size()
         assert (t == len(timesteps)), "Sequence length should be same as time_steps"
 
@@ -66,9 +66,9 @@ class ODEConvGRUCell(nn.Module):
 
             yi_ode = ode_sol[:, -1, :]      # ODE estimate input at t_i esimated from prev_input + Integ(prev_input) from prev_t to t_i
             xi = inputs[:, i, :]            # Actual encoded input at t_i
-
-            yi = self.cgru_cell(input_tensor=xi, h_cur=yi_ode, mask=None)
-            
+            if mask is not None: m = mask[:, i]
+            else: m = None
+            yi = self.cgru_cell(input_tensor=xi, h_cur=yi_ode, mask=m)
             # return to iteration
             prev_input = yi     # ODEConvGRU estimate of input at t_i: (b, c, h , w)
             prev_t, t_i = timesteps[i], timesteps[i - 1]

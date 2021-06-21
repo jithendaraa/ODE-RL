@@ -140,8 +140,7 @@ class MovingMNIST(Dataset):
             "idx": idx, 
             "observed_data": in_frames, 
             "data_to_predict": out_frames,
-            'mask': mask
-            }
+            'mask': mask}
 
         return out
 
@@ -169,7 +168,6 @@ class MovingMNIST(Dataset):
         r = 1
         w = int(64 / r)
         images = images.reshape((length, w, r, w, r)).transpose(0, 2, 4, 1, 3).reshape((length, r * r, w, w))
-
         input = images[:self.n_frames_input]
         if self.n_frames_output > 0:
             output = images[self.n_frames_input:length]

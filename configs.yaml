@@ -219,11 +219,12 @@ train_mmnist_vidode_len20:
   ckpt_id: 'train_mmnist_vidode_len20'
   ckpt_save_freq: 5000
   video_log_freq: 500
-  loss_log_freq: 200
+  loss_log_freq: 100
   train_seq: 20
   train_in_seq: 10
   train_out_seq: 10
   n_downs: 2
+  n_layers: 2
   
 
 train_mmnist_sample_odecgru:      # (Not completed) Samples z0 from N(z_mu, z_sigma) instead of doing z0 = z_mu

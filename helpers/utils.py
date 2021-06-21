@@ -112,6 +112,13 @@ def get_next_batch(data_dict, opt):
     batch_dict["timesteps"] = torch.tensor(np.arange(0, total_t) / total_t).to(device)
     batch_dict["observed_tp"] = torch.tensor(batch_dict["timesteps"][:input_t]).to(device)
     batch_dict["tp_to_predict"] = torch.tensor(batch_dict["timesteps"][input_t:]).to(device)
+
+    if ("mask" in data_dict) and (data_dict["mask"] is not None):
+        data_dict["observed_mask"] = data_dict["mask"][:, :input_t].clone()
+        data_dict["mask_predicted_data"] = data_dict["mask"][:, input_t:].clone()
+
+        if data_dict["observed_mask"] is None:
+            data_dict["observed_mask"] = torch.ones_like(data_dict["observed_data"]).to(device)
     
     # Input: Mask out skipped data
     if opt.model == 'VidODE' and ("observed_mask" in data_dict) and (data_dict["observed_mask"] is not None):
@@ -125,6 +132,9 @@ def get_next_batch(data_dict, opt):
         filter_mask = batch_dict["mask_predicted_data"].unsqueeze(-1).unsqueeze(-1).to(device)
         batch_dict["orignal_data_to_predict"] = batch_dict["data_to_predict"].clone()
         batch_dict["data_to_predict"] = filter_mask * batch_dict["data_to_predict"]
+
+    batch_dict["observed_mask"] = data_dict["observed_mask"].to(device)
+    batch_dict["mask_predicted_data"] = data_dict["mask_predicted_data"].to(device)
     
     return batch_dict
 # ______________________________________________________________________________
