@@ -160,7 +160,7 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
 
     # Forward pass
     predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
-    train_loss = model.get_loss(predicted_frames, 2.0*ground_truth)
+    train_loss = model.get_loss(predicted_frames, (ground_truth+0.5), 'BCE')
 
     # Backward pass
     optimizer.zero_grad()
@@ -170,4 +170,4 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     # Step with optimizer
     optimizer.step()
 
-    return ((predicted_frames/2.0) + 0.5) * 255.0, (ground_truth + 0.5) * 255.0, train_loss.item()
+    return predicted_frames * 255.0, (ground_truth + 0.5) * 255.0, train_loss.item()

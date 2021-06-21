@@ -123,7 +123,7 @@ def get_norm_layer(ch):
     norm_layer = nn.BatchNorm2d(ch)
     return norm_layer
 
-def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False, nonlinear='tanh'):
+def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False, nonlinear='tanh', final_act=True):
     if nonlinear == 'tanh':
         nonlinear = nn.Tanh()
     elif nonlinear == 'relu':
@@ -145,8 +145,11 @@ def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False,
     layers.append(get_norm_layer(n_units))
     layers.append(nonlinear)
     layers.append(nn.Conv2d(n_units, n_outputs, 3, 1, 1, dilation=1))
-    layers.append(get_norm_layer(n_outputs))
-    layers.append(nn.Tanh())
+    
+    if final_act is True:
+        layers.append(get_norm_layer(n_outputs))
+        layers.append(nn.Tanh())
+    
     return nn.Sequential(*layers)
 
 def create_transpose_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, upsize=False, nonlinear='tanh'):

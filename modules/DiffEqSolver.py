@@ -51,15 +51,18 @@ class DiffEqSolver(nn.Module):
 #####################################################################################################
 
 class ODEFunc(nn.Module):
-    def __init__(self, n_inputs, n_outputs, n_layers, n_units, downsize, nonlinear, device=torch.device("cpu")):
+    def __init__(self, n_inputs, n_outputs, n_layers, n_units, downsize, nonlinear, final_act=True, net=None, device=torch.device("cpu")):
         """
 		input_dim: dimensionality of the input
 		latent_dim: dimensionality used for ODE. Analog of a continous latent state
 		"""
         super(ODEFunc, self).__init__()
         self.device = device
-        self.gradient_net = utils.create_convnet(n_inputs, n_outputs, n_layers, n_units, downsize, nonlinear).to(device)
-    
+        if net is None:
+            self.gradient_net = utils.create_convnet(n_inputs, n_outputs, n_layers, n_units, downsize, nonlinear, final_act=final_act).to(device)
+        else:
+            self.gradient_net = net
+        
     def forward(self, t_local, y, backwards=False):
         """
 		Perform one step in solving ODE. Given current data point y and current time point t_local, returns gradient dy/dt at this time point
