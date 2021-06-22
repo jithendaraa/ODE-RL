@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import random
+import cv2
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -222,10 +223,16 @@ class HurricaneVideoDataset(Dataset_base):
 
 class VideoDataset(Dataset_base):
     
-    def __init__(self, opt, train=True):
+    def __init__(self, opt, train=True, offset=0):
         super(VideoDataset, self).__init__(opt, train=train)
         
+        self.opt = opt
+        
         self.sample_from_beg = opt.sample_from_beg
+        if train is False:
+            self.offset = 8000
+        else:
+            self.offset = 0
 
         # Dataroot & Transform
         if opt.dataset == 'mgif':
@@ -243,10 +250,15 @@ class VideoDataset(Dataset_base):
         elif opt.dataset == 'minerl':
             data_root = './dataset/minerl_navigate/'
             vtrans = [vtransforms.Scale(size=64)]
+        elif opt.dataset == 'mmnist':
+            self.channels = 1
+            data_root = '/home/jithen/scratch/datasets/MovingMNIST_video/'
+            vtrans = [vtransforms.Scale(size=64)]
         
         if self.train:
-            vtrans += [vtransforms.RandomHorizontalFlip()]
-            vtrans += [vtransforms.RandomRotation()]
+            if opt.dataset != 'mmnist':
+                vtrans += [vtransforms.RandomHorizontalFlip()]
+                vtrans += [vtransforms.RandomRotation()]
 
         vtrans += [vtransforms.ToTensor(scale=True)]
         vtrans += [vtransforms.Normalize(0.5, 0.5)] if opt.input_norm else []
@@ -262,18 +274,36 @@ class VideoDataset(Dataset_base):
             self.image_list = os.listdir(self.image_path)
         elif opt.dataset in ['mgif', 'stickman']:
             self.image_list = remove_files_under_sample_size(image_path=self.image_path, threshold=threshold)
+        elif opt.dataset in ['mmnist']:
+            self.image_list = os.listdir(self.image_path)
+
         self.image_list = sorted(self.image_list)
     
     def __getitem__(self, index):
         assert self.sample_size <= self.window_size, "[Error] sample_size > window_size"
-        images = np.load(os.path.join(self.image_path, self.image_list[index]))
+        
+        if self.opt.dataset == 'mmnist':
+            idx = index + 1 + self.offset
+            video_filename = 'video_' + str(idx) + '.mp4'
+            video_filename = os.path.join(self.image_path, video_filename)
+            vidcap = cv2.VideoCapture(video_filename)
+            success,image = vidcap.read()
+            success = True
+            frames = []
+            while success:
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).reshape(64, 64, 1)
+                frames.append(gray)
+                success,image = vidcap.read()
+            images = np.array(frames)
+            
+        else:
+            images = np.load(os.path.join(self.image_path, self.image_list[index]))
         
         # Sampling
         input_images, mask = self.sampling(images=images, sample_from_beg=self.sample_from_beg)
 
         # Transform
         input_images = self.vtrans(input_images)  # return (b, c, h, w)
-
         return input_images, mask
     
     def __len__(self):
@@ -314,7 +344,7 @@ def parse_datasets(opt, device):
                                      shuffle=False,
                                      collate_fn=lambda batch: video_collate_fn(batch, time_steps, data_type="test"))
     
-    elif opt.dataset in ['mgif', 'kth', 'penn', 'phyre', 'minerl']:
+    elif opt.dataset in ['mgif', 'kth', 'penn', 'phyre', 'minerl', 'mmnist']:
         train_dataloader = DataLoader(VideoDataset(opt, train=True),
                                       batch_size=opt.batch_size,
                                       shuffle=True,

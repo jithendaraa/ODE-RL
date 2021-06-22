@@ -73,7 +73,6 @@ def get_data_dict(dataloader):
 def get_next_batch(data_dict, test_interp=False, opt=None):
 
     device = get_device(data_dict["observed_data"])
-    
     batch_dict = get_dict_template()
     
     # preserving values:

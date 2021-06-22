@@ -17,11 +17,11 @@ import utils
 import visualize
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
+import wandb
 
 
 def get_opt():
     parser = argparse.ArgumentParser()
-    
     parser.add_argument("--name", default="vid_ode", help='Specify experiment')
     parser.add_argument("--jobid", default="sample", help='Specify experiment')
     parser.add_argument('-j', '--workers', type=int, default=4)
@@ -32,9 +32,7 @@ def get_opt():
     # Hyper-parameters
     parser.add_argument('--lr', type=float, default=1e-3, help="Starting learning rate.")
     parser.add_argument('--window_size', type=int, default=20, help="Window size to sample")
-    parser.add_argument('--sample_size', type=int, default=10, help="Number of time points to sub-sample")
-    
-    # Hyper-parameters
+    parser.add_argument('--sample_size', type=int, default=20, help="Number of time points to sub-sample")
     parser.add_argument('--lamb_adv', type=float, default=0.003, help="Adversarial Loss lambda")
 
     # Model architectures
@@ -75,11 +73,11 @@ def get_opt():
 
     # Log
     parser.add_argument("--ckpt_save_freq", type=int, default=10000)
-    parser.add_argument("--log_print_freq", type=int, default=4000)
-    parser.add_argument("--image_print_freq", type=int, default=5000)
+    parser.add_argument("--log_print_freq", type=int, default=200)
+    parser.add_argument("--image_print_freq", type=int, default=500)
     
     # Path (Data & Checkpoint & Tensorboard)
-    parser.add_argument('-d', '--dataset', type=str, default='kth', choices=["mgif", "hurricane", "kth", "penn", "minerl", 'cater', 'moving_mnist', 'box2D', "phyre"])
+    parser.add_argument('-d', '--dataset', type=str, default='kth', choices=["mgif", "hurricane", "kth", "penn", "minerl", 'cater', 'moving_mnist', 'box2D', "phyre", 'mmnist'])
     parser.add_argument('--log_dir', type=str, default='./logs', help='save tensorboard infos')
     parser.add_argument('--checkpoint_dir', type=str, default='./checkpoints', help='save checkpoint infos')
     parser.add_argument('-td', '--test_dir', type=str, help='load saved model')
@@ -102,6 +100,9 @@ def get_opt():
             opt.window_size = opt.sample_size
 
     opt.input_dim = 3
+
+    if opt.dataset == 'mmnist':
+        opt.input_dim = 1
     
     if opt.phase == 'train':
         # Make Directory
@@ -155,7 +156,6 @@ def main():
         opt = tester._load_json(opt)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # print(f"device:{device}")
     
     # Dataloader
     loader_objs = parse_datasets(opt, device)
@@ -203,6 +203,12 @@ def train(opt, netG, loader_objs, device):
 
     netD_img, netD_seq, optimizer_netD = create_netD(opt, device)
 
+    exp_config_dict = vars(opt)
+
+    wandb.init(project='ODE-RL', entity='jithendaraa', config=exp_config_dict)
+    config = wandb.config
+    wandb.watch(netG)
+    
     for epoch in range(opt.epoch):
         utils.update_learning_rate(optimizer_netG, decay_rate=0.99, lowest=opt.lr / 10)
         utils.update_learning_rate(optimizer_netD, decay_rate=0.99, lowest=opt.lr / 10)
@@ -245,6 +251,8 @@ def train(opt, netG, loader_objs, device):
             optimizer_netG.zero_grad()
             loss_netG.backward()
             optimizer_netG.step()
+
+            # print(fake.size(), real.size(), torch.max(real), torch.min(real), torch.max(fake), torch.min(fake))
             
             if (total_step + 1) % opt.log_print_freq == 0 or total_step == 0:
                 et = time.time() - start_time
@@ -254,6 +262,10 @@ def train(opt, netG, loader_objs, device):
                         f"Mse [{res['loss'].item():.4f}]\t"\
                         f"Adv_G [{loss_adv_netG.item():.4f}]\t"\
                         f"Adv_D [{loss_netD.item():.4f}]"
+
+                 wandb.log( {'Per Step Loss (netD)': loss_netD.item(),
+                             'Per Step Loss (netG)': loss_adv_netG.item(),
+                             'Per Step Loss': loss_netD.item() + loss_adv_netG.item()}, step=total_step)
                 
                 print(log)
 
@@ -263,6 +275,8 @@ def train(opt, netG, loader_objs, device):
             if (total_step + 1) % opt.image_print_freq == 0 or total_step == 0:
                 
                 gt, pred, time_steps = visualize.make_save_sequence(opt, batch_dict, res)
+                pred_gt = torch.cat([pred, gt[:, opt.input_sequence:, ...]], dim=0)
+                wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=total_step)
                 
                 if opt.extrap:
                     visualize.save_extrap_images(opt=opt, gt=gt, pred=pred, path=opt.train_image_path, total_step=total_step)
@@ -271,9 +285,9 @@ def train(opt, netG, loader_objs, device):
             
             total_step += 1
         
-        # Test
-        if (epoch + 1) % 100 == 0:
-            test(netG, epoch, test_dataloader, opt, n_test_batches)
+    #     # Test
+    #     if (epoch + 1) % 100 == 0:
+    #         test(netG, epoch, test_dataloader, opt, n_test_batches)
 
 def test(netG, epoch, test_dataloader, opt, n_test_batches):
     

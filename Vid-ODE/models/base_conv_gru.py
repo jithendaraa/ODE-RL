@@ -78,7 +78,6 @@ class Encoder_z0_ODE_ConvGRU(nn.Module):
                  bias=True, return_all_layers=False, z0_diffeq_solver=None, run_backwards=None, opt=None):
         
         super(Encoder_z0_ODE_ConvGRU, self).__init__()
-        
         # Make sure that both `kernel_size` and `hidden_dim` are lists having len == num_layers
         kernel_size = self._extend_for_multilayer(kernel_size, num_layers)
         hidden_dim = self._extend_for_multilayer(hidden_dim, num_layers)

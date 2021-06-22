@@ -212,9 +212,6 @@ class VidODE(nn.Module):
             e_truth = e_truth.view(b, t, -1, h // resize, w // resize)
         
         ##### ODE encoding
-        print()
-        print("e_truth:", e_truth.size())
-
         first_point_mus, first_point_stds, first_point_encs = [], [], []
         sol_ys, pred_outputs_s = [], []
         pred_flows_s, pred_intermediates_s, pred_masks_s, pred_xs, warped_pred_xs = [], [], [], [], []
@@ -289,7 +286,6 @@ class VidODE(nn.Module):
             extra_info["pred_intermediates"] = pred_intermediates_s
             extra_info["pred_masks"] = pred_masks_s
 
-            print("get_reconstruction() done", pred_x.size())
             return pred_xs, extra_info
 
         else:
@@ -333,7 +329,6 @@ class VidODE(nn.Module):
             extra_info["pred_intermediates"] = pred_intermediates
             extra_info["pred_masks"] = pred_masks
 
-        print("get_reconstruction() done", pred_x.size())
         return pred_x, extra_info
     
     def get_mse(self, truth, pred_x, mask=None):
@@ -385,7 +380,6 @@ class VidODE(nn.Module):
         for t in time_iter:
             cur_and_prev = torch.cat([sol_out[:, t, ...], prev], dim=1)
             pred_flow = self.decoder(cur_and_prev).unsqueeze(1)
-            print("Pred flow:", pred_flow.size())
             pred_flows += [pred_flow]
             prev = sol_out[:, t, ...].clone()
     
@@ -426,10 +420,6 @@ class VidODE(nn.Module):
         batch_dict["data_to_predict"] = batch_dict["data_to_predict"].to(self.device)
         batch_dict["mask_predicted_data"] = batch_dict["mask_predicted_data"].to(self.device)
 
-        # for key in batch_dict.keys():
-        #     if type(batch_dict[key]) is not str:
-        #         print(key, batch_dict[key].size())
-
         pred_x, extra_info = self.get_reconstruction(
             time_steps_to_predict=batch_dict["tp_to_predict"],
             truth=batch_dict["observed_data"],
@@ -457,3 +447,6 @@ class VidODE(nn.Module):
         results["pred_y"] = pred_x
         
         return results
+
+
+# python main.py -nl 2 -b 4 -e 100 -is 10 -os 10 --unequal -d kth --extrap -p train

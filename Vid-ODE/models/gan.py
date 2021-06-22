@@ -29,7 +29,6 @@ class Discriminator(nn.Module):
     def __init__(self, in_ch, device, seq=False, is_extrap=True):
         
         super(Discriminator, self).__init__()
-        
         self.device = device
         self.seq = seq
         self.is_extrap = is_extrap
@@ -56,6 +55,7 @@ class Discriminator(nn.Module):
                 real, fake = self.rearrange_seq(real, fake, input_real, only_fake=False, unequal=unequal)
             else:
                 real, fake = self.rearrange_seq_interp(real, fake, input_real, only_fake=False)
+        
         elif not self.seq:
             b, t, c, h, w = fake.size()
             real = real.contiguous().view(-1, c, h, w)
@@ -112,6 +112,7 @@ class Discriminator(nn.Module):
             return None, fake_seqs
         
         real_seqs = []
+        
         for i in range(t):
             input_real_len = input_real[:, i:, ...].size()[1]
             fake_len = fake[:, :i+1, ...].size()[1]
@@ -121,6 +122,7 @@ class Discriminator(nn.Module):
             else:
                 real_seq = torch.cat([input_real[:, i:, ...], real[:, :i+1, ...]], dim=1)
             real_seqs += [real_seq]
+
         real_seqs = torch.cat(real_seqs, dim=0).view(b * t, -1, h, w)
 
         return real_seqs, fake_seqs
@@ -162,18 +164,17 @@ def create_netD(opt, device):
     # Model
     if opt.unequal is True:
         seq_len = opt.output_sequence    
+        
     else:
         seq_len = opt.sample_size // 2
 
     if opt.irregular and not opt.extrap:
         seq_len = opt.sample_size
     
-    if opt.extrap:
-        seq_len += 1
+    if opt.extrap:  seq_len += 1
 
-    netD_img = Discriminator(in_ch=3, device=device, seq=False, is_extrap=opt.extrap).to(device)
-    netD_seq = Discriminator(in_ch=3 * (seq_len), device=device, seq=True, is_extrap=opt.extrap).to(device)
-
+    netD_img = Discriminator(in_ch=opt.input_dim, device=device, seq=False, is_extrap=opt.extrap).to(device)
+    netD_seq = Discriminator(in_ch=opt.input_dim * (seq_len), device=device, seq=True, is_extrap=opt.extrap).to(device)
     # Optimizer
     optimizer_netD = optim.Adamax(list(netD_img.parameters()) + list(netD_seq.parameters()), lr=opt.lr)
     
