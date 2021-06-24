@@ -32,7 +32,7 @@ defaults:
   train_out_seq: 50
   test_in_seq: 50
   test_out_seq: 150
-  in_channels: 1
+  in_channels: 3
   num_digits: 3
   n_layers: 3
 
@@ -190,6 +190,7 @@ train_mmnist_odecgrumem_len20:
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
   n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
   z_sample: False
+  in_channels: 1
 
 test_mmnist_odecgrumem_len20:
   id: 'ODEConv_mmnist_test'
@@ -197,6 +198,7 @@ test_mmnist_odecgrumem_len20:
   ckpt_id: 'train_mmnist_odecgrumem_len20'
   data_dir: "datasets/MovingMNIST_video/test"
   phase: 'test'
+  mem: True
   load_model: True
   train_seq: 100
   train_in_seq: 50
@@ -211,6 +213,7 @@ test_mmnist_odecgrumem_len20:
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
   n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
   z_sample: False
+  in_channels: 1
 
 
 train_mmnist_vidode_len20:

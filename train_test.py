@@ -83,11 +83,8 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
     if opt.offline is True: os.system('wandb offline')
     
     if opt.off_wandb is False:
-        # 1. Start a new run
         wandb.init(project=opt.wandb_project, entity=opt.wandb_entity, config=exp_config_dict)
-        # 2. Save model inputs and hyperparameters
         config = wandb.config
-        # 3. Log gradients and model parameters
         wandb.watch(model)
 
     with torch.no_grad():
@@ -104,7 +101,7 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
                 pred_ = pred[:, i:i+1, :, :, :].view(b, 1, c, h, w)
                 gt_ = gt[:, i:i+1, :, :, :].view(b, 1, c, h, w)
 
-                mse_loss = model.get_loss(pred_, gt_).item()
+                mse_loss = F.mse_loss(pred_[:, 0, ...], gt_[:, 0, ...]).item()
                 avg_mses[i] += mse_loss          # normalized by b
 
                 pred_255, gt_255 = (pred_ + 0.5) * 255.0, (gt_ + 0.5) * 255.0
@@ -143,7 +140,12 @@ def test_batch(model, test_dataloader, opt, device):
     input_frames = batch_dict['observed_data'].to(device) 
     ground_truth = batch_dict['data_to_predict'].to(device) 
     predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
-    loss = model.get_loss(predicted_frames, 2.0*ground_truth).item()
+    
+    if opt.model == 'ODEConv':  # preds are -1, 1
+        loss = model.get_loss(predicted_frames, 2.0*ground_truth).item()
+    else:
+        loss = None
+    
     return predicted_frames/2.0, ground_truth, loss
 
 def train_batch(model, train_dataloader, optimizer, opt, device):
@@ -154,12 +156,12 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     input_frames, ground_truth = batch_dict['observed_data'].to(device), batch_dict['data_to_predict'].to(device) 
     # Forward pass
     predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
-    train_loss = model.get_loss(predicted_frames, (ground_truth+0.5), 'BCE')
+    train_loss = model.get_loss(predicted_frames, (ground_truth*2), 'MSE')
     # Backward pass
     optimizer.zero_grad()
     train_loss.backward()
-    # Clipping gradient (optional)
-    # torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
+    # Clipping gradient (optional)  torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
+
     # Step with optimizer
     optimizer.step()
-    return predicted_frames * 255.0, (ground_truth + 0.5) * 255.0, train_loss.item()
+    return (predicted_frames/2 + 0.5) * 255.0, (ground_truth + 0.5) * 255.0, train_loss.item()

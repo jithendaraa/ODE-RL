@@ -12,7 +12,7 @@ from dataloader import parse_datasets
 # Models
 from models.ConvGRU import ConvGRU
 from models.ODEConvGRU import ODEConvGRU
-from models.VidODE import VidODE
+# from models.VidODE import VidODE
 from train_test import train, test
 
 def get_opt():
@@ -55,7 +55,8 @@ def init_model(opt, device):
       print("Initialised ODEConv model")
     
     elif opt.model in ['VidODE']:
-      model = VidODE(opt, device)
+      raise NotImplementedError(f'Model {opt.model} is not implemented. Try one of {implemented_models}')
+      # model = VidODE(opt, device)
     
     else: 
       raise NotImplementedError(f'Model {opt.model} is not implemented. Try one of {implemented_models}')
