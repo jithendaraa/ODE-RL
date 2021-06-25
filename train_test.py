@@ -43,7 +43,7 @@ def train(opt, model, loader_objs, device, exp_config_dict):
         utils.update_learning_rate(optimizer, decay_rate=0.99, lowest=opt.lr / 10)
 
         for it in range(n_train_batches):   # n_train_batches steps
-            pred, gt, step_loss = train_batch(model, train_dataloader, optimizer, opt, device)
+            pred, gt, step_loss, loss_dict = train_batch(model, train_dataloader, optimizer, opt, device)
             pred_gt = torch.cat((pred.detach().cpu(), gt.cpu()), 0).numpy()
             epoch_loss += step_loss
             step += 1
@@ -51,13 +51,13 @@ def train(opt, model, loader_objs, device, exp_config_dict):
             if opt.off_wandb is False:
                 # Log losses and pred, gt videos
                 if step % opt.loss_log_freq == 0:
-                    wandb.log( {'Per Step Loss': step_loss}, step=step)
+                    wandb.log( loss_dict, step=step)
 
                 if step == 1 or step % opt.video_log_freq == 0:
                     wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)
                     print("Logged video")
                 
-            print(f"step {step}")
+            print(f"step {step}; Step loss {step_loss}")
 
             # Save model params
             utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
@@ -152,16 +152,30 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     # Get batch data
     data_dict = utils.get_data_dict(train_dataloader)
     batch_dict = utils.get_next_batch(data_dict, opt)
+    
     # Get input sequence and output ground truth 
     input_frames, ground_truth = batch_dict['observed_data'].to(device), batch_dict['data_to_predict'].to(device) 
-    # Forward pass
-    predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
-    train_loss = model.get_loss(predicted_frames, (ground_truth*2), 'MSE')
-    # Backward pass
-    optimizer.zero_grad()
-    train_loss.backward()
-    # Clipping gradient (optional)  torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
+    
+    loss_dict = {}
+    if opt.model in ['S3VAE']:
+        # change input_frames from [-0.5, 0.5] to [0, 1]
+        input_frames = (input_frames + 0.5).to(device)
+        predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
+        train_loss, loss_dict = model.get_loss()
+        optimizer.zero_grad()
+        train_loss.backward()
+        optimizer.step()
+        return predicted_frames * 255.0, input_frames * 255.0, train_loss.item(), loss_dict
 
-    # Step with optimizer
-    optimizer.step()
-    return (predicted_frames/2 + 0.5) * 255.0, (ground_truth + 0.5) * 255.0, train_loss.item()
+    else:
+        predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
+        train_loss = model.get_loss(predicted_frames, (ground_truth+0.5), 'BCE')
+        # Backward pass
+        optimizer.zero_grad()
+        train_loss.backward()
+        # Clipping gradient (optional)
+        # torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
+        # Step with optimizer
+        optimizer.step()
+        loss_dict = {'Per Step Loss': train_loss.item()}
+        return predicted_frames * 255.0, (ground_truth + 0.5) * 255.0, train_loss.item(), loss_dict

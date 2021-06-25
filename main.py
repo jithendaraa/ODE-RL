@@ -13,6 +13,7 @@ from dataloader import parse_datasets
 from models.ConvGRU import ConvGRU
 from models.ODEConvGRU import ODEConvGRU
 # from models.VidODE import VidODE
+from models.S3VAE import S3VAE
 from train_test import train, test
 
 def get_opt():
@@ -53,7 +54,10 @@ def init_model(opt, device):
     elif opt.model in ['ODEConv']:
       model = ODEConvGRU(opt, device)
       print("Initialised ODEConv model")
-    
+
+    elif opt.model in ['S3VAE']:
+      model = S3VAE(opt, device)
+
     elif opt.model in ['VidODE']:
       raise NotImplementedError(f'Model {opt.model} is not implemented. Try one of {implemented_models}')
       # model = VidODE(opt, device)
@@ -66,7 +70,6 @@ def init_model(opt, device):
 def main(opt, exp_config):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
     # Dataloader
     loader_objs = parse_datasets(opt, device)
     print("Loaded", opt.dataset, "dataset")
