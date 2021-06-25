@@ -80,14 +80,37 @@ class Decoder(nn.Module):
     def forward(self, inputs):
         return self.layers(inputs)
 
+
+class DFP(nn.Module):
+    def __init__(self, z_size=128):
+        super().__init__()
+        self.main_net = nn.Sequential(
+            nn.Linear(in_features=z_size, out_features=z_size),
+            nn.Linear(in_features=z_size, out_features=z_size)
+        )
+        self.mean = nn.Linear(in_features=z_size, out_features=3)
+        self.std = nn.Linear(in_features=z_size, out_features=3)
+
+
+    def forward(self, batch):
+        shape, feature_shape = batch.shape[:-1], batch.shape[-1]
+        batch = batch.reshape(-1, feature_shape)
+        features = self.main_net(batch)
+        feature_shape = features.shape[1:]
+        features = features.reshape(*shape, *feature_shape)
+        # features = self.main_net(z_t)
+        mean = self.mean(features)
+        std = F.softplus(self.std(features))
+        return dist.Normal(loc=mean, scale=std)
+
 class S3VAE(nn.Module):
     def __init__(self, opt, device):
         super(S3VAE, self).__init__()
 
         self.opt = opt
         self.device = device
+        self.log_scale = nn.Parameter(torch.Tensor([0.0])).to(device)
         in_ch = opt.in_channels
-        T = opt.train_in_seq
         d_zf, d_zt = opt.d_zf, opt.d_zt
 
         self.conv_encoder = Encoder(in_ch).to(device)
@@ -95,7 +118,11 @@ class S3VAE(nn.Module):
         self.dynamic_rnn = LSTMEncoder(128, 256, d_zt, static=False).to(device)
         self.prior_rnn = LSTMEncoder(d_zt*2, 256, d_zt, static=False).to(device)
         self.conv_decoder = Decoder(d_zf + d_zt, in_ch).to(device)
-        self.log_scale = nn.Parameter(torch.Tensor([0.0])).to(device)
+        # For SCC
+        self._triplet_loss = nn.TripletMarginLoss(margin=opt.m)
+        # Dynamic Factor Prediction
+        self.dfp_net = DFP(z_size=d_zt)
+
     
     def set_zero_losses(self):
         self.vae_loss = 0
@@ -111,15 +138,13 @@ class S3VAE(nn.Module):
 
         b, t, c, h, w = inputs.size()
         print()
-        print("Inputs:", inputs.size())
+        # print("Inputs:", inputs.size())
 
         encoded_inputs = self.conv_encoder(inputs.view(b*t, c, h, w))
         num_features = encoded_inputs.size()[1]
-        # print("encoded_inputs", encoded_inputs.size())
 
         # Get mu and std of static latent variable zf of dim d_zf
         mu_zf, std_zf = self.static_rnn(encoded_inputs.view(b, t, num_features))
-        # print("zf gaussian params: ", mu_zf.size(), std_zf.size())
 
         # Get posterior mu and std of dynamic latent variables z1....zt each of dim d_zt
         mu_zt, std_zt = self.dynamic_rnn(encoded_inputs.view(b, t, num_features))
@@ -127,8 +152,6 @@ class S3VAE(nn.Module):
         
         # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
         prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt)
-        # print("posterior zt gaussian params: ", mu_zt.size(), std_zt.size())
-        # print("prior zt gaussian params: ", prior_mu_zt.size(), prior_std_zt.size())
         
         # p(z_f) prior -> N(0, 1) and q(z_f | x_1:T) posterior
         self.p_zf = dist.Normal(loc=torch.zeros_like(mu_zf).cuda(), scale=torch.ones_like(std_zf).cuda())
@@ -140,14 +163,29 @@ class S3VAE(nn.Module):
 
         zf_sample = self.q_zf_xT.rsample()
         zt_sample = self.q_zt_xt.rsample()
-        # print("Sampled zf and zt", zf_sample.size(), zt_sample.size()) 
-        
         zf_zt = torch.cat((zf_sample.view(b, 1, -1).repeat(1, t, 1), zt_sample), dim=2).view(b*t, -1, 1, 1)
-        # print("zf_zt", zf_zt.size())
 
         x_hat = self.conv_decoder(zf_zt).view(b, t, c, h, w)
-        
+
+        # 1. VAE ELBO Loss
         self.get_vae_loss(x_hat, inputs, zf_sample, zt_sample)
+
+        # 2. SCC Loss
+        # shuffle batch to get zf_pos
+        shuffle_idx = torch.randperm(encoded_inputs.shape[1])
+        shuffled_encoded_inputs = encoded_inputs[:, shuffle_idx].contiguous()
+        zf_pos_mu, zf_pos_std = self.static_rnn(shuffled_encoded_inputs.view(b, t, num_features))
+        zf_pos = dist.Normal(loc=zf_pos_mu, scale=zf_pos_std)
+        # Get zf from another sequence for zf_neg
+        another_encoded_tensor = self.conv_encoder(other.view(b*t, c, h, w))
+        zf_neg_mu, zf_neg_std = self.static_rnn(another_encoded_tensor.view(b, t, num_features))
+        zf_neg = dist.Normal(loc=zf_neg_mu, scale=zf_neg_std)
+        self.get_scc_loss(zf_pos, zf_neg)
+
+        # 3. TODO: DFP Loss
+
+        # 4. MI Loss
+        self.get_mi_loss()
         
         return x_hat
 
@@ -178,19 +216,58 @@ class S3VAE(nn.Module):
         kl_loss = zf_KL_div_loss + zt_KL_div_loss
         
         # ELBO Loss
-        self.vae_loss = (kl_loss - recon_loss).mean()
+        self.vae_loss = (- recon_loss + kl_loss).mean()
         print("VAE Loss:", self.vae_loss)
 
-    def get_scc_loss(self):
-        pass
+    def get_scc_loss(self, zf_pos, zf_neg):
+        # zf equivalent to self.q_zf_xT -- time-invariant representation from real data
+        # zf_pos -- time-invariant representation from shuffled real video
+        # zf_neg -- time-invariant representation from another video
+        zf_sample = self.q_zf_xT.rsample()
+        zf_pos_sample = zf_pos.sample()
+        zf_neg_sample = zf_neg.sample()
+        # max(D(zf, zf_pos) - D(zf, zf_neg) + margin, 0)
+        self.scc_loss = self._triplet_loss(zf_sample, zf_pos_sample, zf_neg_sample)
 
     def get_dfp_loss(self):
         pass
 
-    def get_MI_loss(self):
-        pass
+    def get_mi_loss(self):
+        # sum t from 1..T H(zf) + H(zt) - H(zf, zt)
+        # zf_dist is self.q_zf_xT and zt_dist = self.q_zt_xt
+        # H(.) -> -log q(.)
+        def dist_op(dist1, op, t=False):
+            if t is True:
+                return dist.Normal(loc=op(dist1.loc.permute(1, 0, 2)), scale=op(dist1.scale.permute(1, 0, 2)))
 
-    def get_loss(self, preds, gt, loss=None):
-        loss = self.vae_loss
+            else:
+                return dist.Normal(loc=op(dist1.loc), scale=op(dist1.scale))
+
+
+        z_t1 = dist_op(self.q_zt_xt, lambda x: x.unsqueeze(1), t=True) # t, 1, b, d_zt
+        z_t2 = dist_op(self.q_zt_xt, lambda x: x.unsqueeze(2), t=True) # t, b, 1, d_zt
+        log_q_t = z_t1.log_prob(z_t2.rsample()).sum(-1)        # t, b, b   
+        H_t = log_q_t.logsumexp(2).mean(1) - np.log(log_q_t.shape[2]) # t
+        
+        z_f1 = dist_op(self.q_zf_xT, lambda x: x.unsqueeze(0)) # 1, b, d_zf
+        z_f2 = dist_op(self.q_zf_xT, lambda x: x.unsqueeze(1)) # b, 1, d_zf
+        log_q_f = z_f1.log_prob(z_f2.rsample()).sum(-1)        # b, b 
+        H_f = log_q_f.logsumexp(1).mean(0) - np.log(log_q_t.shape[2])  
+
+        H_ft = (log_q_f.unsqueeze(0) + log_q_t).logsumexp(1).mean(1) # t
+        self.mi_loss = -(H_f + H_t.mean() - H_ft.mean())
+
+    def get_loss(self):
+        
+        # TODO: add self.opt.l2 * self.dfp_loss after adding DFP and uncomment DFP Loss in loss_dict below
+        loss = self.vae_loss + (self.opt.l1 * self.scc_loss) + (self.opt.l3 * self.mi_loss)
+
+        loss_dict = {
+            'Loss': loss.item(),
+            'VAE Loss': self.vae_loss.item(),
+            'SCC Loss': self.scc_loss.item(),
+            # 'DFP Loss': self.dfp_loss.item(),
+            'MI Loss': self.mi_loss.item()
+        }
         return loss 
 

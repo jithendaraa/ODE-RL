@@ -45,6 +45,7 @@ defaults:
   wandb_project: 'ODE-RL'
   wandb_entity: 'jithendaraa'
   offline: False                         # Beluga does not have internet; can set to False on cedar
+  reconstruct: False                     # Set true if you want to train x frames and reconstruct back the same x frames
 
 experimental:
   off_wandb: True
@@ -212,7 +213,31 @@ test_mmnist_odecgrumem_len20:
   n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
   z_sample: False
 
+# Experiment 3: Train and test S3VAE on Moving MNIST with 50000 steps 
+train_mmnist_s3vae:
+  id: 's3vae_mmnist_train'
+  ckpt_id: 'train_mmnist_s3vae'
+  lr: 1e-3
+  batch_size: 16
+  model: 'S3VAE'
+  epochs: 1000
+  reconstruct: True
+  train_seq: 30
+  train_in_seq: 15
+  train_out_seq: 15
+  in_channels: 3
+  d_zf: 256
+  d_zt: 32
+  l1: 1000
+  l2: 100
+  l3: 1
+  m: 1      # Margin for triplet loss
 
+
+
+
+
+# Not supported yet
 train_mmnist_vidode_len20:
   id: 'VidODE_mmnist_train'
   model: 'VidODE'
@@ -226,7 +251,7 @@ train_mmnist_vidode_len20:
   n_downs: 2
   n_layers: 2
   
-
+# Not supported yet
 train_mmnist_sample_odecgru:      # (Not completed) Samples z0 from N(z_mu, z_sigma) instead of doing z0 = z_mu
   id: 'ODEConv_mmnist_train'
   model: "ODEConv"
@@ -243,6 +268,7 @@ train_mmnist_sample_odecgru:      # (Not completed) Samples z0 from N(z_mu, z_si
   n_ode_layers: 2                 # n_layers for the convnet in ode_encoder_func and ode_decoder_func
   z_sample: True
 
+# Not supported yet
 train_mmnist_cgrudecODE:          # Not completed
   id: 'cgrudecODE_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   model: "cgrudecODE"
