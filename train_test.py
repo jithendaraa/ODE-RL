@@ -44,27 +44,27 @@ def train(opt, model, loader_objs, device, exp_config_dict):
 
         for it in range(n_train_batches):   # n_train_batches steps
             pred, gt, step_loss = train_batch(model, train_dataloader, optimizer, opt, device)
-            pred_gt = torch.cat((pred.detach().cpu(), gt.cpu()), 0).numpy()
-            epoch_loss += step_loss
-            step += 1
+            # pred_gt = torch.cat((pred.detach().cpu(), gt.cpu()), 0).numpy()
+            # epoch_loss += step_loss
+            # step += 1
 
-            if opt.off_wandb is False:
-                # Log losses and pred, gt videos
-                if step % opt.loss_log_freq == 0:
-                    wandb.log( {'Per Step Loss': step_loss}, step=step)
+            # if opt.off_wandb is False:
+            #     # Log losses and pred, gt videos
+            #     if step % opt.loss_log_freq == 0:
+            #         wandb.log( {'Per Step Loss': step_loss}, step=step)
 
-                if step == 1 or step % opt.video_log_freq == 0:
-                    wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)
-                    print("Logged video")
+            #     if step == 1 or step % opt.video_log_freq == 0:
+            #         wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)
+            #         print("Logged video")
                 
             print(f"step {step}")
 
             # Save model params
-            utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
+            # utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
             
-        epoch_loss /= n_train_batches # Avg loss over all batches for this epoch
-        wandb.log({"Per Epoch Loss": epoch_loss})
-        loggers.log_after_epoch(epoch, epoch_loss, step, start_time, total_steps, opt=opt)
+        # epoch_loss /= n_train_batches # Avg loss over all batches for this epoch
+        # wandb.log({"Per Epoch Loss": epoch_loss})
+        # loggers.log_after_epoch(epoch, epoch_loss, step, start_time, total_steps, opt=opt)
 
 
 def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=None, lr_schedule=None):
