@@ -137,7 +137,6 @@ class S3VAE(nn.Module):
         other = inputs[torch.from_numpy(np.random.permutation(len(inputs)))].to(self.device)
 
         b, t, c, h, w = inputs.size()
-        print()
         # print("Inputs:", inputs.size())
 
         encoded_inputs = self.conv_encoder(inputs.view(b*t, c, h, w))
@@ -217,7 +216,6 @@ class S3VAE(nn.Module):
         
         # ELBO Loss
         self.vae_loss = (- recon_loss + kl_loss).mean()
-        print("VAE Loss:", self.vae_loss)
 
     def get_scc_loss(self, zf_pos, zf_neg):
         # zf equivalent to self.q_zf_xT -- time-invariant representation from real data
@@ -269,5 +267,5 @@ class S3VAE(nn.Module):
             # 'DFP Loss': self.dfp_loss.item(),
             'MI Loss': self.mi_loss.item()
         }
-        return loss 
+        return loss, loss_dict
 

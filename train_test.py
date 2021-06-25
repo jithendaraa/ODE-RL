@@ -57,7 +57,7 @@ def train(opt, model, loader_objs, device, exp_config_dict):
                     wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)
                     print("Logged video")
                 
-            print(f"step {step}")
+            print(f"step {step}; Step loss {step_loss}")
 
             # Save model params
             utils.save_model_params(model, optimizer, epoch, opt, step, opt.ckpt_save_freq)
