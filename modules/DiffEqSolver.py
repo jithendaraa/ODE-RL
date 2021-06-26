@@ -26,6 +26,7 @@ class DiffEqSolver(nn.Module):
 		# Decode the trajectory through ODE Solver
 		"""
         pred_y = None
+        
         if self.memory is True:
             y_is = [first_point]
             b, c, h, w = first_point.size()
@@ -43,15 +44,18 @@ class DiffEqSolver(nn.Module):
         else:
             pred_y = odeint(self.ode_func, first_point, time_steps_to_predict,
                         rtol=self.odeint_rtol, atol=self.odeint_atol, method=self.ode_method)
-            pred_y = pred_y.permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]
-        
+            
+            if len(pred_y.size()) == 5:
+                pred_y = pred_y.permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]
+            elif len(pred_y.size()) == 3:
+                pred_y = pred_y.permute(1, 0, 2)  # => [b, t, h]
         return pred_y
 
 
 #####################################################################################################
 
 class ODEFunc(nn.Module):
-    def __init__(self, n_inputs, n_outputs, n_layers, n_units, downsize, nonlinear, final_act=True, net=None, device=torch.device("cpu")):
+    def __init__(self, n_inputs=3, n_outputs=3, n_layers=4, n_units=256, downsize=False, nonlinear='relu', final_act=True, net=None, device=torch.device("cpu")):
         """
 		input_dim: dimensionality of the input
 		latent_dim: dimensionality used for ODE. Analog of a continous latent state

@@ -1,7 +1,12 @@
+import sys
+sys.path.append('..')
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import distributions as dist
+
+from modules.DiffEqSolver import DiffEqSolver, ODEFunc
 
 import numpy as np
 
@@ -30,16 +35,42 @@ class Encoder(nn.Module):
         return self.layers(inputs)
 
 class LSTMEncoder(nn.Module):
-    def __init__(self, input_size=128, hidden_size=256, z_size=256, static=False):
+    def __init__(self, input_size=128, hidden_size=256, z_size=256, static=False, ode=False, device=None, method='dopri5'):
         super().__init__()
 
-        self.lstm_net = nn.LSTM(input_size, hidden_size, num_layers=1, batch_first=True)
+        self.ode = ode
+        self.device = device
+        if ode is True:
+            z0_outs = hidden_size // 2
+            self.z0_net = nn.LSTM(input_size, z0_outs, num_layers=1, batch_first=True)
+            self.ode_func_net = nn.Sequential(
+                nn.Linear(2*z0_outs, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, 2*z0_outs),
+            )
+            self.ode_func = ODEFunc(net=self.ode_func_net, device=device)
+            self.ode_solver = DiffEqSolver(self.ode_func, method, device=device).to(device)
+        else:
+            self.lstm_net = nn.LSTM(input_size, hidden_size, num_layers=1, batch_first=True)
+        
         self.mean_net = nn.Linear(hidden_size * (1 + int(static)), z_size)
         self.std_net = nn.Linear(hidden_size * (1 + int(static)), z_size)
         self.static = static
     
     def forward(self, inputs):
-        outs, hidden = self.lstm_net(inputs)
+        b, t, _ = inputs.size()
+        timesteps_to_predict = torch.from_numpy(np.arange(t, dtype=np.int64)) / t
+
+        if self.ode is True:
+            outs, hidden = self.z0_net(inputs)
+            hidden = torch.cat(hidden, 2).squeeze(0)
+            outs = self.ode_solver(hidden, timesteps_to_predict)
+
+        elif self.ode is False:
+            outs, hidden = self.lstm_net(inputs)
+        
         if self.static:
             hidden = torch.cat(hidden, 2).squeeze(0)
             mean = self.mean_net(hidden)
@@ -114,9 +145,9 @@ class S3VAE(nn.Module):
         d_zf, d_zt = opt.d_zf, opt.d_zt
 
         self.conv_encoder = Encoder(in_ch).to(device)
-        self.static_rnn = LSTMEncoder(128, 256, d_zf, static=True).to(device)
-        self.dynamic_rnn = LSTMEncoder(128, 256, d_zt, static=False).to(device)
-        self.prior_rnn = LSTMEncoder(d_zt*2, 256, d_zt, static=False).to(device)
+        self.static_rnn = LSTMEncoder(128, 256, d_zf, static=True, ode=False, device=device).to(device)
+        self.dynamic_rnn = LSTMEncoder(128, 256, d_zt, static=False, ode=opt.ode, device=device).to(device)
+        self.prior_rnn = LSTMEncoder(d_zt*2, 256, d_zt, static=False, ode=False, device=device).to(device)
         self.conv_decoder = Decoder(d_zf + d_zt, in_ch).to(device)
         # For SCC
         self._triplet_loss = nn.TripletMarginLoss(margin=opt.m)

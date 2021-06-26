@@ -41,6 +41,7 @@ defaults:
   decode_diff_method: 'dopri5'          # choices=['dopri5', 'euler', 'adams', 'rk4']
   frozen: True
   mem: False
+  ode: False
 
   wandb_project: 'ODE-RL'
   wandb_entity: 'jithendaraa'
@@ -237,7 +238,29 @@ train_mmnist_s3vae:
   m: 1      # Margin for triplet loss
   loss_log_freq: 50
   video_log_freq: 1000
+  ode: False
 
+train_mmnist_s3vaeode:
+  id: 's3vaeode_mmnist_train'
+  ckpt_id: 'train_mmnist_s3vaeode'
+  lr: 1e-3
+  batch_size: 16
+  model: 'S3VAE'
+  epochs: 1000
+  reconstruct: True
+  train_seq: 30
+  train_in_seq: 15
+  train_out_seq: 15
+  in_channels: 3
+  d_zf: 256
+  d_zt: 32
+  l1: 1000
+  l2: 100
+  l3: 1
+  m: 1      # Margin for triplet loss
+  loss_log_freq: 50
+  video_log_freq: 1000
+  ode: True
 
 
 
