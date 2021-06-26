@@ -35,7 +35,7 @@ def train(opt, model, loader_objs, device, exp_config_dict):
         # 3. Log gradients and model parameters
         wandb.watch(model)
 
-    print(f"Logging to {opt.logdir}")
+    print(f"Logging to {opt.logdir} {n_train_batches}")
     optimizer = optim.Adamax(model.parameters(), lr=opt.lr)
     
     for epoch in range(opt.epochs):
@@ -157,6 +157,7 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     input_frames, ground_truth = batch_dict['observed_data'].to(device), batch_dict['data_to_predict'].to(device) 
     
     loss_dict = {}
+    # return None, None, None, None
     if opt.model in ['S3VAE']:
         # change input_frames from [-0.5, 0.5] to [0, 1]
         input_frames = (input_frames + 0.5).to(device)

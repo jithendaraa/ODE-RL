@@ -104,27 +104,60 @@ class MovingMNIST(Dataset):
 
     def get_item(self, idx):
         
+        frames = np.empty((200, 64, 64, self.channels), np.dtype('uint8'))
+        count = 0
         video_filename = 'video_' + str(idx+1+self.offset) + '.mp4'
         video_filename = os.path.join(self.root, video_filename)
+        print(video_filename)
+
         vidcap = cv2.VideoCapture(video_filename)
-        success,image = vidcap.read()
-        success = True
-        frames = []
-        count = 0
+        success, image = vidcap.read()
+        while success is False: 
+            print("retrying", count)
+            vidcap = cv2.VideoCapture(video_filename)
+            success, image = vidcap.read()
+        
         while success:
             if self.channels == 1:
-                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).reshape(64, 64, 1)
-                frames.append(gray)
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) 
+                if gray.shape == (64, 64):  gray = gray.reshape(64, 64, 1)
+                else:
+                    print(gray.shape)
+                    print(image.shape)
+                frames[count] = gray
             else:
-                frames.append(image)
-            success,image = vidcap.read()
+                
+                frames[count] = image
+            success, image = vidcap.read()
             count += 1
+            retry = 0
+            while success is False and count < 200: 
+                retry += 1
+                print("retrying", count, retry)
+                if retry > 10:
+                    break
+                vidcap = cv2.VideoCapture(video_filename)
+                success, image = vidcap.read()
+                for _ in range(count+1):
+                    success, image = vidcap.read()
+        
+        vidcap.release()
+        cv2.destroyAllWindows()
 
-        frames = np.array(frames)
-        frames_in_video = frames.shape[0]
+        frames_in_video = count
         total_frames_to_sample = self.n_frames_total
 
-        first_frame = np.random.randint(0, frames_in_video - total_frames_to_sample + 1)
+        if count < 200:
+            print(idx)
+            print("frames_in_video < 200:", count)
+            print(f"sampling from (0, {count - total_frames_to_sample + 1})")
+
+        first_frame = np.random.randint(0, count - total_frames_to_sample + 1)
+        
+        if frames_in_video < 200 or first_frame+total_frames_to_sample > 200:
+            print(idx)
+            print("first_frame:", first_frame, first_frame+total_frames_to_sample)
+        
         required_frames = frames[first_frame:first_frame+total_frames_to_sample]
 
         in_frames = required_frames[:self.n_frames_input]
@@ -132,8 +165,7 @@ class MovingMNIST(Dataset):
         in_frames = torch.from_numpy( (in_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
         out_frames = torch.from_numpy( (out_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
         
-        sample_size = self.n_frames_input + self.n_frames_output
-        mask = torch.ones((sample_size, 1))
+        mask = torch.ones((total_frames_to_sample, 1))
         mask = mask.type(torch.FloatTensor).to(self.device)
         
         out = {
@@ -193,7 +225,7 @@ def parse_datasets(opt, device):
         total_frames = opt.total_frames # 2M as in clockwork paper
         total_instances = 1e4
         train_instances = int(opt.train_test_split * total_instances)       # 8000
-        test_instances = total_instances - train_instances                  # 2000
+        test_instances = int(total_instances - train_instances)                  # 2000
         print("Train frames:", opt.test_seq * train_instances)
         print("Test frames:", opt.test_seq * test_instances)
         print(f"Train instances {train_instances}; Test instances {test_instances}")

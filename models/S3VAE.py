@@ -121,7 +121,7 @@ class S3VAE(nn.Module):
         # For SCC
         self._triplet_loss = nn.TripletMarginLoss(margin=opt.m)
         # Dynamic Factor Prediction
-        self.dfp_net = DFP(z_size=d_zt)
+        # self.dfp_net = DFP(z_size=d_zt)
 
     
     def set_zero_losses(self):

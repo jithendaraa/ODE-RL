@@ -90,11 +90,12 @@ class ODEConvGRU(nn.Module):
         pred_x = self(inputs, batch_dict) # Range in [-1, 1] due to last tanh activation
         return pred_x 
         
-    def get_loss(self, pred_frames, truth):
+    def get_loss(self, pred_frames, truth, loss='MSE'):
         """ Returns the reconstruction loss calculated as MSE Error """
         b, t, c, h, w = truth.size()
-        loss_function = nn.MSELoss().cuda()
-        loss = loss_function(pred_frames.view(b*t, c, h, w), truth.view(b*t, c, h, w))
+        if loss == 'MSE':
+            loss_function = nn.MSELoss().cuda()
+            loss = loss_function(pred_frames.view(b*t, c, h, w), truth.view(b*t, c, h, w))
         return loss
 
 class Encoder(nn.Module):
