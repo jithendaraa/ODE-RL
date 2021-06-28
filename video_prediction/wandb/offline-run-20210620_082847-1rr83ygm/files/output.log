@@ -1,0 +1,100 @@
+Training Dataset Shapes: (8000, 19, 64, 64, 1), (8000, 19, 64, 64, 1)
+Validation Dataset Shapes: (2000, 19, 64, 64, 1), (2000, 19, 64, 64, 1)
+Epoch 1/20
+1600/1600 [==============================] - 319s 184ms/step - loss: 0.0874 - val_loss: 0.0266
+Epoch 2/20
+1600/1600 [==============================] - 291s 182ms/step - loss: 649371.6403 - val_loss: 397.5846
+Epoch 3/20
+1600/1600 [==============================] - 291s 182ms/step - loss: 3143.4369 - val_loss: 2.8537
+Epoch 4/20
+1600/1600 [==============================] - 291s 182ms/step - loss: 734.8082 - val_loss: 40.0164
+Epoch 5/20
+1600/1600 [==============================] - 293s 183ms/step - loss: 33.6121 - val_loss: 22.3039
+Epoch 6/20
+1600/1600 [==============================] - 292s 183ms/step - loss: 17.8468 - val_loss: 12.2779
+Epoch 7/20
+1600/1600 [==============================] - 292s 182ms/step - loss: 12.0829 - val_loss: 11.4403
+Epoch 8/20
+1600/1600 [==============================] - 291s 182ms/step - loss: 11.0964 - val_loss: 10.3170
+Epoch 9/20
+1600/1600 [==============================] - 292s 183ms/step - loss: 9.5672 - val_loss: 7.2725
+Epoch 10/20
+1600/1600 [==============================] - 292s 183ms/step - loss: 6.6981 - val_loss: 4.8875
+Epoch 11/20
+1600/1600 [==============================] - 291s 182ms/step - loss: 4.4635 - val_loss: 3.2751
+2021-06-20 08:29:00.027985: I tensorflow/compiler/jit/xla_cpu_device.cc:41] Not creating XLA devices, tf_xla_enable_xla_devices not set
+2021-06-20 08:29:00.033545: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcuda.so.1
+2021-06-20 08:29:00.083410: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1720] Found device 0 with properties:
+pciBusID: 0000:1a:00.0 name: Tesla V100-SXM2-16GB computeCapability: 7.0
+coreClock: 1.53GHz coreCount: 80 deviceMemorySize: 15.78GiB deviceMemoryBandwidth: 836.37GiB/s
+2021-06-20 08:29:00.083591: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-06-20 08:29:00.094544: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-06-20 08:29:00.094809: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublasLt.so.11
+2021-06-20 08:29:00.101044: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-06-20 08:29:00.103864: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-06-20 08:29:00.114464: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.10
+2021-06-20 08:29:00.117111: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-06-20 08:29:00.118391: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-06-20 08:29:00.145548: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1862] Adding visible gpu devices: 0
+2021-06-20 08:29:00.154097: I tensorflow/core/platform/cpu_feature_guard.cc:142] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 AVX512F FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2021-06-20 08:29:00.154506: I tensorflow/compiler/jit/xla_gpu_device.cc:99] Not creating XLA devices, tf_xla_enable_xla_devices not set
+2021-06-20 08:29:00.155371: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1720] Found device 0 with properties:
+pciBusID: 0000:1a:00.0 name: Tesla V100-SXM2-16GB computeCapability: 7.0
+coreClock: 1.53GHz coreCount: 80 deviceMemorySize: 15.78GiB deviceMemoryBandwidth: 836.37GiB/s
+2021-06-20 08:29:00.155392: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-06-20 08:29:00.155402: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-06-20 08:29:00.155410: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublasLt.so.11
+2021-06-20 08:29:00.155418: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-06-20 08:29:00.155425: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-06-20 08:29:00.155432: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.10
+2021-06-20 08:29:00.155440: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-06-20 08:29:00.155447: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-06-20 08:29:00.156967: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1862] Adding visible gpu devices: 0
+2021-06-20 08:29:00.157690: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-06-20 08:29:03.347557: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1261] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-06-20 08:29:03.347579: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1267]      0
+2021-06-20 08:29:03.347584: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1280] 0:   N
+2021-06-20 08:29:03.356662: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1406] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 14759 MB memory) -> physical GPU (device: 0, name: Tesla V100-SXM2-16GB, pci bus id: 0000:1a:00.0, compute capability: 7.0)
+2021-06-20 08:29:03.958001: I tensorflow/core/profiler/lib/profiler_session.cc:136] Profiler session initializing.
+2021-06-20 08:29:03.958024: I tensorflow/core/profiler/lib/profiler_session.cc:155] Profiler session started.
+2021-06-20 08:29:03.958066: I tensorflow/core/profiler/internal/gpu/cupti_tracer.cc:1365] Profiler found 1 GPUs
+2021-06-20 08:29:03.960503: W tensorflow/stream_executor/platform/default/dso_loader.cc:60] Could not load dynamic library 'libcupti.so.11.0'; dlerror: libcupti.so.11.0: cannot open shared object file: No such file or directory
+2021-06-20 08:29:03.961656: W tensorflow/stream_executor/platform/default/dso_loader.cc:60] Could not load dynamic library 'libcupti.so'; dlerror: libcupti.so: cannot open shared object file: No such file or directory
+2021-06-20 08:29:03.961682: E tensorflow/core/profiler/internal/gpu/cupti_tracer.cc:1415] function cupti_interface_->Subscribe( &subscriber_, (CUpti_CallbackFunc)ApiCallback, this)failed with error CUPTI could not be loaded or symbol could not be found.
+2021-06-20 08:29:03.961707: I tensorflow/core/profiler/lib/profiler_session.cc:172] Profiler session tear down.
+2021-06-20 08:29:03.961725: E tensorflow/core/profiler/internal/gpu/cupti_tracer.cc:1496] function cupti_interface_->Finalize()failed with error CUPTI could not be loaded or symbol could not be found.
+2021-06-20 08:29:10.071004: I tensorflow/compiler/mlir/mlir_graph_optimization_pass.cc:116] None of the MLIR optimization passes are enabled (registered 2)
+2021-06-20 08:29:10.079972: I tensorflow/core/platform/profile_utils/cpu_utils.cc:112] CPU Frequency: 2400000000 Hz
+2021-06-20 08:29:11.887901: E tensorflow/core/grappler/optimizers/meta_optimizer.cc:592] layout failed: Invalid argument: MutableGraphView::SortTopologically error: detected edge(s) creating cycle(s) {'Func/model/conv_lst_m2d/while/body/_1/input/_404' -> 'model/conv_lst_m2d/while/body/_1/model/conv_lst_m2d/while/mul_2', 'model/conv_lst_m2d/while/body/_1/model/conv_lst_m2d/while/mul_5' -> 'model/conv_lst_m2d/while/body/_1/model/conv_lst_m2d/while/Identity_4', 'Func/gradient_tape/model/conv_lst_m2d/while/model/conv_lst_m2d/while_grad/body/_179/input/_517' -> 'gradient_tape/model/conv_lst_m2d/while/model/conv_lst_m2d/while_grad/body/_179/gradient_tape/model/conv_lst_m2d/while/gradients/AddN'}.
+2021-06-20 08:29:12.183826: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-06-20 08:29:14.497584: W tensorflow/stream_executor/gpu/asm_compiler.cc:63] Running ptxas --version returned 256
+2021-06-20 08:29:14.638393: W tensorflow/stream_executor/gpu/redzone_allocator.cc:314] Internal: ptxas exited with non-zero error code 256, output:
+Relying on driver to perform ptx compilation.
+Modify $PATH to customize ptxas location.
+This message will be only logged once.
+2021-06-20 08:29:21.289099: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-06-20 08:29:21.687104: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublasLt.so.11
+2021-06-20 08:29:34.961880: I tensorflow/core/profiler/lib/profiler_session.cc:136] Profiler session initializing.
+2021-06-20 08:29:34.961907: I tensorflow/core/profiler/lib/profiler_session.cc:155] Profiler session started.
+2021-06-20 08:29:34.961955: E tensorflow/core/profiler/internal/gpu/cupti_tracer.cc:1415] function cupti_interface_->Subscribe( &subscriber_, (CUpti_CallbackFunc)ApiCallback, this)failed with error CUPTI could not be loaded or symbol could not be found.
+2021-06-20 08:29:35.132249: I tensorflow/core/profiler/lib/profiler_session.cc:71] Profiler session collecting data.
+2021-06-20 08:29:35.132328: E tensorflow/core/profiler/internal/gpu/cupti_tracer.cc:1496] function cupti_interface_->Finalize()failed with error CUPTI could not be loaded or symbol could not be found.
+2021-06-20 08:29:35.171538: I tensorflow/core/profiler/internal/gpu/cupti_collector.cc:228]  GpuTracer has collected 0 callback api events and 0 activity events.
+2021-06-20 08:29:35.180757: I tensorflow/core/profiler/lib/profiler_session.cc:172] Profiler session tear down.
+2021-06-20 08:29:35.197882: I tensorflow/core/profiler/rpc/client/save_profile.cc:137] Creating directory: /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35
+2021-06-20 08:29:35.240819: I tensorflow/core/profiler/rpc/client/save_profile.cc:143] Dumped gzipped tool data for trace.json.gz to /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35/blg4806.int.ets1.calculquebec.ca.trace.json.gz
+2021-06-20 08:29:35.279518: I tensorflow/core/profiler/rpc/client/save_profile.cc:137] Creating directory: /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35
+2021-06-20 08:29:35.305096: I tensorflow/core/profiler/rpc/client/save_profile.cc:143] Dumped gzipped tool data for memory_profile.json.gz to /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35/blg4806.int.ets1.calculquebec.ca.memory_profile.json.gz
+2021-06-20 08:29:35.370189: I tensorflow/core/profiler/rpc/client/capture_profile.cc:251] Creating directory: /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35Dumped tool data for xplane.pb to /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35/blg4806.int.ets1.calculquebec.ca.xplane.pb
+Dumped tool data for overview_page.pb to /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35/blg4806.int.ets1.calculquebec.ca.overview_page.pb
+Dumped tool data for input_pipeline.pb to /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35/blg4806.int.ets1.calculquebec.ca.input_pipeline.pb
+Dumped tool data for tensorflow_stats.pb to /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35/blg4806.int.ets1.calculquebec.ca.tensorflow_stats.pb
+Dumped tool data for kernel_stats.pb to /lustre03/project/6058211/pranaval/ODE-RL/video_prediction/wandb/offline-run-20210620_082847-1rr83ygm/files/train/plugins/profile/2021_06_20_08_29_35/blg4806.int.ets1.calculquebec.ca.kernel_stats.pb
+WARNING:tensorflow:Callback method `on_train_batch_end` is slow compared to the batch time (batch time: 0.1353s vs `on_train_batch_end` time: 0.1835s). Check your callbacks.
+[34m[1mwandb[39m[22m: [33mWARNING[39m When using several event log directories, please call wandb.tensorboard.patch(root_logdir="...") before wandb.init
+2021-06-20 08:34:04.236467: E tensorflow/core/grappler/optimizers/meta_optimizer.cc:592] layout failed: Invalid argument: MutableGraphView::SortTopologically error: detected edge(s) creating cycle(s) {'model/conv_lst_m2d/while/body/_1/model/conv_lst_m2d/while/Relu_1' -> 'model/conv_lst_m2d/while/body/_1/model/conv_lst_m2d/while/mul_5', 'model/conv_lst_m2d/while/body/_1/model/conv_lst_m2d/while/mul_2' -> 'model/conv_lst_m2d/while/body/_1/model/conv_lst_m2d/while/add_5', 'model/conv_lst_m2d/while/body/_1/model/conv_lst_m2d/while/convolution_7' -> 'model/conv_lst_m2d/while/body/_1/model/conv_lst_m2d/while/add_6'}.
+WARNING:root:Converting video data to uint8
+ 91% 10/11 [00:00<00:00, 1066.55it/s]
+WARNING:root:Converting video data to uint8
+ 91% 10/11 [00:00<00:00, 2276.30it/s]
