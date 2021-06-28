@@ -7,12 +7,13 @@ import torch.nn as nn
 from modules.ConvGRUCell import ConvGRUCell
 
 class ODEConvGRUCell(nn.Module):
-    def __init__(self, ode_func, opt, resolution, ch, device=None, kernel_size=(3, 3)):
+    def __init__(self, ode_func, opt, resolution, ch, out_ch=None, device=None, kernel_size=(3, 3)):
         super(ODEConvGRUCell, self).__init__()
 
         self.ode_func = ode_func
         self.device = device
         self.z0_diffeq_solver = None
+        if out_ch is None: out_ch = ch
 
         self.cgru_cell = ConvGRUCell(input_size=resolution, 
                                         input_dim=ch, 
@@ -21,12 +22,12 @@ class ODEConvGRUCell(nn.Module):
                                         bias=True).to(device)
 
         # last conv layer for generating mu, sigma
-        self.z0_dim = ch
+        self.z0_dim = out_ch
         z = ch
         self.transform_z0 = nn.Sequential(
             nn.Conv2d(z, z, 1, 1, 0),
             nn.ReLU(),
-            nn.Conv2d(z, z * 2, 1, 1, 0)).to(device)
+            nn.Conv2d(z, out_ch * 2, 1, 1, 0)).to(device)
         
 
     def forward(self, inputs, timesteps, mask=None):
@@ -58,7 +59,6 @@ class ODEConvGRUCell(nn.Module):
             ode_sol = prev_input + inc  # next_input at t_i = prev_input(at prev_t) + Integ(prev_input') from prev_t to t_i
             ode_sol = torch.stack((prev_input, ode_sol), dim=1)  # [1, b, 2, c, h, w] => [b, 2, c, h, w]
             assert (not torch.isnan(ode_sol).any())
-
             if torch.mean(ode_sol[:, 0, :] - prev_input) >= 0.001:
                 print("Error: first point of the ODE is not equal to initial value")
                 print(torch.mean(ode_sol[:, :, 0, :] - prev_input))

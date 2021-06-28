@@ -8,7 +8,7 @@ import numpy as np
 from helpers.utils import get_norm_layer
 
 class ConvGRUCell(nn.Module):
-    def __init__(self, input_size, input_dim, hidden_dim, kernel_size, bias, dtype=None, padding=None):
+    def __init__(self, input_size, input_dim, hidden_dim, kernel_size, bias=True, dtype=None, padding=None):
         """
         :param input_size: (int, int) / Height and width of input tensor as (height, width).
         :param input_dim: int / Number of channels of input tensor.

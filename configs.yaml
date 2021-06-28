@@ -48,6 +48,12 @@ defaults:
   offline: False                         # Beluga does not have internet; can set to False on cedar
   reconstruct: False                     # Set true if you want to train x frames and reconstruct back the same x frames
 
+  neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
+  neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
+  neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
+  n_ode_layers: 2
+  convgru_out_ch: 256
+
 experimental:
   off_wandb: True
 
@@ -218,13 +224,13 @@ test_mmnist_odecgrumem_len20:
   in_channels: 1
 
 # Experiment 3: Train and test S3VAE on Moving MNIST with 50000 steps 
-train_mmnist_s3vae:
-  id: 's3vae_mmnist_train'
-  ckpt_id: 'train_mmnist_s3vae'
+train_mmnist_s3vae_odecgru:
+  id: 's3vae_odecgru_mmnist_train'
+  ckpt_id: 'train_mmnist_s3vae_odecgru'
   lr: 1e-3
-  batch_size: 16
+  batch_size: 4
   model: 'S3VAE'
-  epochs: 1000
+  epochs: 25
   reconstruct: True
   train_seq: 30
   train_in_seq: 15
@@ -239,6 +245,30 @@ train_mmnist_s3vae:
   loss_log_freq: 50
   video_log_freq: 1000
   ode: False
+  encoder: 'odecgru'
+
+train_mmnist_s3vae_def:
+  id: 's3vae_def_mmnist_train'
+  ckpt_id: 'train_mmnist_s3vae_def'
+  lr: 1e-3
+  batch_size: 4
+  model: 'S3VAE'
+  epochs: 25
+  reconstruct: True
+  train_seq: 30
+  train_in_seq: 15
+  train_out_seq: 15
+  in_channels: 3
+  d_zf: 256
+  d_zt: 32
+  l1: 1000
+  l2: 100
+  l3: 1
+  m: 1      # Margin for triplet loss
+  loss_log_freq: 50
+  video_log_freq: 1000
+  ode: False
+  encoder: 'default'
 
 train_mmnist_s3vaeode:
   id: 's3vaeode_mmnist_train'

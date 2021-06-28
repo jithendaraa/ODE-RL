@@ -62,6 +62,7 @@ class ODEFunc(nn.Module):
 		"""
         super(ODEFunc, self).__init__()
         self.device = device
+        self.n_outputs = n_outputs
         if net is None:
             self.gradient_net = utils.create_convnet(n_inputs, n_outputs, n_layers, n_units, downsize, nonlinear, final_act=final_act).to(device)
         else:

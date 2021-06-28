@@ -170,7 +170,7 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
 
     else:
         predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
-        train_loss = model.get_loss(predicted_frames, (ground_truth+0.5), 'BCE')
+        train_loss = model.get_loss(predicted_frames, (ground_truth+0.5))
         # Backward pass
         optimizer.zero_grad()
         train_loss.backward()
