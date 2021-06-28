@@ -22,7 +22,7 @@ defaults:
   # Save & logs frequencies
   ckpt_save_freq: 2000            # Save model params every x steps
   test_log_freq: 50               # log test loss every x steps
-  video_log_freq: 5000
+  video_log_freq: 1000
 
   # Image sequence details
   resolution: 64
@@ -42,6 +42,7 @@ defaults:
   frozen: True
   mem: False
   ode: False
+  encoder: 'default'
 
   wandb_project: 'ODE-RL'
   wandb_entity: 'jithendaraa'
@@ -53,25 +54,13 @@ defaults:
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
   n_ode_layers: 2
   convgru_out_ch: 256
+  l1: 1000
+  l2: 100
+  l3: 1
+  m: 1      # Margin for triplet loss
 
 experimental:
   off_wandb: True
-
-short_frames:
-  train_seq: 20
-  train_in_seq: 10
-  train_out_seq: 10
-  test_seq: 20
-  test_in_seq: 10
-  test_out_seq: 10
-
-long_frames:
-  train_seq: 100
-  train_in_seq: 50
-  train_out_seq: 50
-  test_seq: 200
-  test_in_seq: 50
-  test_out_seq: 150
 
 # Experiment 1: Train and test ConvGRU on Moving MNIST with 2M frames, 50000 steps, batch size 4
 train_mmnist_cgru_len20:
@@ -223,6 +212,7 @@ test_mmnist_odecgrumem_len20:
   z_sample: False
   in_channels: 1
 
+
 # Experiment 3: Train and test S3VAE on Moving MNIST with 50000 steps 
 train_mmnist_s3vae_odecgru:
   id: 's3vae_odecgru_mmnist_train'
@@ -251,9 +241,7 @@ train_mmnist_s3vae_def:
   id: 's3vae_def_mmnist_train'
   ckpt_id: 'train_mmnist_s3vae_def'
   lr: 1e-3
-  batch_size: 4
   model: 'S3VAE'
-  epochs: 25
   reconstruct: True
   train_seq: 30
   train_in_seq: 15
@@ -261,22 +249,14 @@ train_mmnist_s3vae_def:
   in_channels: 3
   d_zf: 256
   d_zt: 32
-  l1: 1000
-  l2: 100
-  l3: 1
-  m: 1      # Margin for triplet loss
   loss_log_freq: 50
-  video_log_freq: 1000
-  ode: False
   encoder: 'default'
 
 train_mmnist_s3vaeode:
   id: 's3vaeode_mmnist_train'
   ckpt_id: 'train_mmnist_s3vaeode'
   lr: 1e-3
-  batch_size: 16
   model: 'S3VAE'
-  epochs: 1000
   reconstruct: True
   train_seq: 30
   train_in_seq: 15
@@ -284,15 +264,23 @@ train_mmnist_s3vaeode:
   in_channels: 3
   d_zf: 256
   d_zt: 32
-  l1: 1000
-  l2: 100
-  l3: 1
-  m: 1      # Margin for triplet loss
   loss_log_freq: 50
-  video_log_freq: 1000
   ode: True
 
-
+train_mmnist_s3vaecgru:
+  id: 's3vaecgru_mmnist_train'
+  ckpt_id: 'train_mmnist_s3vaecgru'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 30
+  train_in_seq: 15
+  train_out_seq: 15
+  in_channels: 3
+  d_zf: 256
+  d_zt: 64
+  loss_log_freq: 50
+  encoder: 'cgru'
 
 # Not supported yet
 train_mmnist_vidode_len20:

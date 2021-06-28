@@ -24,14 +24,15 @@ class Encoder(nn.Module):
                 nn.Conv2d(256, 512, 4, 2, 1), nn.BatchNorm2d(512), nn.LeakyReLU(0.2),
                 nn.Conv2d(512, 128, 4, 1, 0), nn.BatchNorm2d(128), nn.Tanh())
 
-        elif encoder_type == 'odecgru':
+        elif encoder_type in ['odecgru', 'cgru']:
             self.resize = 16
             self.layers = nn.Sequential(
-                nn.Conv2d(in_ch, 64, 4, 2, 1), nn.BatchNorm2d(64), nn.LeakyReLU(0.2),
+                nn.Conv2d(in_ch, 16, 4, 2, 1), nn.BatchNorm2d(16), nn.LeakyReLU(0.2),
+                nn.Conv2d(16, 32, 3, 1, 1), nn.BatchNorm2d(32), nn.LeakyReLU(0.2),
+                nn.Conv2d(32, 64, 3, 1, 1), nn.BatchNorm2d(64), nn.LeakyReLU(0.2),
                 nn.Conv2d(64, 128, 4, 2, 1), nn.BatchNorm2d(128), nn.LeakyReLU(0.2),
                 nn.Conv2d(128, 256, 4, 2, 1), nn.BatchNorm2d(256), nn.LeakyReLU(0.2),
-                nn.Conv2d(256, 512, 3, 1, 1), nn.BatchNorm2d(512), nn.LeakyReLU(0.2),
-                nn.Conv2d(512, 128, 4, 2, 1), nn.BatchNorm2d(128), nn.Tanh())
+                nn.Conv2d(256, 128, 4, 2, 1), nn.BatchNorm2d(128), nn.Tanh())
 
     def forward(self, inputs):
         return self.layers(inputs)
@@ -100,11 +101,11 @@ class Decoder(nn.Module):
                 nn.Conv2d(64, final_dim, 1, 1, 0),
                 nn.Sigmoid())
         
-        elif opt.encoder == 'odecgru':
+        elif opt.encoder in ['odecgru', 'cgru']:
             self.layers = nn.Sequential(
-                nn.ConvTranspose2d(in_ch, 512, 3, 1, 1), nn.BatchNorm2d(512), nn.ReLU(),
+                nn.ConvTranspose2d(in_ch, 256, 3, 1, 1), nn.BatchNorm2d(256), nn.ReLU(),
                 nn.Upsample(scale_factor=2),
-                nn.Conv2d(512, 256, 3, 1, 1), nn.BatchNorm2d(256), nn.ReLU(),
+                nn.Conv2d(256, 256, 3, 1, 1), nn.BatchNorm2d(256), nn.ReLU(),
                 nn.Upsample(scale_factor=2),
                 nn.Conv2d(256, 128, 3, 1, 1), nn.BatchNorm2d(128), nn.ReLU(),
                 nn.Upsample(scale_factor=2),
@@ -129,47 +130,30 @@ class ConvGRUEncoder(nn.Module):
         self.out_ch = out_ch
         self.resolution_after_encoder = (opt.resolution // resize, opt.resolution // resize)
 
-        if self.static:
-            self.convgru_cell = ConvGRUCell(self.resolution_after_encoder, 
-                                            in_ch, 
-                                            out_ch, (3, 3)).to(device)
+        if self.static or opt.encoder == 'cgru':
+            self.convgru_cell = ConvGRUCell(self.resolution_after_encoder, in_ch, out_ch, (5, 5)).to(device)
         
         else:
-            self.ode_encoder_func = ODEFunc(n_inputs=in_ch, 
-                                            n_outputs=in_ch, 
-                                            n_layers=3, 
-                                            n_units=opt.neural_ode_n_units,
-                                            downsize=False,
-                                            nonlinear='relu',
-                                            device=device)
-        
-            # Encoding using ODEConvGRU: Feed self.ode_func to ODEConvGRU cell to solve diff equations and to find z0
-            self.ode_convgru_cell = ODEConvGRUCell(self.ode_encoder_func, opt, self.resolution_after_encoder, in_ch, out_ch=out_ch, device=device)
-
-            self.ode_decoder_func = ODEFunc(n_inputs=out_ch, 
-                                            n_outputs=out_ch, 
-                                            n_layers=3, 
-                                            n_units=opt.neural_ode_n_units,
-                                            downsize=False,
-                                            nonlinear='relu',
-                                            device=device)
-
-            # Neural ODE decoding: uses `self.ode_decoder_func` to solve IVP differential equation in latent space
-            self.diffeq_solver = DiffEqSolver(self.ode_decoder_func, opt.decode_diff_method, device=device, memory=False)
-
+            if opt.encoder == 'odecgru':
+                self.build_odecgru_nets()
+                
         self.mean_net = nn.Sequential(
-            nn.Conv2d(out_ch, out_ch, 3, 1, 1),
-            nn.BatchNorm2d(out_ch), nn.ReLU(),
-            nn.Conv2d(out_ch, 128, 3, 1, 1),
-            nn.BatchNorm2d(128), nn.ReLU(),
+            nn.Conv2d(out_ch, out_ch, 3, 1, 1), nn.BatchNorm2d(out_ch), nn.ReLU(),
+            nn.Conv2d(out_ch, 128, 3, 1, 1), nn.BatchNorm2d(128), nn.ReLU(),
             nn.Conv2d(128, out_ch, 3, 1, 1))
 
         self.std_net = nn.Sequential(
-            nn.Conv2d(out_ch, out_ch, 3, 1, 1),
-            nn.BatchNorm2d(out_ch), nn.ReLU(),
-            nn.Conv2d(out_ch, 128, 3, 1, 1),
-            nn.BatchNorm2d(128), nn.ReLU(),
+            nn.Conv2d(out_ch, out_ch, 3, 1, 1), nn.BatchNorm2d(out_ch), nn.ReLU(),
+            nn.Conv2d(out_ch, 128, 3, 1, 1), nn.BatchNorm2d(128), nn.ReLU(),
             nn.Conv2d(128, out_ch, 3, 1, 1))
+
+    def build_odecgru_nets(self):
+        self.ode_encoder_func = ODEFunc(n_inputs=self.in_ch, n_outputs=self.in_ch, n_layers=3, n_units=self.opt.neural_ode_n_units,downsize=False,nonlinear='relu',device=self.device)
+        # Encoding using ODEConvGRU: Feed self.ode_func to ODEConvGRU cell to solve diff equations and to find z0
+        self.ode_convgru_cell = ODEConvGRUCell(self.ode_encoder_func, self.opt, self.resolution_after_encoder, self.in_ch, out_ch=self.out_ch, device=self.device)
+        self.ode_decoder_func = ODEFunc(n_inputs=self.out_ch, n_outputs=self.out_ch, n_layers=3, n_units=self.opt.neural_ode_n_units,downsize=False,nonlinear='relu',device=self.device)
+        # Neural ODE decoding: uses `self.ode_decoder_func` to solve IVP differential equation in latent space
+        self.diffeq_solver = DiffEqSolver(self.ode_decoder_func, self.opt.decode_diff_method, device=self.device, memory=False)
 
 
     def forward(self, inputs):
@@ -178,21 +162,21 @@ class ConvGRUEncoder(nn.Module):
         timesteps_to_predict = torch.from_numpy(np.arange(t, dtype=np.int64)) / t
         hiddens = []
 
-        if self.static:
+        if self.static or self.opt.encoder == 'cgru':
             hidden = torch.zeros(b, self.out_ch, h, w).to(self.device)
             inputs = inputs.permute(1, 0, 2, 3, 4) # (t, b, c, h, w)
             for in_ in inputs:
                 hidden = self.convgru_cell(in_, hidden)
                 hiddens.append(hidden)
 
-            if self.prior:
+            if self.static and self.prior is False:
+                mean = self.mean_net(hidden)
+                std = F.softplus(self.std_net(hidden))
+
+            elif self.prior or self.opt.encoder == 'cgru':
                 hiddens = torch.stack(hiddens).to(self.device).view(-1, self.out_ch, h, w)
                 mean = self.mean_net(hiddens)
                 std = F.softplus(self.std_net(hiddens))
-
-            else:
-                mean = self.mean_net(hidden)
-                std = F.softplus(self.std_net(hidden))
         
         else:
             if self.opt.encoder == 'convgru':
@@ -251,9 +235,8 @@ class S3VAE(nn.Module):
             self.dynamic_rnn = LSTMEncoder(128, 256, d_zt, static=False, ode=opt.ode, device=device).to(device)
             self.prior_rnn = LSTMEncoder(d_zt*2, 256, d_zt, static=False, ode=False, device=device).to(device)
         
-        elif opt.encoder == 'odecgru':
+        elif opt.encoder in ['odecgru', 'cgru']:
             conv_encoder_out_ch = self.conv_encoder.layers[-3].out_channels
-            
             self.static_rnn = ConvGRUEncoder(conv_encoder_out_ch, d_zf, opt, device, resize, static=True).to(device)
             self.dynamic_rnn = ConvGRUEncoder(conv_encoder_out_ch, d_zt, opt, device, resize, static=False).to(device)
             self.prior_rnn = ConvGRUEncoder(d_zt*2, d_zt, opt, device, resize, prior=True).to(device)
@@ -288,28 +271,24 @@ class S3VAE(nn.Module):
         
         # Get zf from another sequence for zf_neg
         another_encoded_tensor = self.conv_encoder(other.view(b*t, c, h, w))    
-        
 
         # Get mu and std of static latent variable zf of dim d_zf
-        if self.opt.encoder == 'odecgru':
+        if self.opt.encoder in ['odecgru', 'cgru']:
             bt, c_, h_, w_ = encoded_inputs.size()
             # Get posterior mu and std of static latent variable zf of channels dim d_zf
             mu_zf, std_zf = self.static_rnn(encoded_inputs.view(b, t, c_, h_, w_))
             zf_pos_mu, zf_pos_std = self.static_rnn(shuffled_encoded_inputs.view(b, t, c_, h_, w_))
             zf_neg_mu, zf_neg_std = self.static_rnn(another_encoded_tensor.view(b, t, c_, h_, w_))
-            # print("Posterior zf", mu_zf.size(), std_zf.size())
 
             # Get posterior mu and std of dynamic latent variables z1....zt each of channel dim d_zt
             mu_zt, std_zt = self.dynamic_rnn(encoded_inputs.view(b, t, c_, h_, w_))
             _, _, h, w = mu_zt.size()
             mu_std_zt = torch.cat((mu_zt, std_zt), dim=1).view(b, t, self.opt.d_zt*2, h, w) # join channel dim
             mu_zt, std_zt = mu_zt.view(b, t, self.opt.d_zt, h, w), std_zt.view(b, t, self.opt.d_zt, h, w)
-            # print("Posterior zt", mu_zt.size(), std_zt.size())
 
             # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
             prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt)
             prior_mu_zt, prior_std_zt = prior_mu_zt.view(b, t, self.opt.d_zt, h, w), prior_std_zt.view(b, t, self.opt.d_zt, h, w)
-            # print("Prior zt", prior_mu_zt.size(), prior_std_zt.size())
 
 
         elif self.opt.encoder == 'default':
@@ -342,14 +321,12 @@ class S3VAE(nn.Module):
         if self.opt.encoder == 'default':
             zf_zt = torch.cat((zf_sample.view(b, 1, -1).repeat(1, t, 1), zt_sample), dim=2).view(b*t, -1, 1, 1)
 
-        elif self.opt.encoder == 'odecgru':
-            # print(zf_sample.unsqueeze(1).size(), zt_sample.size())
+        elif self.opt.encoder in ['odecgru', 'cgru']:
             zf_zt = torch.cat((zf_sample.unsqueeze(1).repeat(1, t, 1, 1, 1), zt_sample), dim=2)
             _, _, c_, h_, w_ = zf_zt.size()
             zf_zt = zf_zt.view(-1, c_, h_, w_)
 
         x_hat = self.conv_decoder(zf_zt).view(b, t, self.in_ch, self.h, self.w)
-        # print(x_hat.size())
 
         # 1. VAE ELBO Loss
         self.get_vae_loss(x_hat, inputs, zf_sample, zt_sample)
@@ -376,7 +353,7 @@ class S3VAE(nn.Module):
         kl = (log_qzx - log_pz)
         dims = len(kl.size())
         if self.opt.encoder == 'default':   kl = kl.sum(-1)
-        elif self.opt.encoder == 'odecgru': kl = kl.sum(dim=(dims-3, dims-2, dims-1))
+        elif self.opt.encoder in ['odecgru', 'cgru']: kl = kl.sum(dim=(dims-3, dims-2, dims-1))
         return kl
 
     def get_vae_loss(self, x_hat, x, zf, zt):
@@ -422,7 +399,7 @@ class S3VAE(nn.Module):
             if t is True:
                 if self.opt.encoder == 'default':
                     return dist.Normal(loc=op(dist1.loc.permute(1, 0, 2)), scale=op(dist1.scale.permute(1, 0, 2)))
-                elif self.opt.encoder == 'odecgru':
+                elif self.opt.encoder in ['odecgru', 'cgru']:
                     return dist.Normal(loc=op(dist1.loc.permute(1, 0, 2, 3, 4)), scale=op(dist1.scale.permute(1, 0, 2, 3, 4)))
             else:
                 return dist.Normal(loc=op(dist1.loc), scale=op(dist1.scale))
