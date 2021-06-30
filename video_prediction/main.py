@@ -1,20 +1,17 @@
 import os
 import wandb
-from encoder import Encoder
-from decoder import Decoder
-from model import ED
-from net_params import convgru_encoder_params, convgru_decoder_params
+from EncoderDecoder import EncoderDecoder
 from data.mm import MovingMNIST
 import torch
 from torch import nn
 from torch.optim import lr_scheduler
 import torch.optim as optim
 import sys
-from earlystopping import EarlyStopping
 from tqdm import tqdm
 import numpy as np
 import argparse
 from torchvision.utils import make_grid
+from torchvision.utils import save_image
 
 os.environ["WANDB_API_KEY"] = "73b7aa2bb830c99a8a3e6228588c6587d037ee96"
 os.environ["WANDB_MODE"] = "dryrun"
@@ -33,7 +30,7 @@ parser.add_argument('-frames_output',
                     default=10,
                     type=int,
                     help='sum of predict frames')
-parser.add_argument('-epochs', default=50, type=int, help='sum of epochs')
+parser.add_argument('-epochs', default=500, type=int, help='sum of epochs')
 args = parser.parse_args()
 
 random_seed = 1996
@@ -57,8 +54,6 @@ validLoader = torch.utils.data.DataLoader(validFolder,
                                           batch_size=args.batch_size,
                                           shuffle=False)
 
-encoder_params = convgru_encoder_params
-decoder_params = convgru_decoder_params
 
 def train():
     '''
@@ -66,23 +61,17 @@ def train():
     '''
     run = wandb.init(project='VideoODE', reinit=True)
     config = wandb.config
-    encoder = Encoder(encoder_params[0], encoder_params[1]).cuda()
-    decoder = Decoder(decoder_params[0], decoder_params[1]).cuda()
-    net = ED(encoder, decoder)
-    wandb.watch(net)
-    
-    early_stopping = EarlyStopping(patience=20, verbose=True)
+    model = EncoderDecoder()
+        
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    net.to(device)
+    model.to(device)
+    wandb.watch(model)
     cur_epoch = 0
 
     lossfunction = nn.MSELoss().cuda()
-    optimizer = optim.Adam(net.parameters(), lr=args.lr)
-    pla_lr_scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,
-                                                      factor=0.5,
-                                                      patience=4,
-                                                      verbose=True)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    pla_lr_scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,factor=0.5,patience=4,verbose=True)
 
     # to track the training loss as the model trains
     train_losses = []
@@ -99,43 +88,38 @@ def train():
             inputs = inputVar.to(device)  # B,S,C,H,W
             label = targetVar.to(device)  # B,S,C,H,W
             optimizer.zero_grad()
-            net.train()
-            pred = net(inputs)  # B,S,C,H,W
+            model.train()
+            pred = model(inputs)  # B,S,C,H,W
             loss = lossfunction(pred, label)
             loss_aver = loss.item() / args.batch_size
             train_losses.append(loss_aver)
             loss.backward()
-            torch.nn.utils.clip_grad_value_(net.parameters(), clip_value=10.0)
             optimizer.step()
-            
         ######################
         # validate the model #
         ######################
         with torch.no_grad():
-            net.eval()
+            model.eval()
             t = tqdm(validLoader, leave=False, total=len(validLoader))
             for i, (idx, targetVar, inputVar, _, _) in enumerate(t):
                 if i == 3000:
                     break
                 inputs = inputVar.to(device)
                 label = targetVar.to(device)
-                pred = net(inputs)
+                pred = model(inputs)
                 loss = lossfunction(pred, label)
                 loss_aver = loss.item() / args.batch_size
                 # record validation loss
                 valid_losses.append(loss_aver)
-
             original_frames = label[0,:,:,:,:].cpu().numpy()
             new_predictions = pred[0,:,:,:,:].cpu().numpy()    
-                
             original_frames = np.array(original_frames)*255
             new_predictions = np.array(new_predictions)*255
-            print(np.shape(original_frames))
-            print(np.shape(new_predictions))
-            wandb.log({'Original': wandb.Image(make_grid(label[0,:,:,:,:].cpu()))})
-            wandb.log({'Predicted': wandb.Image(make_grid(pred[0,:,:,:,:].cpu()))})
-            wandb.log({'Original': wandb.Video(original_frames, fps=4, format="gif")})  
-            wandb.log({'Predicted': wandb.Video(new_predictions, fps=4, format="gif")})    
+            
+            wandb.log({'Original': wandb.Image(make_grid(label[0,:,:,:,:].cpu())), "epoch":epoch})
+            wandb.log({'Predicted': wandb.Image(make_grid(pred[0,:,:,:,:].cpu())), "epoch":epoch})
+            wandb.log({'Original_gif': wandb.Video(original_frames, fps=4, format="gif"), "epoch":epoch})  
+            wandb.log({'Predicted_gif': wandb.Video(new_predictions, fps=4, format="gif"), "epoch":epoch})    
                 
         torch.cuda.empty_cache()
         train_loss = np.average(train_losses)
@@ -149,8 +133,8 @@ def train():
                      f'train_loss: {train_loss:.6f} ' +
                      f'valid_loss: {valid_loss:.6f}')
 
-        wandb.log({'train_loss': train_loss})
-        wandb.log({'valid_loss': valid_loss})             
+        wandb.log({'train_loss': train_loss, "epoch":epoch})
+        wandb.log({'valid_loss': valid_loss, "epoch":epoch})             
 
         print(print_msg)
         # clear lists to track next epoch
@@ -159,7 +143,7 @@ def train():
         pla_lr_scheduler.step(valid_loss)  # lr_scheduler
         model_dict = {
             'epoch': epoch,
-            'state_dict': net.state_dict(),
+            'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict()
         }
 
