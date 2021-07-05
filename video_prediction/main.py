@@ -16,55 +16,16 @@ from torchvision.utils import save_image
 os.environ["WANDB_API_KEY"] = "73b7aa2bb830c99a8a3e6228588c6587d037ee96"
 os.environ["WANDB_MODE"] = "dryrun"
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--batch_size',
-                    default=4,
-                    type=int,
-                    help='mini-batch size')
-parser.add_argument('-lr', default=1e-4, type=float, help='G learning rate')
-parser.add_argument('-frames_input',
-                    default=10,
-                    type=int,
-                    help='sum of input frames')
-parser.add_argument('-frames_output',
-                    default=10,
-                    type=int,
-                    help='sum of predict frames')
-parser.add_argument('-epochs', default=500, type=int, help='sum of epochs')
-args = parser.parse_args()
-
-random_seed = 1996
-np.random.seed(random_seed)
-torch.manual_seed(random_seed)
-
-trainFolder = MovingMNIST(is_train=True,
-                          root='data/',
-                          n_frames_input=args.frames_input,
-                          n_frames_output=args.frames_output,
-                          num_objects=[3])
-validFolder = MovingMNIST(is_train=False,
-                          root='data/',
-                          n_frames_input=args.frames_input,
-                          n_frames_output=args.frames_output,
-                          num_objects=[3])
-trainLoader = torch.utils.data.DataLoader(trainFolder,
-                                          batch_size=args.batch_size,
-                                          shuffle=False)
-validLoader = torch.utils.data.DataLoader(validFolder,
-                                          batch_size=args.batch_size,
-                                          shuffle=False)
-
-
-def train():
+def train(args):
     '''
     main function to run the training
     '''
-    run = wandb.init(project='VideoODE', reinit=True)
+    notes = 'Encoder -> 3 CGRU, Decoder -> 3 CGRU, 2Conv'
+    run = wandb.init(name='SingleConvGRU_5', project='VideoODE', notes=notes,reinit=True)
     config = wandb.config
-    model = EncoderDecoder()
-        
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    model = EncoderDecoder(args, device)
+        
     model.to(device)
     wandb.watch(model)
     cur_epoch = 0
@@ -94,6 +55,7 @@ def train():
             loss_aver = loss.item() / args.batch_size
             train_losses.append(loss_aver)
             loss.backward()
+            torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
             optimizer.step()
         ######################
         # validate the model #
@@ -118,8 +80,8 @@ def train():
             
             wandb.log({'Original': wandb.Image(make_grid(label[0,:,:,:,:].cpu())), "epoch":epoch})
             wandb.log({'Predicted': wandb.Image(make_grid(pred[0,:,:,:,:].cpu())), "epoch":epoch})
-            wandb.log({'Original_gif': wandb.Video(original_frames, fps=4, format="gif"), "epoch":epoch})  
-            wandb.log({'Predicted_gif': wandb.Video(new_predictions, fps=4, format="gif"), "epoch":epoch})    
+            wandb.log({'Original_gif': wandb.Video(original_frames, format="gif"), "epoch":epoch})  
+            wandb.log({'Predicted_gif': wandb.Video(new_predictions, format="gif"), "epoch":epoch})    
                 
         torch.cuda.empty_cache()
         train_loss = np.average(train_losses)
@@ -150,4 +112,38 @@ def train():
     run.finish()     
         
 if __name__ == "__main__":
-    train()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--batch_size',
+                        default=4,
+                        type=int,
+                        help='mini-batch size')
+    parser.add_argument('-lr', default=1e-4, type=float, help='G learning rate')
+    parser.add_argument('-seq_len',
+                        default=10,
+                        type=int,
+                        help='sum of input frames')
+    parser.add_argument('-epochs', default=500, type=int, help='sum of epochs')
+    parser.add_argument('--n_layers', default=3, type=int, help='# layers')
+    args = parser.parse_args()
+
+    random_seed = 1996
+    np.random.seed(random_seed)
+    torch.manual_seed(random_seed)
+
+    trainFolder = MovingMNIST(is_train=True,
+                            root='data/',
+                            n_frames_input=args.seq_len,
+                            n_frames_output=args.seq_len,
+                            num_objects=[3])
+    validFolder = MovingMNIST(is_train=False,
+                            root='data/',
+                            n_frames_input=args.seq_len,
+                            n_frames_output=args.seq_len,
+                            num_objects=[3])
+    trainLoader = torch.utils.data.DataLoader(trainFolder,
+                                            batch_size=args.batch_size,
+                                            shuffle=False)
+    validLoader = torch.utils.data.DataLoader(validFolder,
+                                            batch_size=args.batch_size,
+                                            shuffle=False)
+    train(args)
