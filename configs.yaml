@@ -66,16 +66,17 @@ experimental:
 train_mmnist_cgru_len20:
   id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   ckpt_id: 'train_mmnist_cgru_len20'
-  lr: 8e-4
-  ckpt_save_freq: 2000
-  video_log_freq: 1000
-  loss_log_freq: 100
+  lr: 1e-4
+  ckpt_save_freq: 5000
+  video_log_freq: 500
+  loss_log_freq: 50
   train_seq: 20
   train_in_seq: 10
   train_out_seq: 10
-  conv_encoder_out_ch: 128
-  convgru_out_ch: 128
+  conv_encoder_out_ch: 64
+  convgru_out_ch: 64
   depth: 1                              # num_pairs <ConvEncode, ConvGRUCell>
+  in_channels: 1
 
 test_mmnist_cgru_len20:
   id: 'ConvGRU_mmnist_test'
@@ -252,6 +253,21 @@ train_mmnist_s3vae_def:
   loss_log_freq: 50
   encoder: 'default'
 
+test_mmnist_s3vae_def:
+  id: 's3vae_def_mmnist_test'
+  ckpt_id: 'train_mmnist_s3vae_def'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 30
+  train_in_seq: 15
+  train_out_seq: 15
+  in_channels: 3
+  d_zf: 256
+  d_zt: 32
+  loss_log_freq: 50
+  encoder: 'default'
+
 train_mmnist_s3vaeode:
   id: 's3vaeode_mmnist_train'
   ckpt_id: 'train_mmnist_s3vaeode'
@@ -270,17 +286,21 @@ train_mmnist_s3vaeode:
 train_mmnist_s3vaecgru:
   id: 's3vaecgru_mmnist_train'
   ckpt_id: 'train_mmnist_s3vaecgru'
-  lr: 1e-3
+  lr: 5e-4
   model: 'S3VAE'
   reconstruct: True
   train_seq: 30
   train_in_seq: 15
   train_out_seq: 15
   in_channels: 3
-  d_zf: 256
-  d_zt: 64
+  d_zf: 128
+  d_zt: 32
   loss_log_freq: 50
   encoder: 'cgru'
+
+
+
+
 
 # Not supported yet
 train_mmnist_vidode_len20:

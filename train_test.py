@@ -36,11 +36,10 @@ def train(opt, model, loader_objs, device, exp_config_dict):
         wandb.watch(model)
 
     print(f"Logging to {opt.logdir} {n_train_batches}")
-    optimizer = optim.Adamax(model.parameters(), lr=opt.lr)
+    optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     
     for epoch in range(opt.epochs):
         epoch_loss = 0
-        utils.update_learning_rate(optimizer, decay_rate=0.99, lowest=opt.lr / 10)
 
         for it in range(n_train_batches):   # n_train_batches steps
             pred, gt, step_loss, loss_dict = train_batch(model, train_dataloader, optimizer, opt, device)
@@ -158,25 +157,28 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     
     loss_dict = {}
     # return None, None, None, None
+
+    optimizer.zero_grad()
+
     if opt.model in ['S3VAE']:
         # change input_frames from [-0.5, 0.5] to [0, 1]
         input_frames = (input_frames + 0.5).to(device)
         predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
         train_loss, loss_dict = model.get_loss()
-        optimizer.zero_grad()
+        
         train_loss.backward()
         optimizer.step()
         return predicted_frames * 255.0, input_frames * 255.0, train_loss.item(), loss_dict
 
     else:
+        input_frames = (input_frames + 0.5).to(device)
+        ground_truth = (ground_truth + 0.5).to(device)
+
         predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
-        train_loss = model.get_loss(predicted_frames, (ground_truth+0.5))
-        # Backward pass
-        optimizer.zero_grad()
+        train_loss = model.get_loss(predicted_frames, ground_truth)
         train_loss.backward()
-        # Clipping gradient (optional)
         # torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
-        # Step with optimizer
         optimizer.step()
         loss_dict = {'Per Step Loss': train_loss.item()}
-        return predicted_frames * 255.0, (ground_truth + 0.5) * 255.0, train_loss.item(), loss_dict
+
+        return predicted_frames * 255.0, ground_truth * 255.0, train_loss.item(), loss_dict

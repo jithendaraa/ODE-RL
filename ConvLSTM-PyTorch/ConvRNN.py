@@ -25,11 +25,13 @@ class CGRU_cell(nn.Module):
         self.filter_size = filter_size
         self.num_features = num_features
         self.padding = (filter_size - 1) // 2
+        
         self.conv1 = nn.Sequential(
             nn.Conv2d(self.input_channels + self.num_features,
                       2 * self.num_features, self.filter_size, 1,
                       self.padding),
             nn.GroupNorm(2 * self.num_features // 32, 2 * self.num_features))
+
         self.conv2 = nn.Sequential(
             nn.Conv2d(self.input_channels + self.num_features,
                       self.num_features, self.filter_size, 1, self.padding),
@@ -43,6 +45,7 @@ class CGRU_cell(nn.Module):
         else:
             htprev = hidden_state
         output_inner = []
+        
         for index in range(seq_len):
             if inputs is None:
                 x = torch.zeros(htprev.size(0), self.input_channels,
@@ -52,19 +55,15 @@ class CGRU_cell(nn.Module):
 
             combined_1 = torch.cat((x, htprev), 1)  # X_t + H_t-1
             gates = self.conv1(combined_1)  # W * (X_t + H_t-1)
-
             zgate, rgate = torch.split(gates, self.num_features, dim=1)
-            # zgate, rgate = gates.chunk(2, 1)
             z = torch.sigmoid(zgate)
             r = torch.sigmoid(rgate)
-
-            combined_2 = torch.cat((x, r * htprev),
-                                   1)  # h' = tanh(W*(x+r*H_t-1))
-            ht = self.conv2(combined_2)
-            ht = torch.tanh(ht)
+            combined_2 = torch.cat((x, r * htprev), 1)  # h' = tanh(W*(x+r*H_t-1))
+            ht = torch.tanh(self.conv2(combined_2))
             htnext = (1 - z) * htprev + z * ht
             output_inner.append(htnext)
             htprev = htnext
+
         return torch.stack(output_inner), htnext
 
 

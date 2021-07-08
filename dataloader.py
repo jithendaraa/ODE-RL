@@ -108,7 +108,7 @@ class MovingMNIST(Dataset):
         count = 0
         video_filename = 'video_' + str(idx+1+self.offset) + '.mp4'
         video_filename = os.path.join(self.root, video_filename)
-        print(video_filename)
+        # print(video_filename)
 
         vidcap = cv2.VideoCapture(video_filename)
         success, image = vidcap.read()

@@ -32,6 +32,5 @@ class ED(nn.Module):
 
     def forward(self, input):
         state = self.encoder(input)
-        print("STATE", state[0].size())
-        output = self.decoder(state)
+        output = F.sigmoid(self.decoder(state))
         return output

@@ -12,24 +12,20 @@ from modules.ImpalaCNN import ImpalaModel
 
 class ConvGRU(nn.Module):
     
-    def __init__(self, opt, device, activation='elu', decODE=False):
+    def __init__(self, opt, device, activation='leaky_relu', decODE=False):
         super(ConvGRU, self).__init__()
         
         self.opt = opt
         self.decODE = decODE
         self.device = device
-        self.encoder_out_channels = opt.conv_encoder_out_ch
+        self.encoder_out_channels = opt.convgru_out_ch
         dtype = torch.cuda.FloatTensor if self.device == 'cuda' else torch.FloatTensor
         self.decoder_out_channels = opt.in_channels
 
-        if activation == 'relu':
-            nonlinear = nn.ReLU()
-        elif activation == 'tanh':
-            nonlinear = nn.Tanh()
-        elif activation == 'leaky_relu':
-            nonlinear = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-        elif activation == 'elu':
-            nonlinear = nn.ELU()
+        if activation == 'relu':            nonlinear = nn.ReLU()
+        elif activation == 'tanh':          nonlinear = nn.Tanh()
+        elif activation == 'leaky_relu':    nonlinear = nn.LeakyReLU(negative_slope=0.2, inplace=True)
+        elif activation == 'elu':           nonlinear = nn.ELU()
         
         if opt.phase == 'train':
             self.n_input_frames = self.opt.train_in_seq
@@ -38,7 +34,7 @@ class ConvGRU(nn.Module):
             self.n_input_frames = self.opt.test_in_seq
             self.n_output_frames = self.opt.test_out_seq
 
-        self.encoder = Encoder(in_channels=opt.in_channels, out_channels=self.encoder_out_channels, act=nonlinear, dtype=dtype, opt=opt, device=device).to(device)
+        self.encoder = Encoder(in_channels=opt.in_channels, out_channels=self.encoder_out_channels, n_frames=self.n_input_frames, act=nonlinear, dtype=dtype, opt=opt, device=device).to(device)
         encoder_resolution = self.encoder.resolution
         self.hidden_state_channels = self.encoder.get_hidden_state_channels()
         
@@ -49,40 +45,28 @@ class ConvGRU(nn.Module):
             self.decoder = Decoder(in_channels=self.encoder_out_channels, out_channels=self.decoder_out_channels, hidden_state_channels=self.hidden_state_channels,act=nonlinear, dtype=dtype, opt=opt, device=device, resolution=encoder_resolution, n_frames=self.n_output_frames).to(device)
     
     def forward(self, inputs, batch_dict=None):
-        encoded_inputs, _, last_state_list = self.encoder(inputs)
-        
-        b, t, c = self.opt.batch_size, self.n_input_frames, self.encoder_out_channels
-        h, w = self.encoder.resolution
-        encoded_inputs = encoded_inputs.view(b, t, c, h, w)
-        last_state_list = last_state_list[::-1] # reverse list which has length self.opt.depth
-        
-        pred_x = self.decoder(encoded_inputs[:, -1:, :, :, :], last_state_list)
-        m = nn.Sigmoid()
-        pred_x = m(pred_x)
+        _, last_state_list = self.encoder(inputs)
+        pred_x = F.sigmoid(self.decoder(last_state_list))
         return pred_x
 
     def get_prediction(self, inputs, batch_dict=None):
-        pred_x = self(inputs, batch_dict) # Range in [-1, 1] due to last tanh activation
+        pred_x = self(inputs, batch_dict) 
         return pred_x
     
     def get_loss(self, pred_frames, truth, loss='MSE'):
         """ Returns the reconstruction loss calculated as MSE Error """
         b, t, c, h, w = truth.size()
-
-        if loss == 'MSE':
-            loss_function = nn.MSELoss().cuda()
-        elif loss == 'BCE':
-            
-            loss_function = nn.BCELoss().cuda()
-            loss = loss_function(pred_frames.view(b*t, c, h, w), truth.view(b*t, c, h, w)) 
+        if loss == 'MSE':   loss_function = nn.MSELoss().cuda()
+        elif loss == 'BCE': loss_function = nn.BCELoss().cuda()
+        loss = loss_function(pred_frames.reshape(b*t, c, h, w), truth.reshape(b*t, c, h, w)) 
         return loss
 
 
 class Encoder(nn.Module):
-    def __init__(self, in_channels=1, out_channels=96, act='leaky_relu', dtype=None, opt=None, device=None):
+    def __init__(self, in_channels=1, out_channels=96, n_frames=10, act='leaky_relu', dtype=None, opt=None, device=None):
         super(Encoder, self).__init__()
-        
         self.opt = opt
+        self.n_frames = n_frames
         b = self.opt.batch_size
         self.depth = opt.depth
         h, w = opt.resolution, opt.resolution
@@ -93,10 +77,6 @@ class Encoder(nn.Module):
         chan = 16
         self.conv_encoders = nn.ModuleList()
         self.conv_gru_cells = nn.ModuleList()
-        self.hiddens = {}
-        # impala_depth = 4
-        resize = 4
-        self.resolution = h // resize, w // resize
         self.hidden_state_channels = []
 
         # Make pairs of conv_encoders and convGRU cells
@@ -104,19 +84,12 @@ class Encoder(nn.Module):
             # Normal encoding
             resize = 4
             self.resolution = h // resize, w // resize
-            conv_encoders = [nn.Conv2d(in_channels, chan, 3, 1, 1), nn.BatchNorm2d(chan), nonlinear]
-            conv_encoders += [nn.Conv2d(chan, chan*2, 3, 2, 1), nn.BatchNorm2d(chan*2), nonlinear]
-            conv_encoders += [nn.Conv2d(chan*2, chan*4, 3, 1, 1), nn.BatchNorm2d(chan*4), nonlinear]
-            conv_encoders += [nn.Conv2d(chan*4, opt.conv_encoder_out_ch, 3, 2, 1)]
-            conv_encoders += [nn.Tanh()]
-            conv_encoders = nn.Sequential(*conv_encoders).to(self.device)
-            # Impala Encoding: conv_encoders = ImpalaModel(in_channels, flatten=False, depth=impala_depth)
+            conv_encoders = [nn.Conv2d(in_channels, chan, 3, 2, 1), nonlinear]
+            conv_encoders += [nn.Conv2d(chan, opt.conv_encoder_out_ch, 3, 2, 1), nonlinear]
+            conv_encoders = nn.Sequential(*conv_encoders)
+            conv_gru_cell = ConvGRUCell((h // resize, w // resize), opt.conv_encoder_out_ch, opt.convgru_out_ch, 5, bias=True, dtype=dtype)
             self.conv_encoders.append(conv_encoders)
-
-            self.hiddens[0] = [torch.zeros((b, opt.convgru_out_ch, h // resize, w // resize)).to(self.device)]
-            conv_gru_cell = ConvGRUCell((h // resize, w // resize), opt.conv_encoder_out_ch, opt.convgru_out_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
             self.conv_gru_cells.append(conv_gru_cell)
-            
             self.hidden_state_channels.append(opt.convgru_out_ch)
 
         # TODO: correct with ImpalaCNN for depth
@@ -127,7 +100,6 @@ class Encoder(nn.Module):
             conv_encoders = nn.Sequential(*conv_encoders).to(self.device)
             self.conv_encoders.append(conv_encoders)
 
-            self.hiddens[0] = [torch.zeros((b, chan*2, h // resize, w // resize)).to(self.device)]
             conv_gru_cell = ConvGRUCell((h // resize, w // resize), chan, chan*2, 5, bias=True, dtype=dtype, padding=2).to(self.device)
             self.conv_gru_cells.append(conv_gru_cell)
             self.hidden_state_channels.append(chan*2)
@@ -165,38 +137,28 @@ class Encoder(nn.Module):
                 
                 self.hidden_state_channels.append(hidden_channels)
         
-        self.init_hiddens = copy.deepcopy(self.hiddens)
         self.init_hidden_state_channels = self.hidden_state_channels.copy()
 
     def get_hidden_state_channels(self):
         return self.hidden_state_channels[::-1]
 
     def forward(self, inputs):
-        
-        self.hiddens = copy.deepcopy(self.init_hiddens)
+        b, in_frames, c, h, w = inputs.size()
         self.hidden_state_channels = self.init_hidden_state_channels.copy()
 
-        b, in_frames, c, h, w = inputs.size()
-        encoded_inputs = self.conv_encoders[0](inputs.view(-1, c, h, w))
-        device = self.device
+        encoded_inputs = self.conv_encoders[0](inputs.view(-1, c, h, w)) # 40, c, h, w
         last_state_list   = []
-
         encoded_inputs_i = encoded_inputs
+
         for i in range(self.depth):
             _, ei_ch, ei_h, ei_w = encoded_inputs_i.size()
             encoded_inputs_i = encoded_inputs.view(b, in_frames, ei_ch, ei_h, ei_w).permute(1, 0, 2, 3, 4) # t, b, c, h, w
-
-            for input_t in encoded_inputs_i:
-                h_prev = self.hiddens[i][-1]
-                h_next = self.conv_gru_cells[i](input_t, h_prev).to(device)
-                self.hiddens[i].append(h_next)
-
+            hiddens, h_next = self.conv_gru_cells[i](encoded_inputs_i, None, self.n_frames)
             last_state_list.append(h_next)
-            hiddens = torch.stack(self.hiddens[i][1:]).to(device)
             encoded_inputs_i = hiddens     
         
-        # e(X1)...e(X10); (h1...h10) of last depth; last hidden state after each depth
-        return encoded_inputs, hiddens, last_state_list
+        # (h1...h10) of last depth; last hidden state after each depth
+        return hiddens, last_state_list
 
 
 class Decoder(nn.Module):
@@ -217,22 +179,19 @@ class Decoder(nn.Module):
         self.encoder_resolution = resolution
         self.n_frames = n_frames
 
-        self.conv_decoders = nn.ModuleList()
         self.conv_gru_cells = nn.ModuleList()
+        self.conv_decoders = nn.ModuleList()
         chan = 16           # value of chan from Encoder
 
         if self.depth == 1:
             conv_gru_ch = self.hidden_state_channels[0]
             last_ch = self.hidden_state_channels[1]
 
-            conv_gru_cell = ConvGRUCell((e_h, e_w), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype, padding=2).to(self.device)
-            self.conv_gru_cells.append(conv_gru_cell)
-
-            conv_decoders = [nn.ConvTranspose2d(conv_gru_ch, chan*4, 4, 2, 1), nn.BatchNorm2d(chan*4), nonlinear]
-            conv_decoders += [nn.ConvTranspose2d(chan*4, chan*2, 3, 1, 1), nn.BatchNorm2d(chan*2), nonlinear]
-            conv_decoders += [nn.ConvTranspose2d(chan*2, chan, 4, 2, 1), nn.BatchNorm2d(chan), nonlinear]
-            conv_decoders += [nn.ConvTranspose2d(chan, last_ch, 3, 1, 1)]
+            conv_gru_cell = ConvGRUCell((e_h, e_w), conv_gru_ch, conv_gru_ch, 5, bias=True, dtype=dtype).to(self.device)
+            conv_decoders = [nn.ConvTranspose2d(conv_gru_ch, chan*2, 4, 2, 1), nonlinear]
+            conv_decoders += [nn.ConvTranspose2d(chan*2, last_ch, 4, 2, 1)]
             conv_decoders = nn.Sequential(*conv_decoders).to(self.device)
+            self.conv_gru_cells.append(conv_gru_cell)
             self.conv_decoders.append(conv_decoders)
 
         # TODO: need to correct decoder for self.depth > 1
@@ -275,36 +234,28 @@ class Decoder(nn.Module):
                     self.conv_decoders.append(conv_decoders)
                     resize *= 2
 
-    def forward(self, encoded_inputs, hidden_states):
+    def forward(self, hidden_states):
         assert len(hidden_states) == self.depth
-        e_h, e_w = self.encoder_resolution
+        # hidden_states = hidden_states[::-1] # reverse list which has length self.opt.depth
         b = self.opt.batch_size
+        
+        e_h, e_w = self.encoder_resolution
         outs = []
 
         for i in range(self.depth):
             h_prev = hidden_states[i]
-            hiddens = []
-
-            for t in range(self.n_frames):
-                if t == 0:
-                    h_next = self.conv_gru_cells[i](encoded_inputs[:, t, :, :, :], h_prev).to(self.device)
-                else:
-                    h_next = self.conv_gru_cells[i](h_prev, h_prev).to(self.device)
-                
-                hiddens.append(h_next)
-                h_prev = h_next
-
-            hiddens = torch.stack(hiddens).to(self.device).view(b*self.n_frames, -1, e_h, e_w)
+            hiddens, h_next = self.conv_gru_cells[i](None, h_prev) # t, b, c, h, w
+            hiddens = hiddens.to(self.device).view(b*self.n_frames, -1, e_h, e_w)
             outputs = self.conv_decoders[i](hiddens)
             _, c, h, w = outputs.size()
-            outputs = outputs.view(b, self.n_frames, c, h, w).permute(1, 0, 2, 3, 4)  # t, b, c, h , w
+            outputs = outputs.view(self.n_frames, b, c, h, w).permute(1, 0, 2, 3, 4)
             outs.append(outputs)
         
-        pred_x = outs[-1].permute(1, 0, 2, 3, 4)           # Make batch dim first
-        
-        assert list(pred_x.size()) == [b, self.n_frames, self.opt.in_channels, self.opt.resolution, self.opt.resolution]
+        pred_x = outs[-1]           
+        return pred_x   
 
-        return pred_x   # preds are [-1, 1]
+
+
 
 # TODO: Incomplete
 # class DecODEr(nn.Module):

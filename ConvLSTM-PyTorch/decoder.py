@@ -20,7 +20,6 @@ class Decoder(nn.Module):
         assert len(subnets) == len(rnns)
 
         self.blocks = len(subnets)
-        print(len(subnets))
 
         for index, (params, rnn) in enumerate(zip(subnets, rnns)):
             setattr(self, 'rnn' + str(self.blocks - index), rnn)
@@ -28,9 +27,13 @@ class Decoder(nn.Module):
                     make_layers(params))
 
     def forward_by_stage(self, inputs, state, subnet, rnn):
+        
+        # Pass through ConvGRU
         inputs, state_stage = rnn(inputs, state, seq_len=10)
         seq_number, batch_size, input_channel, height, width = inputs.size()
         inputs = torch.reshape(inputs, (-1, input_channel, height, width))
+        
+        # Pass through Deconv
         inputs = subnet(inputs)
         inputs = torch.reshape(inputs, (seq_number, batch_size, inputs.size(1),
                                         inputs.size(2), inputs.size(3)))
@@ -42,6 +45,7 @@ class Decoder(nn.Module):
         inputs = self.forward_by_stage(None, hidden_states[-1],
                                        getattr(self, 'stage1'),
                                        getattr(self, 'rnn1'))
+        
         # for i in list(range(1, self.blocks))[::-1]:
         #     inputs = self.forward_by_stage(inputs, hidden_states[i - 1],
         #                                    getattr(self, 'stage' + str(i)),

@@ -27,11 +27,13 @@ class Encoder(nn.Module):
             setattr(self, 'rnn' + str(index), rnn)
 
     def forward_by_stage(self, inputs, subnet, rnn):
+        # Pass through ConvEncoder
         seq_number, batch_size, input_channel, height, width = inputs.size()
         inputs = torch.reshape(inputs, (-1, input_channel, height, width))
         inputs = subnet(inputs)
-        inputs = torch.reshape(inputs, (seq_number, batch_size, inputs.size(1),
-                                        inputs.size(2), inputs.size(3)))
+
+        # Pass through ConvGRU
+        inputs = torch.reshape(inputs, (seq_number, batch_size, inputs.size(1), inputs.size(2), inputs.size(3)))
         outputs_stage, state_stage = rnn(inputs, None)
         return outputs_stage, state_stage
 
@@ -39,6 +41,7 @@ class Encoder(nn.Module):
         inputs = inputs.transpose(0, 1)  # to S,B,1,64,64
         hidden_states = []
         logging.debug(inputs.size())
+
         for i in range(1, self.blocks + 1):
             inputs, state_stage = self.forward_by_stage(
                 inputs, getattr(self, 'stage' + str(i)),
