@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
 from modules.DiffEqSolver import DiffEqSolver, ODEFunc
@@ -80,7 +81,6 @@ class LSTMEncoder(nn.Module):
 class ConvGRUEncoder(nn.Module):
     def __init__(self, in_ch, out_ch, opt, device, resize, prior=False, static=True):
         super(ConvGRUEncoder, self).__init__()
-
         self.opt = opt
         self.device = device
         self.static = static
@@ -115,27 +115,24 @@ class ConvGRUEncoder(nn.Module):
         self.diffeq_solver = DiffEqSolver(self.ode_decoder_func, self.opt.decode_diff_method, device=self.device, memory=False)
 
 
-    def forward(self, inputs):
+    def forward(self, inputs, seq_len=15):
         
         b, t, c, h, w = inputs.size()
         timesteps_to_predict = torch.from_numpy(np.arange(t, dtype=np.int64)) / t
-        hiddens = []
 
         if self.static or self.opt.encoder == 'cgru':
-            hidden = torch.zeros(b, self.out_ch, h, w).to(self.device)
-            inputs = inputs.permute(1, 0, 2, 3, 4) # (t, b, c, h, w)
-            for in_ in inputs:
-                hidden = self.convgru_cell(in_, hidden)
-                hiddens.append(hidden)
+            hiddens, hidden = self.convgru_cell(inputs, None, seq_len)
 
             if self.static and self.prior is False:
                 mean = self.mean_net(hidden)
                 std = F.softplus(self.std_net(hidden))
 
             elif self.prior or self.opt.encoder == 'cgru':
-                hiddens = torch.stack(hiddens).to(self.device).view(-1, self.out_ch, h, w)
-                mean = self.mean_net(hiddens)
-                std = F.softplus(self.std_net(hiddens))
+                t, b, c, h, w = hiddens.size()
+                mean = self.mean_net(hiddens.view(-1, c, h, w))
+                std = F.softplus(self.std_net(hiddens.view(-1, c, h, w)))
+                mean = mean.view(t, b, c, h, w).permute(1, 0, 2, 3, 4)
+                std = std.view(t, b, c, h, w).permute(1, 0, 2, 3, 4)
         
         else:
             if self.opt.encoder == 'convgru':

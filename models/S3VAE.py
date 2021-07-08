@@ -13,7 +13,6 @@ from modules.S3VAE_ED import Encoder, LSTMEncoder, ConvGRUEncoder, Decoder, DFP
 class S3VAE(nn.Module):
     def __init__(self, opt, device):
         super(S3VAE, self).__init__()
-
         self.opt = opt
         self.train_in_seq = opt.train_in_seq
         self.h, self.w = opt.resolution, opt.resolution
@@ -65,26 +64,25 @@ class S3VAE(nn.Module):
         # Get zf from another sequence for zf_neg
         another_encoded_tensor = self.conv_encoder(other.view(b*t, c, h, w))  
 
-
         # Get mu and std of static latent variable zf of dim d_zf
         if self.opt.encoder in ['odecgru', 'cgru']:
             bt, c_, h_, w_ = encoded_inputs.size()
-            print("After Conv encoding:", encoded_inputs.size())
+            encoded_inputs = encoded_inputs.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
+            shuffled_encoded_inputs = shuffled_encoded_inputs.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
+            another_encoded_tensor = another_encoded_tensor.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
             
             # Get posterior mu and std of static latent variable zf of channels dim d_zf
-            mu_zf, std_zf = self.static_rnn(encoded_inputs.view(b, t, c_, h_, w_))
-            zf_pos_mu, zf_pos_std = self.static_rnn(shuffled_encoded_inputs.view(b, t, c_, h_, w_))
-            zf_neg_mu, zf_neg_std = self.static_rnn(another_encoded_tensor.view(b, t, c_, h_, w_))
+            mu_zf, std_zf = self.static_rnn(encoded_inputs, t)
+            zf_pos_mu, zf_pos_std = self.static_rnn(shuffled_encoded_inputs, t)
+            zf_neg_mu, zf_neg_std = self.static_rnn(another_encoded_tensor, t)
 
             # Get posterior mu and std of dynamic latent variables z1....zt each of channel dim d_zt
-            mu_zt, std_zt = self.dynamic_rnn(encoded_inputs.view(b, t, c_, h_, w_))
-            _, _, h, w = mu_zt.size()
-            mu_std_zt = torch.cat((mu_zt, std_zt), dim=1).view(b, t, self.opt.d_zt*2, h, w) # join channel dim
-            mu_zt, std_zt = mu_zt.view(b, t, self.opt.d_zt, h, w), std_zt.view(b, t, self.opt.d_zt, h, w)
+            mu_zt, std_zt = self.dynamic_rnn(encoded_inputs, t)
+            b, _, _, h, w = mu_zt.size()
+            mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
 
             # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
-            prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt)
-            prior_mu_zt, prior_std_zt = prior_mu_zt.view(b, t, self.opt.d_zt, h, w), prior_std_zt.view(b, t, self.opt.d_zt, h, w)
+            prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt.permute(1, 0, 2, 3, 4), t)
 
 
         elif self.opt.encoder == 'default':
@@ -119,7 +117,7 @@ class S3VAE(nn.Module):
 
         elif self.opt.encoder in ['odecgru', 'cgru']:
             zf_zt = torch.cat((zf_sample.unsqueeze(1).repeat(1, t, 1, 1, 1), zt_sample), dim=2)
-            _, _, c_, h_, w_ = zf_zt.size()
+            b, t, c_, h_, w_ = zf_zt.size()
             zf_zt = zf_zt.view(-1, c_, h_, w_)
 
         x_hat = self.conv_decoder(zf_zt).view(b, t, self.in_ch, self.h, self.w)
