@@ -66,7 +66,6 @@ experimental:
 train_mmnist_cgru_len20:
   id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   ckpt_id: 'train_mmnist_cgru_len20'
-  lr: 1e-4
   ckpt_save_freq: 5000
   video_log_freq: 500
   loss_log_freq: 50
@@ -215,53 +214,15 @@ test_mmnist_odecgrumem_len20:
 
 
 # Experiment 3: Train and test S3VAE on Moving MNIST with 50000 steps 
-train_mmnist_s3vae_odecgru:
-  id: 's3vae_odecgru_mmnist_train'
-  ckpt_id: 'train_mmnist_s3vae_odecgru'
-  lr: 1e-3
-  batch_size: 4
-  model: 'S3VAE'
-  epochs: 25
-  reconstruct: True
-  train_seq: 30
-  train_in_seq: 15
-  train_out_seq: 15
-  in_channels: 3
-  d_zf: 256
-  d_zt: 32
-  l1: 1000
-  l2: 100
-  l3: 1
-  m: 1      # Margin for triplet loss
-  loss_log_freq: 50
-  video_log_freq: 1000
-  ode: False
-  encoder: 'odecgru'
-
 train_mmnist_s3vae_def:
   id: 's3vae_def_mmnist_train'
   ckpt_id: 'train_mmnist_s3vae_def'
   lr: 1e-3
   model: 'S3VAE'
   reconstruct: True
-  train_seq: 30
-  train_in_seq: 15
-  train_out_seq: 15
-  in_channels: 3
-  d_zf: 256
-  d_zt: 32
-  loss_log_freq: 50
-  encoder: 'default'
-
-test_mmnist_s3vae_def:
-  id: 's3vae_def_mmnist_test'
-  ckpt_id: 'train_mmnist_s3vae_def'
-  lr: 1e-3
-  model: 'S3VAE'
-  reconstruct: True
-  train_seq: 30
-  train_in_seq: 15
-  train_out_seq: 15
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
   in_channels: 3
   d_zf: 256
   d_zt: 32
@@ -286,17 +247,41 @@ train_mmnist_s3vaeode:
 train_mmnist_s3vaecgru:
   id: 's3vaecgru_mmnist_train'
   ckpt_id: 'train_mmnist_s3vaecgru'
-  lr: 5e-4
+  lr: 1e-3
   model: 'S3VAE'
   reconstruct: True
-  train_seq: 30
-  train_in_seq: 15
-  train_out_seq: 15
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
   in_channels: 3
   d_zf: 128
   d_zt: 32
   loss_log_freq: 50
   encoder: 'cgru'
+
+train_mmnist_s3vae_odecgru:
+  id: 's3vae_odecgru_mmnist_train'
+  ckpt_id: 'train_mmnist_s3vae_odecgru'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  in_channels: 3
+  d_zf: 128
+  d_zt: 32
+  loss_log_freq: 50
+  encoder: 'odecgru'
+
+
+
+
+
+
+
+
+
 
 
 

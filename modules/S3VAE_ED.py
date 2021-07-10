@@ -116,9 +116,6 @@ class ConvGRUEncoder(nn.Module):
 
 
     def forward(self, inputs, seq_len=15):
-        
-        b, t, c, h, w = inputs.size()
-        timesteps_to_predict = torch.from_numpy(np.arange(t, dtype=np.int64)) / t
 
         if self.static or self.opt.encoder == 'cgru':
             hiddens, hidden = self.convgru_cell(inputs, None, seq_len)
@@ -139,7 +136,11 @@ class ConvGRUEncoder(nn.Module):
                 pass
             
             elif self.opt.encoder == 'odecgru':
+                print("HERE", inputs.size())
+                t, b, c, h, w = inputs.size()
+                timesteps_to_predict = torch.from_numpy(np.arange(t, dtype=np.int64)) / t
                 first_point_mu, first_point_std = self.ode_convgru_cell(inputs, timesteps_to_predict)
+                print("DONE")
                 # z1...zt
                 sol_z = self.diffeq_solver(first_point_mu, timesteps_to_predict).contiguous().view(-1, self.out_ch, self.resolution_after_encoder[0], self.resolution_after_encoder[1])
                 mean = self.mean_net(sol_z)

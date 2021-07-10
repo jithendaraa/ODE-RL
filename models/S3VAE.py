@@ -51,7 +51,6 @@ class S3VAE(nn.Module):
 
     def forward(self, inputs):
         self.set_zero_losses()
-
         # Shuffled inputs to generate zf_neg
         other = inputs[torch.from_numpy(np.random.permutation(len(inputs)))].to(self.device)
         b, t, c, h, w = inputs.size()
@@ -70,7 +69,8 @@ class S3VAE(nn.Module):
             encoded_inputs = encoded_inputs.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
             shuffled_encoded_inputs = shuffled_encoded_inputs.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
             another_encoded_tensor = another_encoded_tensor.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
-            
+            print("conv encoding done")
+
             # Get posterior mu and std of static latent variable zf of channels dim d_zf
             mu_zf, std_zf = self.static_rnn(encoded_inputs, t)
             zf_pos_mu, zf_pos_std = self.static_rnn(shuffled_encoded_inputs, t)
@@ -108,7 +108,6 @@ class S3VAE(nn.Module):
         # zt prior p(z_t | z<t) prior and zt posterior q(z_t | x <= T) posterior
         self.p_zt = dist.Normal(loc=prior_mu_zt, scale=prior_std_zt)
         self.q_zt_xt = dist.Normal(loc=mu_zt, scale=std_zt)
-
         zf_sample = self.q_zf_xT.rsample()
         zt_sample = self.q_zt_xt.rsample()
         
