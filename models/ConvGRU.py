@@ -4,17 +4,13 @@ sys.path.append('../')
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import copy
-
 from modules.ConvGRUCell import ConvGRUCell
-# from modules.DiffEqSolver import DiffEqSolver
 from modules.ImpalaCNN import ImpalaModel
 
 class ConvGRU(nn.Module):
     
     def __init__(self, opt, device, activation='leaky_relu', decODE=False):
         super(ConvGRU, self).__init__()
-        
         self.opt = opt
         self.decODE = decODE
         self.device = device
@@ -37,12 +33,7 @@ class ConvGRU(nn.Module):
         self.encoder = Encoder(in_channels=opt.in_channels, out_channels=self.encoder_out_channels, n_frames=self.n_input_frames, act=nonlinear, dtype=dtype, opt=opt, device=device).to(device)
         encoder_resolution = self.encoder.resolution
         self.hidden_state_channels = self.encoder.get_hidden_state_channels()
-        
-        if decODE:
-            pass
-            # self.decODEr = DecODEr(in_channels=encoder_out_channels, out_channels=self.decoder_out_channels, act=activation, dtype=dtype, opt=opt, device=device, resolution=encoder_resolution, n_frames=self.n_output_frames).to(device)
-        else:
-            self.decoder = Decoder(in_channels=self.encoder_out_channels, out_channels=self.decoder_out_channels, hidden_state_channels=self.hidden_state_channels,act=nonlinear, dtype=dtype, opt=opt, device=device, resolution=encoder_resolution, n_frames=self.n_output_frames).to(device)
+        self.decoder = Decoder(in_channels=self.encoder_out_channels, out_channels=self.decoder_out_channels, hidden_state_channels=self.hidden_state_channels, act=nonlinear, dtype=dtype, opt=opt, device=device, resolution=encoder_resolution, n_frames=self.n_output_frames).to(device)
     
     def forward(self, inputs, batch_dict=None):
         _, last_state_list = self.encoder(inputs)
@@ -54,10 +45,8 @@ class ConvGRU(nn.Module):
         return pred_x
     
     def get_loss(self, pred_frames, truth, loss='MSE'):
-        """ Returns the reconstruction loss calculated as MSE Error """
         b, t, c, h, w = truth.size()
         if loss == 'MSE':   loss_function = nn.MSELoss().cuda()
-        elif loss == 'BCE': loss_function = nn.BCELoss().cuda()
         loss = loss_function(pred_frames.reshape(b*t, c, h, w), truth.reshape(b*t, c, h, w)) 
         return loss
 
@@ -73,7 +62,6 @@ class Encoder(nn.Module):
         self.out_channels = out_channels
         self.device = device
         nonlinear = act
-
         chan = 16
         self.conv_encoders = nn.ModuleList()
         self.conv_gru_cells = nn.ModuleList()
@@ -238,13 +226,12 @@ class Decoder(nn.Module):
         assert len(hidden_states) == self.depth
         # hidden_states = hidden_states[::-1] # reverse list which has length self.opt.depth
         b = self.opt.batch_size
-        
         e_h, e_w = self.encoder_resolution
         outs = []
 
         for i in range(self.depth):
             h_prev = hidden_states[i]
-            hiddens, h_next = self.conv_gru_cells[i](None, h_prev) # t, b, c, h, w
+            hiddens, h_next = self.conv_gru_cells[i](None, h_prev, seq_len=self.n_frames) # t, b, c, h, w
             hiddens = hiddens.to(self.device).view(b*self.n_frames, -1, e_h, e_w)
             outputs = self.conv_decoders[i](hiddens)
             _, c, h, w = outputs.size()
@@ -253,6 +240,7 @@ class Decoder(nn.Module):
         
         pred_x = outs[-1]           
         return pred_x   
+
 
 
 
