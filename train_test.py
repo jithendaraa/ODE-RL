@@ -122,13 +122,9 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
             avg_mses[i] /= (batches * (i+1))    # normalize by batches and pred_len
             avg_ssims[i] /= (batches * (i+1))   # normalize by batches and pred_len
             avg_psnrs[i] = 10 * math.log10(1 / avg_mses[i])
-
             print(avg_mses[i], avg_psnrs[i], avg_ssims[i])
-
             if opt.off_wandb is False:
-                wandb.log({"PSNR": avg_psnrs[i],
-                            "MSE": avg_mses[i], 
-                            "SSIM": avg_ssims[i]})
+                wandb.log({"PSNR": avg_psnrs[i], "MSE": avg_mses[i],  "SSIM": avg_ssims[i]})
 
         avg_mse, avg_psnr, avg_ssim = avg_mses[-1], avg_psnrs[-1], avg_ssims[-1]
         loggers.log_final_test_metrics(test_loss, avg_mse, avg_psnr, avg_ssim, opt.id)    # Logs final MSE, PSNR, SSIM
@@ -136,28 +132,29 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
 def test_batch(model, test_dataloader, opt, device):
     data_dict = utils.get_data_dict(test_dataloader)
     batch_dict = utils.get_next_batch(data_dict, opt)
-    input_frames = batch_dict['observed_data'].to(device) 
-    ground_truth = batch_dict['data_to_predict'].to(device) 
-    predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
+    input_frames = batch_dict['observed_data'].to(device)   # [-0.5, 0.5]
+    ground_truth = batch_dict['data_to_predict'].to(device) # [-0.5, 0.5]
     
     if opt.model == 'ODEConv':  # preds are -1, 1
+        predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
         loss = model.get_loss(predicted_frames, 2.0*ground_truth).item()
-    else:
-        loss = None
+        predicted_frames = predicted_frames/2.0
     
-    return predicted_frames/2.0, ground_truth, loss
+    elif opt.model in ['ConvGRU']:  # preds are [0, 1]
+        input_frames, ground_truth = (input_frames + 0.5).to(device), (ground_truth + 0.5).to(device)
+        predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
+        loss = model.get_loss(predicted_frames, ground_truth)
+        ground_truth, predicted_frames = (ground_truth - 0.5).to(device), (predicted_frames - 0.5).to(device) # Make to range [-0.5, 0.5]
+
+    return predicted_frames, ground_truth, loss
 
 def train_batch(model, train_dataloader, optimizer, opt, device):
     # Get batch data
     data_dict = utils.get_data_dict(train_dataloader)
     batch_dict = utils.get_next_batch(data_dict, opt)
-    
     # Get input sequence and output ground truth 
     input_frames, ground_truth = batch_dict['observed_data'].to(device), batch_dict['data_to_predict'].to(device) 
-    
     loss_dict = {}
-    # return None, None, None, None
-
     optimizer.zero_grad()
 
     if opt.model in ['S3VAE']:
@@ -165,7 +162,6 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
         input_frames = (input_frames + 0.5).to(device)
         predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
         train_loss, loss_dict = model.get_loss()
-        
         train_loss.backward()
         optimizer.step()
         return predicted_frames * 255.0, input_frames * 255.0, train_loss.item(), loss_dict
@@ -173,11 +169,9 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     else:
         input_frames = (input_frames + 0.5).to(device)
         ground_truth = (ground_truth + 0.5).to(device)
-
         predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
         train_loss = model.get_loss(predicted_frames, ground_truth)
         train_loss.backward()
-        # torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=10.0)
         optimizer.step()
         loss_dict = {'Per Step Loss': train_loss.item()}
 
