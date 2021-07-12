@@ -254,10 +254,11 @@ def get_normalized_ssim(pred, gt):
         for pred_, gt_ in zip(pred_np, gt_np):  # For every batch
             ssim_val += ssim(pred_, gt_, data_range=255, gaussian_weights=True, use_sample_covariance=False, multichannel=False, channel_axis=None)
     elif c == 3:
-        pred_np = pred.cpu().numpy()
-        gt_np = gt.cpu().numpy()
+        # Move channel to last dim
+        pred_np = pred.permute(0, 2, 3, 1).cpu().numpy()
+        gt_np = gt.permute(0, 2, 3, 1).cpu().numpy()
         for pred_, gt_ in zip(pred_np, gt_np):  # For every batch
-            ssim_val += ssim(pred_, gt_, data_range=255, gaussian_weights=True, use_sample_covariance=False, axis_channel=1)
+            ssim_val += ssim(pred_, gt_, data_range=255, gaussian_weights=True, use_sample_covariance=False,  multichannel=True, axis_channel=3)
     else:
         return None
     

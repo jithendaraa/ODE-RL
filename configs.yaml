@@ -11,6 +11,7 @@ defaults:
   decODE: False
   off_wandb: False
   step: 50000
+  z_sample: False
 
   # Directories
   logdir: "logs"
@@ -20,9 +21,10 @@ defaults:
   model_params_logdir: "model_params"             # has the form logs/<model_name>/model_params/<id>_00000xxxxx.pickle
   
   # Save & logs frequencies
-  ckpt_save_freq: 2000            # Save model params every x steps
+  ckpt_save_freq: 5000            # Save model params every x steps
   test_log_freq: 50               # log test loss every x steps
-  video_log_freq: 1000
+  video_log_freq: 500
+  loss_log_freq: 50
 
   # Image sequence details
   resolution: 64
@@ -66,9 +68,8 @@ experimental:
 train_mmnist_cgru_len20:
   id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   ckpt_id: 'train_mmnist_cgru_len20'
+  lr: 1e-4
   ckpt_save_freq: 5000
-  video_log_freq: 500
-  loss_log_freq: 50
   train_seq: 20
   train_in_seq: 10
   train_out_seq: 10
@@ -87,119 +88,86 @@ test_mmnist_cgru_len20:
   test_seq: 100
   test_in_seq: 10
   test_out_seq: 90
-  conv_encoder_out_ch: 128
-  convgru_out_ch: 128
-  depth: 1                          # num_pairs <ConvEncode, ConvGRUCell>                  # num_pairs <ConvEncode, ConvGRUCell>
- 
+  conv_encoder_out_ch: 64
+  convgru_out_ch: 64
+  depth: 1                          # num_pairs <ConvEncode, ConvGRUCell>                  
+  in_channels: 1
+
 
 
 # Experiment 2: Train and test ODEConvGRU on Moving MNIST with 50000 steps
-train_mmnist_odecgru:
+train_mmnist_odecgru_len20_1ch:
   id: 'ODEConv_mmnist_train'
   model: "ODEConv"
-  ckpt_id: 'train_mmnist_odecgru'
-  load_model: False
-  ckpt_save_freq: 1000
-  loss_log_freq: 50
-  video_log_freq: 1000
+  ckpt_id: 'train_mmnist_odecgru_len20_1ch'
+  lr: 1e-4
   train_seq: 20
   train_in_seq: 10
   train_out_seq: 10
-  n_downs: 2                            # reducing/increasing resolution per encoder/decoder layer
-  conv_encoder_n_units: 32              # Out ch at end of ConvEncoder is conv_encoder_n_units * (2^n_downs)
-  n_layers: 3                           # n_layers whenever create_convnet is called for ODE Func nets
-  neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
-  neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
+  conv_encoder_out_ch: 64
+  neural_ode_decoder_out_ch: 64        # output channels for ode_decoder_func in models/ODEConvGRU.py
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
-  n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
-  z_sample: False
+  n_ode_layers: 3                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
+  in_channels: 1
 
-test_mmnist_odecgru:
-  id: 'ODEConv_mmnist_test'
-  data_dir: "datasets/MovingMNIST_video/test"
-  model: "ODEConv"
-  phase: "test"
-  load_model: True
-  frozen: True
-  downsize: True                        # if True, conv_encoder will 0.5x and conv_decoder will 2x the resolution for every layer in `n_layers`
-  conv_encoder_out_ch: 128              # output channels for conv encoder in models/ODEConvGRU.py
-  conv_n_units: 64                      # n_units for conv encoder and conv decoder in models/ODEConvGRU.py
-  n_layers: 3                           # n_layers for conv encoder and conv decoder in models/ODEConvGRU.py
-  neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
-  neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
-  neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
-  n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
-  z_sample: False
-
-train_mmnist_odecgru_len20:
+train_mmnist_odecgru_len20_1ch_var2:
   id: 'ODEConv_mmnist_train'
   model: "ODEConv"
-  ckpt_id: 'train_mmnist_odecgru_len20'
-  ckpt_save_freq: 5000
-  video_log_freq: 5000
-  loss_log_freq: 200
+  ckpt_id: 'train_mmnist_odecgru_len20_1ch_var2'
+  lr: 1e-4
   train_seq: 20
   train_in_seq: 10
   train_out_seq: 10
-  n_downs: 2                            # reducing/increasing resolution per encoder/decoder layer
-  conv_encoder_n_units: 32              # Out ch at end of ConvEncoder is conv_encoder_n_units * (2^n_downs)
-  neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
-  neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
+  conv_encoder_out_ch: 64
+  neural_ode_decoder_out_ch: 64        # output channels for ode_decoder_func in models/ODEConvGRU.py
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
-  n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
-  z_sample: False
+  n_ode_layers: 1                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
+  in_channels: 1
 
-test_mmnist_odecgru_len20:
+test_mmnist_odecgru_len20_1ch:
   id: 'ODEConv_mmnist_test'
-  model: "ODEConv"
-  ckpt_id: 'train_mmnist_odecgru_len20'
+  ckpt_id: 'train_mmnist_odecgru_len20_1ch'
   data_dir: "datasets/MovingMNIST_video/test"
+  model: "ODEConv"
   phase: 'test'
   load_model: True
   test_seq: 100
   test_in_seq: 10
   test_out_seq: 90
-  n_downs: 2                            # reducing/increasing resolution per encoder/decoder layer
-  conv_encoder_n_units: 32              # Out ch at end of ConvEncoder is conv_encoder_n_units * (2^n_downs)
-  neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
-  neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
+  conv_encoder_out_ch: 64
+  neural_ode_decoder_out_ch: 64        # output channels for ode_decoder_func in models/ODEConvGRU.py
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
-  n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
-  z_sample: False
+  n_ode_layers: 3                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
+  in_channels: 1
 
 
 # Experiment 3: Train and test ODEConvGRU-memory on Moving MNIST with 50000 steps 
-train_mmnist_odecgrumem_len20:
+train_mmnist_odecgrumem_len20_1ch:
   id: 'ODEConv_mmnist_train'
   model: "ODEConv"
-  ckpt_id: 'train_mmnist_odecgrumem_len20'
-  ckpt_save_freq: 5000
-  video_log_freq: 5000
   mem: True
-  loss_log_freq: 200
+  ckpt_id: 'train_mmnist_odecgrumem_len20_1ch'
+  ckpt_save_freq: 5000
   train_seq: 20
   train_in_seq: 10
   train_out_seq: 10
-  n_downs: 2                            # reducing/increasing resolution per encoder/decoder layer
-  conv_encoder_n_units: 32              # Out ch at end of ConvEncoder is conv_encoder_n_units * (2^n_downs)
-  neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
-  neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
+  conv_encoder_out_ch: 64
+  neural_ode_decoder_out_ch: 64        # output channels for ode_decoder_func in models/ODEConvGRU.py
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
-  n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
-  z_sample: False
+  n_ode_layers: 3                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
   in_channels: 1
 
-test_mmnist_odecgrumem_len20:
+test_mmnist_odecgrumem_len20_1ch:
   id: 'ODEConv_mmnist_test'
   model: "ODEConv"
-  ckpt_id: 'train_mmnist_odecgrumem_len20'
+  mem: True
+  ckpt_id: 'train_mmnist_odecgrumem_len20_1ch'
   data_dir: "datasets/MovingMNIST_video/test"
   phase: 'test'
-  mem: True
   load_model: True
-  train_seq: 100
-  train_in_seq: 50
-  train_out_seq: 50
+  train_seq: 20
+  train_in_seq: 10
+  train_out_seq: 10
   test_seq: 100
   test_in_seq: 10
   test_out_seq: 90
@@ -213,6 +181,7 @@ test_mmnist_odecgrumem_len20:
   in_channels: 1
 
 
+  
 # Experiment 3: Train and test S3VAE on Moving MNIST with 50000 steps 
 train_mmnist_s3vae_def:
   id: 's3vae_def_mmnist_train'
@@ -226,7 +195,23 @@ train_mmnist_s3vae_def:
   in_channels: 3
   d_zf: 256
   d_zt: 32
-  loss_log_freq: 50
+  encoder: 'default'
+
+test_mmnist_s3vae_def:
+  # python main.py --config defaults test_mmnist_s3vaecgru experimental
+  id: 's3vae_def_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_s3vae_def'
+  data_dir: "datasets/MovingMNIST_video/test"
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  test_seq: 40
+  test_in_seq: 20
+  test_out_seq: 20
+  in_channels: 3
+  d_zf: 256
+  d_zt: 32
   encoder: 'default'
 
 train_mmnist_s3vaeode:
@@ -256,7 +241,23 @@ train_mmnist_s3vaecgru:
   in_channels: 3
   d_zf: 128
   d_zt: 32
-  loss_log_freq: 50
+  encoder: 'cgru'
+
+test_mmnist_s3vaecgru:
+  # python main.py --config defaults test_mmnist_s3vaecgru experimental
+  id: 's3vaecgru_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_s3vaecgru'
+  data_dir: "datasets/MovingMNIST_video/test"
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  test_seq: 40
+  test_in_seq: 20
+  test_out_seq: 20
+  in_channels: 3
+  d_zf: 128
+  d_zt: 32
   encoder: 'cgru'
 
 train_mmnist_s3vae_odecgru:

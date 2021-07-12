@@ -46,7 +46,7 @@ def get_opt():
     
 def init_model(opt, device):
 
-    implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv']
+    implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv', 'S3VAE']
 
     if opt.model in ['ConvGRU', 'cgrudecODE']:
       model = ConvGRU(opt, device, decODE=opt.decODE)

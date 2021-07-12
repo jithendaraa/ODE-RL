@@ -31,7 +31,6 @@ class Encoder(nn.Module):
     def forward(self, inputs):
         return self.layers(inputs)
 
-
 class LSTMEncoder(nn.Module):
     def __init__(self, input_size=128, hidden_size=256, z_size=256, static=False, ode=False, device=None, method='dopri5'):
         super().__init__()
@@ -107,15 +106,14 @@ class ConvGRUEncoder(nn.Module):
             nn.Conv2d(128, out_ch, 3, 1, 1))
 
     def build_odecgru_nets(self):
-        self.ode_encoder_func = ODEFunc(n_inputs=self.in_ch, n_outputs=self.in_ch, n_layers=3, n_units=self.opt.neural_ode_n_units,downsize=False,nonlinear='relu',device=self.device)
+        self.ode_encoder_func = ODEFunc(n_inputs=self.in_ch, n_outputs=self.in_ch, n_layers=3, n_units=self.opt.neural_ode_n_units, downsize=False, nonlinear='relu', device=self.device)
         # Encoding using ODEConvGRU: Feed self.ode_func to ODEConvGRU cell to solve diff equations and to find z0
         self.ode_convgru_cell = ODEConvGRUCell(self.ode_encoder_func, self.opt, self.resolution_after_encoder, self.in_ch, out_ch=self.out_ch, device=self.device)
-        self.ode_decoder_func = ODEFunc(n_inputs=self.out_ch, n_outputs=self.out_ch, n_layers=3, n_units=self.opt.neural_ode_n_units,downsize=False,nonlinear='relu',device=self.device)
+        self.ode_decoder_func = ODEFunc(n_inputs=self.out_ch, n_outputs=self.out_ch, n_layers=3, n_units=self.opt.neural_ode_n_units, downsize=False, nonlinear='relu', device=self.device)
         # Neural ODE decoding: uses `self.ode_decoder_func` to solve IVP differential equation in latent space
         self.diffeq_solver = DiffEqSolver(self.ode_decoder_func, self.opt.decode_diff_method, device=self.device, memory=False)
 
-
-    def forward(self, inputs, seq_len=15):
+    def forward(self, inputs, seq_len):
 
         if self.static or self.opt.encoder == 'cgru':
             hiddens, hidden = self.convgru_cell(inputs, None, seq_len)
@@ -132,19 +130,17 @@ class ConvGRUEncoder(nn.Module):
                 std = std.view(t, b, c, h, w).permute(1, 0, 2, 3, 4)
         
         else:
-            if self.opt.encoder == 'convgru':
-                pass
-            
-            elif self.opt.encoder == 'odecgru':
-                print("HERE", inputs.size())
+            if self.opt.encoder == 'odecgru':
                 t, b, c, h, w = inputs.size()
                 timesteps_to_predict = torch.from_numpy(np.arange(t, dtype=np.int64)) / t
                 first_point_mu, first_point_std = self.ode_convgru_cell(inputs, timesteps_to_predict)
-                print("DONE")
-                # z1...zt
-                sol_z = self.diffeq_solver(first_point_mu, timesteps_to_predict).contiguous().view(-1, self.out_ch, self.resolution_after_encoder[0], self.resolution_after_encoder[1])
+                sol_z = self.diffeq_solver(first_point_mu, timesteps_to_predict)    # Get z1...zt
+                t, b, c, h, w = sol_z.size()
+                sol_z = sol_z.view(-1, c, h, w) 
                 mean = self.mean_net(sol_z)
                 std = F.softplus(self.std_net(sol_z))
+                mean = mean.view(t, b, c, h, w).permute(1, 0, 2, 3, 4)
+                std = std.view(t, b, c, h, w).permute(1, 0, 2, 3, 4)
         
         return mean, std
 
@@ -162,8 +158,7 @@ class Decoder(nn.Module):
                 nn.Conv2d(128, 128, 3, 1, 1), nn.BatchNorm2d(128), nn.ReLU(),
                 nn.Upsample(scale_factor=2),
                 nn.Conv2d(128, 64, 3, 1, 1), nn.BatchNorm2d(64), nn.ReLU(),
-                nn.Conv2d(64, final_dim, 1, 1, 0),
-                nn.Sigmoid())
+                nn.Conv2d(64, final_dim, 1, 1, 0))
         
         elif opt.encoder in ['odecgru', 'cgru']:
             self.layers = nn.Sequential(
@@ -176,12 +171,10 @@ class Decoder(nn.Module):
                 nn.Conv2d(128, 128, 3, 1, 1), nn.BatchNorm2d(128), nn.ReLU(),
                 nn.Upsample(scale_factor=2),
                 nn.Conv2d(128, 64, 3, 1, 1), nn.BatchNorm2d(64), nn.ReLU(),
-                nn.Conv2d(64, final_dim, 1, 1, 0),
-                nn.Sigmoid())
+                nn.Conv2d(64, final_dim, 1, 1, 0))
     
     def forward(self, inputs):
         return self.layers(inputs)
-
 
 class DFP(nn.Module):
     def __init__(self, z_size=128):

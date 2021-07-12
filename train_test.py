@@ -115,7 +115,7 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
         test_loss /= batches # avg test loss over all batches
 
         for i in range(1, pred_timesteps):
-            avg_mses[i] += avg_mses[i-1]         # normalized by b
+            avg_mses[i] += avg_mses[i-1]         # normalized by batch_size
             avg_ssims[i] += avg_ssims[i-1]
         
         for i in range(pred_timesteps):
@@ -135,17 +135,18 @@ def test_batch(model, test_dataloader, opt, device):
     input_frames = batch_dict['observed_data'].to(device)   # [-0.5, 0.5]
     ground_truth = batch_dict['data_to_predict'].to(device) # [-0.5, 0.5]
     
-    if opt.model == 'ODEConv':  # preds are -1, 1
-        predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
-        loss = model.get_loss(predicted_frames, 2.0*ground_truth).item()
-        predicted_frames = predicted_frames/2.0
+    # inputs and gt in [0, 1]
+    input_frames, ground_truth = (input_frames + 0.5).to(device), (ground_truth + 0.5).to(device)
+    predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
     
-    elif opt.model in ['ConvGRU']:  # preds are [0, 1]
-        input_frames, ground_truth = (input_frames + 0.5).to(device), (ground_truth + 0.5).to(device)
-        predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
+    if opt.model in ['ConvGRU', 'ODEConv']:  # preds are [0, 1]
         loss = model.get_loss(predicted_frames, ground_truth)
-        ground_truth, predicted_frames = (ground_truth - 0.5).to(device), (predicted_frames - 0.5).to(device) # Make to range [-0.5, 0.5]
-
+        
+    elif opt.model in ['S3VAE']:
+        loss, _ = model.get_loss()
+    
+    # Convert to [-0.5, 0.5] range
+    ground_truth, predicted_frames = (ground_truth - 0.5).to(device), (predicted_frames - 0.5).to(device) 
     return predicted_frames, ground_truth, loss
 
 def train_batch(model, train_dataloader, optimizer, opt, device):
@@ -156,23 +157,21 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     input_frames, ground_truth = batch_dict['observed_data'].to(device), batch_dict['data_to_predict'].to(device) 
     loss_dict = {}
     optimizer.zero_grad()
+    
+    # change input_frames and ground_truth from [-0.5, 0.5] to [0, 1]
+    input_frames, ground_truth = (input_frames + 0.5).to(device), (ground_truth + 0.5).to(device)
 
-    if opt.model in ['S3VAE']:
-        # change input_frames from [-0.5, 0.5] to [0, 1]
-        input_frames = (input_frames + 0.5).to(device)
-        predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
+    predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
+    
+    if opt.model in ['S3VAE']:  
         train_loss, loss_dict = model.get_loss()
         train_loss.backward()
         optimizer.step()
         return predicted_frames * 255.0, input_frames * 255.0, train_loss.item(), loss_dict
 
-    else:
-        input_frames = (input_frames + 0.5).to(device)
-        ground_truth = (ground_truth + 0.5).to(device)
-        predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
+    else: 
         train_loss = model.get_loss(predicted_frames, ground_truth)
         train_loss.backward()
         optimizer.step()
         loss_dict = {'Per Step Loss': train_loss.item()}
-
         return predicted_frames * 255.0, ground_truth * 255.0, train_loss.item(), loss_dict
