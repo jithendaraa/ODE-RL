@@ -44,11 +44,11 @@ class DiffEqSolver(nn.Module):
         else:
             pred_y = odeint(self.ode_func, first_point, time_steps_to_predict,
                         rtol=self.odeint_rtol, atol=self.odeint_atol, method=self.ode_method)
-            
-            if len(pred_y.size()) == 5:
-                pred_y = pred_y.permute(1, 0, 2, 3, 4)  # => [b, t, c, h0, w0]
-            elif len(pred_y.size()) == 3:
-                pred_y = pred_y.permute(1, 0, 2)  # => [b, t, h]
+
+            if len(pred_y.size()) == 3:
+                pred_y = None
+                # TODO: Fix this without using permute
+                # pred_y = pred_y.permute(1, 0, 2)  # => [b, t, h]
         return pred_y
 
 
