@@ -161,19 +161,17 @@ def create_convnet(n_inputs, n_outputs, n_layers=1, n_units=128, downsize=False,
     layers.append(nn.Conv2d(n_inputs, n_units, 3, 1, 1, dilation=1))
     
     for i in range(n_layers):
-        layers.append(get_norm_layer(n_units))
         layers.append(nonlinear)
         if downsize is False:
             layers.append(nn.Conv2d(n_units, n_units, 3, 1, 1, dilation=1))
         else:
             layers.append(nn.Conv2d(n_units, n_units, 4, 2, 1, dilation=1))
     
-    layers.append(get_norm_layer(n_units))
     layers.append(nonlinear)
     layers.append(nn.Conv2d(n_units, n_outputs, 3, 1, 1, dilation=1))
     
     if final_act is True:
-        layers.append(get_norm_layer(n_outputs))
+        # layers.append(get_norm_layer(n_outputs))
         layers.append(nn.Tanh())
     
     return nn.Sequential(*layers)
@@ -248,13 +246,20 @@ def load_model_params(model, opt):
     return model
 
 def get_normalized_ssim(pred, gt):
-    pred_np = pred.permute(0, 2, 3, 1).cpu().numpy()    # b, c, h, w
-    gt_np = gt.permute(0, 2, 3, 1).cpu().numpy()
+    b, c, h, w = pred.size()
     ssim_val = 0
-    b, t = pred_np.shape[0], pred_np.shape[1]
-
-    for pred_, gt_ in zip(pred_np, gt_np):  # For every batch
-        ssim_val += ssim(pred_, gt_, data_range=255, gaussian_weights=True, use_sample_covariance=False, multichannel=True)
+    if c == 1:
+        pred_np = pred.squeeze(1).cpu().numpy()
+        gt_np = gt.squeeze(1).cpu().numpy()
+        for pred_, gt_ in zip(pred_np, gt_np):  # For every batch
+            ssim_val += ssim(pred_, gt_, data_range=255, gaussian_weights=True, use_sample_covariance=False, multichannel=False, channel_axis=None)
+    elif c == 3:
+        pred_np = pred.cpu().numpy()
+        gt_np = gt.cpu().numpy()
+        for pred_, gt_ in zip(pred_np, gt_np):  # For every batch
+            ssim_val += ssim(pred_, gt_, data_range=255, gaussian_weights=True, use_sample_covariance=False, axis_channel=1)
+    else:
+        return None
     
     return (ssim_val / (b))
 
