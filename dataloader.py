@@ -126,7 +126,6 @@ class MovingMNIST(Dataset):
                     print(image.shape)
                 frames[count] = gray
             else:
-                
                 frames[count] = image
             success, image = vidcap.read()
             count += 1

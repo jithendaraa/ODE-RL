@@ -34,7 +34,7 @@ defaults:
   train_out_seq: 50
   test_in_seq: 50
   test_out_seq: 150
-  in_channels: 3
+  in_channels: 1
   num_digits: 3
   n_layers: 3
 
@@ -76,7 +76,6 @@ train_mmnist_cgru_len20:
   conv_encoder_out_ch: 64
   convgru_out_ch: 64
   depth: 1                              # num_pairs <ConvEncode, ConvGRUCell>
-  in_channels: 1
 
 test_mmnist_cgru_len20:
   id: 'ConvGRU_mmnist_test'
@@ -87,11 +86,13 @@ test_mmnist_cgru_len20:
   load_model: True
   test_seq: 100
   test_in_seq: 10
-  test_out_seq: 90
+  test_out_seq: 190
   conv_encoder_out_ch: 64
   convgru_out_ch: 64
   depth: 1                          # num_pairs <ConvEncode, ConvGRUCell>                  
   in_channels: 1
+
+
 
 
 

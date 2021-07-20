@@ -71,10 +71,6 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
     test_loss = 0
     step = 0
     pred_timesteps = opt.test_out_seq
-    avg_mses = [0] * pred_timesteps
-    avg_psnrs = [0] * pred_timesteps
-    avg_ssims = [0] * pred_timesteps
-
     dataloader = loader_objs['test_dataloader']
     batches = loader_objs['n_test_batches'] 
     print(f"Testing model on {batches} batches ({opt.batch_size*batches} steps)")
@@ -85,48 +81,54 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
         wandb.init(project=opt.wandb_project, entity=opt.wandb_entity, config=exp_config_dict)
         config = wandb.config
         wandb.watch(model)
+    
+    mse_vals, ssim_vals, psnr_vals = [], [], []
 
     with torch.no_grad():
         model.eval()
             
         for it in range(batches):
             pred, gt, loss = test_batch(model, dataloader, opt, device) # pred, gt are in -0.5, 0.5
-            pred_gt = torch.cat(((pred.cpu() + 0.5) * 255.0, (gt.cpu() + 0.5) * 255.0), 0).numpy()
             b, _, c, h, w = pred.size()
             test_loss += loss
             step += 1
+            frame_mse = []
+            frame_ssim = []
+            frame_psnr = []
 
-            for i in range(pred_timesteps):
-                pred_ = pred[:, i:i+1, :, :, :].view(b, 1, c, h, w)
-                gt_ = gt[:, i:i+1, :, :, :].view(b, 1, c, h, w)
-
-                mse_loss = F.mse_loss(pred_[:, 0, ...], gt_[:, 0, ...]).item()
-                avg_mses[i] += mse_loss          # normalized by b
-
+            for t in range(pred_timesteps):
+                pred_ = pred[:, t, :, :, :]
+                gt_ = gt[:, t, :, :, :]
+                mse = F.mse_loss(pred_, gt_).item()
+                psnr = 10 * math.log10(1 / mse)
                 pred_255, gt_255 = (pred_ + 0.5) * 255.0, (gt_ + 0.5) * 255.0
-                pred_255, gt_255 = pred_255.view(b, c, h, w), gt_255.view(b, c, h, w)
-                avg_ssims[i] += utils.get_normalized_ssim(pred_255, gt_255)   # normalized by b
-                
+                pred_255, gt_255 = pred_255, gt_255
+                ssim = utils.get_normalized_ssim(pred_255, gt_255)   # normalized by b
+                frame_mse.append(mse)
+                frame_psnr.append(psnr)
+                frame_ssim.append(ssim)
+
+            mse_vals.append(frame_mse)
+            psnr_vals.append(frame_psnr)
+            ssim_vals.append(frame_ssim)
+
             print(f'Testing step {step}....')
 
-            if step % 500 == 0 and opt.off_wandb is False:
-                wandb.log({'Pred_GT': wandb.Video(pred_gt)}, step=it+1)
-
+        pred_gt = torch.cat(((pred.cpu() + 0.5) * 255.0, (gt.cpu() + 0.5) * 255.0), 0).numpy()
         test_loss /= batches # avg test loss over all batches
 
-        for i in range(1, pred_timesteps):
-            avg_mses[i] += avg_mses[i-1]         # normalized by batch_size
-            avg_ssims[i] += avg_ssims[i-1]
-        
-        for i in range(pred_timesteps):
-            avg_mses[i] /= (batches * (i+1))    # normalize by batches and pred_len
-            avg_ssims[i] /= (batches * (i+1))   # normalize by batches and pred_len
-            avg_psnrs[i] = 10 * math.log10(1 / avg_mses[i])
-            print(avg_mses[i], avg_psnrs[i], avg_ssims[i])
-            if opt.off_wandb is False:
-                wandb.log({"PSNR": avg_psnrs[i], "MSE": avg_mses[i],  "SSIM": avg_ssims[i]})
+        mse_vals = torch.FloatTensor(mse_vals).mean(dim=0)
+        psnr_vals = torch.FloatTensor(psnr_vals).mean(dim=0)
+        ssim_vals = torch.FloatTensor(ssim_vals).mean(dim=0)
 
-        avg_mse, avg_psnr, avg_ssim = avg_mses[-1], avg_psnrs[-1], avg_ssims[-1]
+        for i in range(pred_timesteps):
+            if opt.off_wandb is False:
+                wandb.log({"PSNR": psnr_vals[i], 
+                            "MSE": mse_vals[i],  
+                            "SSIM": ssim_vals[i],
+                            'Pred_GT': wandb.Video(pred_gt)}, step=i+1+opt.test_in_seq)
+
+        avg_mse, avg_psnr, avg_ssim = mse_vals[-1], psnr_vals[-1], ssim_vals[-1]
         loggers.log_final_test_metrics(test_loss, avg_mse, avg_psnr, avg_ssim, opt.id)    # Logs final MSE, PSNR, SSIM
 
 def test_batch(model, test_dataloader, opt, device):
