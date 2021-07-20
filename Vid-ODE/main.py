@@ -25,12 +25,12 @@ def get_opt():
     parser.add_argument("--name", default="vid_ode", help='Specify experiment')
     parser.add_argument("--jobid", default="sample", help='Specify experiment')
     parser.add_argument('-j', '--workers', type=int, default=4)
-    parser.add_argument('-b', '--batch_size', type=int, default=6)
+    parser.add_argument('-b', '--batch_size', type=int, default=4)
     parser.add_argument('-e', '--epoch', type=int, default=500, help='epoch')
     parser.add_argument('-p', '--phase', default="train", choices=["train", "test_met"])
     
     # Hyper-parameters
-    parser.add_argument('--lr', type=float, default=1e-3, help="Starting learning rate.")
+    parser.add_argument('--lr', type=float, default=4e-4, help="Starting learning rate.")
     parser.add_argument('--window_size', type=int, default=20, help="Window size to sample")
     parser.add_argument('--sample_size', type=int, default=20, help="Number of time points to sub-sample")
     parser.add_argument('--lamb_adv', type=float, default=0.003, help="Adversarial Loss lambda")
@@ -72,9 +72,9 @@ def get_opt():
     parser.add_argument('-u', '--unequal', action='store_true', default=False)
 
     # Log
-    parser.add_argument("--ckpt_save_freq", type=int, default=10000)
+    parser.add_argument("--ckpt_save_freq", type=int, default=5000)
     parser.add_argument("--log_print_freq", type=int, default=200)
-    parser.add_argument("--image_print_freq", type=int, default=500)
+    parser.add_argument("--image_print_freq", type=int, default=5000)
     
     # Path (Data & Checkpoint & Tensorboard)
     parser.add_argument('-d', '--dataset', type=str, default='kth', choices=["mgif", "hurricane", "kth", "penn", "minerl", 'cater', 'moving_mnist', 'box2D', "phyre", 'mmnist'])
@@ -204,6 +204,7 @@ def train(opt, netG, loader_objs, device):
     netD_img, netD_seq, optimizer_netD = create_netD(opt, device)
 
     exp_config_dict = vars(opt)
+    print(n_train_batches, n_test_batches)
 
     wandb.init(project='ODE-RL', entity='jithendaraa', config=exp_config_dict)
     config = wandb.config
@@ -212,7 +213,7 @@ def train(opt, netG, loader_objs, device):
     for epoch in range(opt.epoch):
         utils.update_learning_rate(optimizer_netG, decay_rate=0.99, lowest=opt.lr / 10)
         utils.update_learning_rate(optimizer_netD, decay_rate=0.99, lowest=opt.lr / 10)
-        
+
         for it in range(n_train_batches):
             data_dict = utils.get_data_dict(train_dataloader)
             batch_dict = utils.get_next_batch(data_dict, opt=opt)
@@ -252,8 +253,6 @@ def train(opt, netG, loader_objs, device):
             loss_netG.backward()
             optimizer_netG.step()
 
-            # print(fake.size(), real.size(), torch.max(real), torch.min(real), torch.max(fake), torch.min(fake))
-            
             if (total_step + 1) % opt.log_print_freq == 0 or total_step == 0:
                 et = time.time() - start_time
                 et = str(datetime.timedelta(seconds=et))[:-7]
@@ -263,7 +262,7 @@ def train(opt, netG, loader_objs, device):
                         f"Adv_G [{loss_adv_netG.item():.4f}]\t"\
                         f"Adv_D [{loss_netD.item():.4f}]"
 
-                 wandb.log( {'Per Step Loss (netD)': loss_netD.item(),
+                wandb.log({'Per Step Loss (netD)': loss_netD.item(),
                              'Per Step Loss (netG)': loss_adv_netG.item(),
                              'Per Step Loss': loss_netD.item() + loss_adv_netG.item()}, step=total_step)
                 
@@ -284,10 +283,11 @@ def train(opt, netG, loader_objs, device):
                     visualize.save_interp_images(opt=opt, gt=gt, pred=pred, path=opt.train_image_path, total_step=total_step)
             
             total_step += 1
+            print(f"Training step {total_step}/{int(opt.epoch * n_train_batches)}...")
         
-    #     # Test
-    #     if (epoch + 1) % 100 == 0:
-    #         test(netG, epoch, test_dataloader, opt, n_test_batches)
+        # Test
+        if (epoch + 1) % 100 == 0:
+            test(netG, epoch, test_dataloader, opt, n_test_batches)
 
 def test(netG, epoch, test_dataloader, opt, n_test_batches):
     

@@ -7,7 +7,7 @@ import sys
 sys.path.append('../')
 sys.path.append('./')
 
-from slotAttention.slot_attention.slot_attention import SlotAttention
+# from slotAttention.slot_attention.slot_attention import SlotAttention
 import utils
 
 
@@ -290,53 +290,53 @@ class Encoder(nn.Module):
         new_ch = self.opt.init_dim * self.resize # channels after cnn encoder
 
         if self.opt.slot_attention is True:
+            pass
+            # slot_dim = self.opt.dim
+            # num_slots = self.opt.num_slots
+            # h, w = H // self.resize, W // self.resize
+            # input_dim = h*w
+            # D = int(slot_dim ** 0.5)
+            # encoder_resolution = (h, w)
+            # decoder_resolution = (h, w)
             
-            slot_dim = self.opt.dim
-            num_slots = self.opt.num_slots
-            h, w = H // self.resize, W // self.resize
-            input_dim = h*w
-            D = int(slot_dim ** 0.5)
-            encoder_resolution = (h, w)
-            decoder_resolution = (h, w)
+            # self.encoder_pos = SoftPositionEmbed(new_ch, encoder_resolution, device=self.device).to(self.device)
+
+            # mlp = [
+            #     nn.LayerNorm([new_ch, input_dim]),
+            #     nn.Linear(input_dim, input_dim),
+            #     nn.ReLU(),
+            #     nn.Linear(input_dim, slot_dim)
+            # ]
+            # self.mlp = nn.Sequential(*mlp).to(self.device)
             
-            self.encoder_pos = SoftPositionEmbed(new_ch, encoder_resolution, device=self.device).to(self.device)
+            # self.slot_attention = SlotAttention(num_slots, slot_dim, iters=self.opt.slot_iters).to(self.device)
 
-            mlp = [
-                nn.LayerNorm([new_ch, input_dim]),
-                nn.Linear(input_dim, input_dim),
-                nn.ReLU(),
-                nn.Linear(input_dim, slot_dim)
-            ]
-            self.mlp = nn.Sequential(*mlp).to(self.device)
-            
-            self.slot_attention = SlotAttention(num_slots, slot_dim, iters=self.opt.slot_iters).to(self.device)
+            # if self.opt.pos == 2:
 
-            if self.opt.pos == 2:
+            #     # 1. CNN Encode
+            #     out = self.cnn_encoder(x) # CNN Encoding -> b * t, new_ch, h, w
+            #     # print("After CNN encoding", out.size())
+                
+            #     # 2. Positional Embedding
+            #     out = self.encoder_pos(out) # Posn Encoding -> b * t, new_ch, h, w
+            #     # print("After posn encoding", out.size())
+                
+            #     # 3. Flatten spatial dims
+            #     out = spatial_flatten(out) # Spatial flatten b*t, new_ch, h*w
+            #     # print("After flattening", out.size())
+                
+            #     # 4. Pass through LayerNorm, MLP
+            #     out = self.mlp(out) # MLP Layer b*t, new_ch, slot_dim
+            #     # print("After MLP", out.size())
 
-                # 1. CNN Encode
-                out = self.cnn_encoder(x) # CNN Encoding -> b * t, new_ch, h, w
-                # print("After CNN encoding", out.size())
+            #     # 5. Slot attention
+            #     slots = self.slot_attention(out) # SA: b*t, num_slots, slot_dim
+            #     # print("After slot attention", slots.size())
                 
-                # 2. Positional Embedding
-                out = self.encoder_pos(out) # Posn Encoding -> b * t, new_ch, h, w
-                # print("After posn encoding", out.size())
-                
-                # 3. Flatten spatial dims
-                out = spatial_flatten(out) # Spatial flatten b*t, new_ch, h*w
-                # print("After flattening", out.size())
-                
-                # 4. Pass through LayerNorm, MLP
-                out = self.mlp(out) # MLP Layer b*t, new_ch, slot_dim
-                # print("After MLP", out.size())
-
-                # 5. Slot attention
-                slots = self.slot_attention(out) # SA: b*t, num_slots, slot_dim
-                # print("After slot attention", slots.size())
-                
-                # 6. Spatial broadcasting from K slot features to images of resolution `self.decoder_initial_size`
-                out = spatial_broadcast(slots, decoder_resolution).permute(0, 3, 1, 2)
-                # print("After spatial broadcast", out.size())
-                # print()
+            #     # 6. Spatial broadcasting from K slot features to images of resolution `self.decoder_initial_size`
+            #     out = spatial_broadcast(slots, decoder_resolution).permute(0, 3, 1, 2)
+            #     # print("After spatial broadcast", out.size())
+            #     # print()
 
         elif self.opt.slot_attention is False:
             out = self.cnn_encoder(x)

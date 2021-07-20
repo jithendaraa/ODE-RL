@@ -283,18 +283,41 @@ class VideoDataset(Dataset_base):
         assert self.sample_size <= self.window_size, "[Error] sample_size > window_size"
         
         if self.opt.dataset == 'mmnist':
+            frames = np.empty((200, 64, 64, 1), np.dtype('uint8'))
             idx = index + 1 + self.offset
             video_filename = 'video_' + str(idx) + '.mp4'
             video_filename = os.path.join(self.image_path, video_filename)
+            count = 0
+
             vidcap = cv2.VideoCapture(video_filename)
             success,image = vidcap.read()
-            success = True
-            frames = []
+            while success is False: 
+                print("retrying", count)
+                vidcap = cv2.VideoCapture(video_filename)
+                success, image = vidcap.read()
+
             while success:
-                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).reshape(64, 64, 1)
-                frames.append(gray)
-                success,image = vidcap.read()
-            images = np.array(frames)
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) 
+                if gray.shape == (64, 64):  gray = gray.reshape(64, 64, 1)
+                frames[count] = gray
+
+                success, image = vidcap.read()
+                count += 1
+                retry = 0
+
+                while success is False and count < 200: 
+                    retry += 1
+                    print("retrying", count, retry)
+                    if retry > 10:
+                        break
+                    vidcap = cv2.VideoCapture(video_filename)
+                    success, image = vidcap.read()
+                    for _ in range(count+1):
+                        success, image = vidcap.read()
+
+            vidcap.release()
+            cv2.destroyAllWindows()
+            images = frames
             
         else:
             images = np.load(os.path.join(self.image_path, self.image_list[index]))
