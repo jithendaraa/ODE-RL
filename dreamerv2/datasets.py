@@ -113,11 +113,12 @@ def get_mm_data(task, config):
 
 def get_mm_gen_data(task, config):
   assert task == '0', 'Only video prediction task available.'
-  dataset_dir = os.path.join(config.video_data_dir, 'data', 'MovingMNIST')
-  train_eps_path = os.path.join(dataset_dir, 'train_eps_mm.pkl')
-  eval_eps_path = os.path.join(dataset_dir, 'eval_eps_mm.pkl')
+  dataset_dir = os.path.join(config.video_data_dir, 'MovingMNIST_video')
+  train_eps_path = os.path.join(dataset_dir, 'train', 'train_eps_mm.pkl')
+  eval_eps_path = os.path.join(dataset_dir, 'test', 'eval_eps_mm.pkl')
 
   print(f"Dataset Directory: {dataset_dir}")
+  print(train_eps_path)
   if not os.path.exists(train_eps_path):
     print("Train Dataset not found. Generating...")
     generate_mm_sequences(dataset_dir, split='train', size=8000)
