@@ -177,29 +177,58 @@ def main(config):
       eval_metric = tf.keras.metrics.TopKCategoricalAccuracy(k=5)
 
   psnr_vals = []
+  ssim_vals = []
+  mse_vals = []
+  
   for _ in tqdm(range(size)):
     data = next(eval_dataset)
     eval_openl, eval_recon, eval_openl_val, eval_recon_val = agent._wm.video_pred(data, nenvs=config.batch_size)
     x, y = eval_openl_val
     psnr = tf.image.psnr(x, y, 1.0)
+    ssim = tf.image.ssim(x, y, 1.0)
+    mse = tf.keras.losses.mean_squared_error(x, y)
     psnr_vals.append(psnr)
-
+    ssim_vals.append(ssim)
+    mse_vals.append(mse)
 
   psnrtf = tf.stack(psnr_vals, 1)
   psnrtf = tf.reshape(psnrtf, [-1, 200])
   psnrtf_mean = tf.math.reduce_mean(psnrtf, 0)
   psnrtf_std = tf.math.reduce_std(psnrtf, 0)
+
+  ssimtf = tf.stack(ssim_vals, 1)
+  ssimtf = tf.reshape(ssimtf, [-1, 200])
+  ssimtf_mean = tf.math.reduce_mean(ssimtf, 0)
+  ssimtf_std = tf.math.reduce_std(ssimtf, 0)
+
+  msetf = tf.stack(mse_vals, 1)
+  msetf = tf.reshape(msetf, [-1, 200])
+  msetf_mean = tf.math.reduce_mean(msetf, 0)
+  msetf_std = tf.math.reduce_std(msetf, 0)
+  print(psnrtf.shape, ssimtf.shape, msetf.shape)
+
   n_frames = psnrtf_mean.shape[0]
-  plt.plot(np.arange(n_frames), psnrtf_mean.numpy(), label='Openl')
-  plt.fill_between(np.arange(n_frames), psnrtf_mean.numpy()+psnrtf_std.numpy(), psnrtf_mean.numpy()-psnrtf_std.numpy(), alpha=0.7)
-  plt.xlabel('Frames')
-  plt.ylabel('PSNR')
-  plt.xlim((0, n_frames))
-  plt.title(f'{config.id}: ({psnrtf_mean.numpy()[-1]:.2f}+{psnrtf_std.numpy()[-1]:.2f})')
-  plt.grid()
-  plt.tight_layout()
-  plt.legend()
-  plt.savefig(f'out/eval_{config.id}_psnr_full.png')
+  print(n_frames)
+
+  wandb.init(project='ODE-RL', entity='jithendaraa', config=vars(config))
+  config = wandb.config
+
+  for i in range(1, n_frames+1):
+    wandb.log({
+        'PSNR': psnrtf_mean.numpy().tolist()[i-1],
+        'SSIM': ssimtf_mean.numpy().tolist()[i-1],
+        'MSE':  msetf_mean.numpy().tolist()[i-1]}, step=i)
+
+  # plt.plot(np.arange(n_frames), psnrtf_mean.numpy(), label='Openl')
+  # plt.fill_between(np.arange(n_frames), psnrtf_mean.numpy()+psnrtf_std.numpy(), psnrtf_mean.numpy()-psnrtf_std.numpy(), alpha=0.7)
+  # plt.xlabel('Frames')
+  # plt.ylabel('PSNR')
+  # plt.xlim((0, n_frames))
+  # plt.title(f'{config.id}: ({psnrtf_mean.numpy()[-1]:.2f}+{psnrtf_std.numpy()[-1]:.2f})')
+  # plt.grid()
+  # plt.tight_layout()
+  # plt.legend()
+  # plt.savefig(f'out/eval_{config.id}_psnr_full.png')
 
   # with open('psnrvals.pkl', 'wb') as fp:
   #   pickle.dump(psnr_vals, fp)

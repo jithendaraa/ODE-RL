@@ -94,7 +94,7 @@ def get_cater_data(task, config):
 # DOwnload mnist dataaset 
 def get_mm_data(task, config):
   assert task == '0', 'Only video prediction task available.'
-  dataset_dir = os.path.join('data', 'MovingMNIST')
+  dataset_dir = os.path.join('/home/jithen/scratch/datasets', 'MovingMNIST_video')
   vid_path = os.path.join(dataset_dir, 'mnist_test_seq.npy')
   print(f"Dataset Directory: {dataset_dir}")
   print(f"Video Path: {vid_path}")
@@ -114,9 +114,9 @@ def get_mm_data(task, config):
 
 def get_mm_gen_data(task, config):
   assert task == '0', 'Only video prediction task available.'
-  dataset_dir = os.path.join('data', 'MovingMNIST')
-  train_eps_path = os.path.join(dataset_dir, 'train_eps_mm.pkl')
-  eval_eps_path = os.path.join(dataset_dir, 'eval_eps_mm.pkl')
+  dataset_dir = os.path.join('/home/jithen/scratch/datasets', 'MovingMNIST_video')
+  train_eps_path = os.path.join(dataset_dir, 'train', 'train_eps_mm.pkl')
+  eval_eps_path = os.path.join(dataset_dir, 'test', 'eval_eps_mm.pkl')
 
   print(f"Dataset Directory: {dataset_dir}")
   if not os.path.exists(train_eps_path):

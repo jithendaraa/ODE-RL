@@ -144,7 +144,7 @@ cater:
   train_iter: 10
   eval_iter: 10
   batch_size: 4
-  batch_length: 30
+  batch_length: 20
   log_every: 500
   log_video_every: 5000
   dyn_classifer_cell: 'gru'
@@ -167,12 +167,13 @@ moving_mnist:
   lazy_load: False
   train_iter: 10
   eval_iter: 10
-  batch_size: 50
-  batch_length: 50
+  batch_size: 4
+  batch_length: 20
   eval_batch_length: 200
   log_every: 500
   log_video_every: 5000
   train_steps: 1
+  model: 'ConvRSSM'
 
 atari:
 
