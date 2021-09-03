@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=18:00:00
+#SBATCH --time=27:00:00
 #SBATCH --account=def-ebrahimi
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:v100l:1
@@ -15,7 +15,7 @@
 id=$1
 start=`date +%s`
 echo "Starting run at: `date`"
-python main.py --config defaults ${id}
+python main.py --config flownet_args defaults ${id}
 echo "Ending run at: `date`"
 end=`date +%s`
 runtime=$((end-start))

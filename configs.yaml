@@ -13,6 +13,13 @@ defaults:
   step: 50000
   z_sample: False
 
+  # Slot attention
+  slot_att: False
+  num_slots: 3
+  num_iterations: 3
+  slot_size: 64
+  unmasked: True
+
   # Directories
   logdir: "logs"
   user_dir: "/home/jithen"            
@@ -50,6 +57,7 @@ defaults:
   wandb_entity: 'jithendaraa'
   offline: False                         # Beluga does not have internet; can set to False on cedar
   reconstruct: False                     # Set true if you want to train x frames and reconstruct back the same x frames
+  extrapolate: False
 
   neural_ode_encoder_out_ch: 128        # output channels for ode_encoder_func in models/ODEConvGRU.py
   neural_ode_decoder_out_ch: 128        # output channels for ode_decoder_func in models/ODEConvGRU.py
@@ -61,11 +69,17 @@ defaults:
   l3: 1
   m: 1      # Margin for triplet loss
 
+flownet_args:
+  rgb_max: 1.
+  fp16: False
+  flownet_params_path: '/home/jithen/projects/rrg-ebrahimi/jithen/ODE-RL/FlowNet2_checkpoint.pth.tar'
+
 experimental:
   off_wandb: True
 
 # Experiment 1: Train and test ConvGRU on Moving MNIST with 2M frames, 50000 steps, batch size 4
 train_mmnist_cgru_len20:
+  # python main.py --config defaults flownet_args train_mmnist_cgru_len20 experimental
   id: 'ConvGRU_mmnist_train'            # actual id is id_inframes_outframes eg. ConvGRU_mmnist_train_30_70 if training or ConvGRU_mmnist_train_30_170 is testing
   ckpt_id: 'train_mmnist_cgru_len20'
   lr: 1e-4
@@ -84,15 +98,13 @@ test_mmnist_cgru_len20:
   model: "ConvGRU"
   phase: "test"
   load_model: True
-  test_seq: 100
+  test_seq: 200
   test_in_seq: 10
   test_out_seq: 190
   conv_encoder_out_ch: 64
   convgru_out_ch: 64
   depth: 1                          # num_pairs <ConvEncode, ConvGRUCell>                  
   in_channels: 1
-
-
 
 
 
@@ -142,6 +154,7 @@ test_mmnist_odecgru_len20_1ch:
   in_channels: 1
 
 
+
 # Experiment 3: Train and test ODEConvGRU-memory on Moving MNIST with 50000 steps 
 train_mmnist_odecgrumem_len20_1ch:
   id: 'ODEConv_mmnist_train'
@@ -182,38 +195,175 @@ test_mmnist_odecgrumem_len20_1ch:
   in_channels: 1
 
 
-  
-# Experiment 3: Train and test S3VAE on Moving MNIST with 50000 steps 
-train_mmnist_s3vae_def:
-  id: 's3vae_def_mmnist_train'
-  ckpt_id: 'train_mmnist_s3vae_def'
+
+# Experiment 4: S3VAE on MMNIST 50K steps (Train by reconstructing or extrapolation)
+train_mmnist_recon_s3vae_def:
+  # python main.py --config defaults flownet_args train_mmnist_recon_s3vae_def experimental
+  id: 'recon_s3vae_def_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_s3vae_def'
   lr: 1e-3
   model: 'S3VAE'
   reconstruct: True
   train_seq: 40
   train_in_seq: 20
   train_out_seq: 20
-  in_channels: 3
-  d_zf: 256
+  d_zf: 64
+  d_zt: 64
+  encoder: 'default'
+
+test_mmnist_recon_s3vae_def:
+  id: 'recon_s3vae_def_mmnist_test'
+  ckpt_id: 'train_mmnist_recon_s3vae_def'
+  data_dir: "datasets/MovingMNIST_video/test"
+  model: 'S3VAE'
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  test_seq: 200
+  test_in_seq: 20
+  test_out_seq: 180
+  d_zf: 128
   d_zt: 32
   encoder: 'default'
 
-test_mmnist_s3vae_def:
-  # python main.py --config defaults test_mmnist_s3vaecgru experimental
-  id: 's3vae_def_mmnist_test'
+
+
+
+
+# Experiment 5: S3VAE with ConvGRU MMNIST, 50K steps (Train by reconstructing or extrapolation)
+train_mmnist_recon_s3vaecgru:
+  # python main.py --config defaults flownet_args train_mmnist_recon_s3vaecgru experimental
+  id: 'recon_s3vaecgru_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_s3vaecgru'
+  lr: 6e-4
   model: 'S3VAE'
-  ckpt_id: 'train_mmnist_s3vae_def'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 64
+  d_zt: 32
+  encoder: 'cgru'
+  unmasked: True
+
+test_mmnist_recon_s3vaecgru:
+  # python main.py --config defaults flownet_args test_mmnist_recon_s3vaecgru experimental
+  id: 'recon_s3vaecgru_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_recon_s3vaecgru'
   data_dir: "datasets/MovingMNIST_video/test"
   phase: 'test'
   reconstruct: True
   load_model: True
-  test_seq: 40
-  test_in_seq: 20
-  test_out_seq: 20
-  in_channels: 3
-  d_zf: 256
+  test_seq: 200
+  test_in_seq: 10
+  test_out_seq: 190
+  d_zf: 64
   d_zt: 32
+  encoder: 'cgru'
+
+
+
+
+# Experiment 6: Slotted S3VAE MMNIST, 50K steps
+train_mmnist_recon_s3vae_def_sa:
+  # python main.py --config defaults flownet_args train_mmnist_recon_s3vae_def_sa experimental
+  id: 'recon_s3vae_def_sa_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_s3vae_def_sa'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 128
+  d_zt: 32
+  slot_size: 32
   encoder: 'default'
+  slot_att: True
+  unmasked: True
+
+
+
+
+# Experiment 7: Slotted S3VAE with ConvGRU MMNIST, 50K steps
+train_mmnist_recon_s3vaecgru_sa:
+  # python main.py --config defaults flownet_args train_mmnist_recon_s3vaecgru_sa experimental
+  id: 'recon_s3vaecgru_sa_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_s3vaecgru_sa'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 64
+  d_zt: 32
+  slot_size: 32
+  encoder: 'cgru_sa'
+  slot_att: True
+  unmasked: True
+
+test_mmnist_recon_s3vaecgru_sa:
+  # python main.py --config defaults flownet_args test_mmnist_recon_s3vaecgru_sa experimental
+  id: 'recon_s3vaecgru_sa_mmnist_test'
+  ckpt_id: 'train_mmnist_recon_s3vaecgru_sa'
+  model: 'S3VAE'
+  phase: 'test'
+  data_dir: "datasets/MovingMNIST_video/test"
+  reconstruct: True
+  load_model: True
+  test_seq: 200
+  test_in_seq: 20
+  test_out_seq: 180
+  step: 50000
+  d_zf: 64
+  d_zt: 32
+  slot_size: 32
+  encoder: 'cgru_sa'
+  slot_att: True
+  unmasked: True
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 train_mmnist_s3vaeode:
   id: 's3vaeode_mmnist_train'
@@ -230,37 +380,6 @@ train_mmnist_s3vaeode:
   loss_log_freq: 50
   ode: True
 
-train_mmnist_s3vaecgru:
-  id: 's3vaecgru_mmnist_train'
-  ckpt_id: 'train_mmnist_s3vaecgru'
-  lr: 1e-3
-  model: 'S3VAE'
-  reconstruct: True
-  train_seq: 40
-  train_in_seq: 20
-  train_out_seq: 20
-  in_channels: 3
-  d_zf: 128
-  d_zt: 32
-  encoder: 'cgru'
-
-test_mmnist_s3vaecgru:
-  # python main.py --config defaults test_mmnist_s3vaecgru experimental
-  id: 's3vaecgru_mmnist_test'
-  model: 'S3VAE'
-  ckpt_id: 'train_mmnist_s3vaecgru'
-  data_dir: "datasets/MovingMNIST_video/test"
-  phase: 'test'
-  reconstruct: True
-  load_model: True
-  test_seq: 40
-  test_in_seq: 20
-  test_out_seq: 20
-  in_channels: 3
-  d_zf: 128
-  d_zt: 32
-  encoder: 'cgru'
-
 train_mmnist_s3vae_odecgru:
   id: 's3vae_odecgru_mmnist_train'
   ckpt_id: 'train_mmnist_s3vae_odecgru'
@@ -275,19 +394,6 @@ train_mmnist_s3vae_odecgru:
   d_zt: 32
   loss_log_freq: 50
   encoder: 'odecgru'
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # Not supported yet
 train_mmnist_vidode_len20:

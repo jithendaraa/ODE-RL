@@ -1,5 +1,6 @@
 import torch
 import torch.optim as optim
+import torch.nn as nn
 import torch.nn.functional as F
 torch.autograd.set_detect_anomaly(True)
 from torch.optim import lr_scheduler
@@ -65,9 +66,7 @@ def train(opt, model, loader_objs, device, exp_config_dict):
         wandb.log({"Per Epoch Loss": epoch_loss})
         loggers.log_after_epoch(epoch, epoch_loss, step, start_time, total_steps, opt=opt)
 
-
 def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=None, lr_schedule=None):
-
     test_loss = 0
     step = 0
     pred_timesteps = opt.test_out_seq
@@ -89,7 +88,6 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
             
         for it in range(batches):
             pred, gt, loss = test_batch(model, dataloader, opt, device) # pred, gt are in -0.5, 0.5
-            b, _, c, h, w = pred.size()
             test_loss += loss
             step += 1
             frame_mse = []
@@ -123,10 +121,13 @@ def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=No
 
         for i in range(pred_timesteps):
             if opt.off_wandb is False:
+                step=i+1+opt.test_in_seq
+                if opt.model in ['S3VAE']:
+                    step = i+1
                 wandb.log({"PSNR": psnr_vals[i], 
                             "MSE": mse_vals[i],  
                             "SSIM": ssim_vals[i],
-                            'Pred_GT': wandb.Video(pred_gt)}, step=i+1+opt.test_in_seq)
+                            'Pred_GT': wandb.Video(pred_gt)}, step=step)
 
         avg_mse, avg_psnr, avg_ssim = mse_vals[-1], psnr_vals[-1], ssim_vals[-1]
         loggers.log_final_test_metrics(test_loss, avg_mse, avg_psnr, avg_ssim, opt.id)    # Logs final MSE, PSNR, SSIM
@@ -145,24 +146,27 @@ def test_batch(model, test_dataloader, opt, device):
         loss = model.get_loss(predicted_frames, ground_truth)
         
     elif opt.model in ['S3VAE']:
-        loss, _ = model.get_loss()
+        loss_function = nn.MSELoss().cuda()
+        b, t, c, h, w = predicted_frames.size()
+        ground_truth = torch.cat((input_frames, ground_truth), 1)
+        loss = loss_function(predicted_frames.reshape(b*t, c, h, w), ground_truth.reshape(b*t, c, h, w)) 
     
     # Convert to [-0.5, 0.5] range
     ground_truth, predicted_frames = (ground_truth - 0.5).to(device), (predicted_frames - 0.5).to(device) 
+
     return predicted_frames, ground_truth, loss
 
 def train_batch(model, train_dataloader, optimizer, opt, device):
-    # Get batch data
+    # Get batch data & Get input sequence and output ground truth 
     data_dict = utils.get_data_dict(train_dataloader)
     batch_dict = utils.get_next_batch(data_dict, opt)
-    # Get input sequence and output ground truth 
-    input_frames, ground_truth = batch_dict['observed_data'].to(device), batch_dict['data_to_predict'].to(device) 
+    input_frames = batch_dict['observed_data'].to(device)   # [-0.5, 0.5]
+    ground_truth = batch_dict['data_to_predict'].to(device) # [-0.5, 0.5]
     loss_dict = {}
     optimizer.zero_grad()
     
     # change input_frames and ground_truth from [-0.5, 0.5] to [0, 1]
-    input_frames, ground_truth = (input_frames + 0.5).to(device), (ground_truth + 0.5).to(device)
-
+    input_frames, ground_truth = (input_frames + 0.5).to(device), (ground_truth + 0.5).to(device) 
     predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
     
     if opt.model in ['S3VAE']:  
