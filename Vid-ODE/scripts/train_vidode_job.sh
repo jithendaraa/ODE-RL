@@ -14,11 +14,11 @@ EPOCHS=$2
 frame_dims=64
 is=$3
 os=$4
-ckpt=$5
+ckpt=5000
 img=5000
-nru=$6
-nru2=$7
-dataset=$8
+nru=$5
+nru2=$6
+dataset=$7
 
 start=`date +%s`
 echo "python main.py --nru ${nru} -nl $nl --nru2 ${nru2} -b ${BATCH_SIZE} -e ${EPOCHS} -fd ${frame_dims} -is ${is} -os ${os} --ckpt_save_freq ${ckpt} --image_print_freq ${img} --unequal -d ${dataset} --extrap -p train"

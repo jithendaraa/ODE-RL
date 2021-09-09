@@ -5,7 +5,7 @@ echo ""
 id=$1
 job_script='run_job.sh'
 output_file="out/ConvGRU/""$id""-%j.out"
-RES=$(sbatch --job-name ${id} --output ${output_file} --time 10:00:00 scripts/${job_script} ${id})
+RES=$(sbatch --job-name ${id} --output ${output_file} --time 1:00:00 scripts/${job_script} ${id})
 train_job_id=${RES##* }
 echo "train_job_id"" ""${train_job_id}"" -> ""${id}" >> out/job_logs.txt
 

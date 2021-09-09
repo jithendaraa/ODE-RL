@@ -30,7 +30,7 @@ def get_opt():
     parser.add_argument('-p', '--phase', default="train", choices=["train", "test_met"])
     
     # Hyper-parameters
-    parser.add_argument('--lr', type=float, default=4e-4, help="Starting learning rate.")
+    parser.add_argument('--lr', type=float, default=8e-4, help="Starting learning rate.")
     parser.add_argument('--window_size', type=int, default=20, help="Window size to sample")
     parser.add_argument('--sample_size', type=int, default=20, help="Number of time points to sub-sample")
     parser.add_argument('--lamb_adv', type=float, default=0.003, help="Adversarial Loss lambda")

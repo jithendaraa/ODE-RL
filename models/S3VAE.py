@@ -44,6 +44,7 @@ class S3VAE(nn.Module):
         
         # For SCC Loss
         self._triplet_loss = nn.TripletMarginLoss(margin=opt.m)
+        self._triplet_loss_sc = nn.TripletMarginLoss(margin=opt.m)
         self.conv_encoder = Encoder(in_ch, opt.encoder).to(device)
         resize = self.conv_encoder.resize
         self.res_after_encoder = opt.resolution // resize

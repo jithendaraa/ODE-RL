@@ -9,6 +9,7 @@ from torchvision import transforms as T
 
 import video_transforms as vtransforms
 import utils
+import re
 
 
 class Dataset_base(Dataset):
@@ -272,12 +273,18 @@ class VideoDataset(Dataset_base):
         threshold = self.window_size if opt.irregular else self.sample_size
         if opt.dataset in ['kth', 'sintel', 'ucf101', 'penn', 'phyre', 'minerl']:
             self.image_list = os.listdir(self.image_path)
+        
         elif opt.dataset in ['mgif', 'stickman']:
             self.image_list = remove_files_under_sample_size(image_path=self.image_path, threshold=threshold)
+        
         elif opt.dataset in ['mmnist']:
-            self.image_list = os.listdir(self.image_path)
+            image_list = os.listdir(self.image_path)
+            p = re.compile('mp4$')
+            self.image_list = list(filter(p.search, image_list))
 
         self.image_list = sorted(self.image_list)
+        print("AAA:", len(self.image_list))
+
     
     def __getitem__(self, index):
         assert self.sample_size <= self.window_size, "[Error] sample_size > window_size"

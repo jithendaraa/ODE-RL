@@ -13,6 +13,12 @@ defaults:
   step: 50000
   z_sample: False
 
+  # losses
+  static_contrastive: False
+
+  # misc
+  scalable: True # infer zf from just a few input frames
+
   # Slot attention
   slot_att: False
   num_slots: 3
@@ -73,6 +79,9 @@ flownet_args:
   rgb_max: 1.
   fp16: False
   flownet_params_path: '/home/jithen/projects/rrg-ebrahimi/jithen/ODE-RL/FlowNet2_checkpoint.pth.tar'
+
+losses:
+  static_contrastive: True
 
 experimental:
   off_wandb: True
@@ -222,8 +231,8 @@ test_mmnist_recon_s3vae_def:
   test_seq: 200
   test_in_seq: 20
   test_out_seq: 180
-  d_zf: 128
-  d_zt: 32
+  d_zf: 64
+  d_zt: 64
   encoder: 'default'
 
 
@@ -256,8 +265,8 @@ test_mmnist_recon_s3vaecgru:
   reconstruct: True
   load_model: True
   test_seq: 200
-  test_in_seq: 10
-  test_out_seq: 190
+  test_in_seq: 20
+  test_out_seq: 180
   d_zf: 64
   d_zt: 32
   encoder: 'cgru'
@@ -281,7 +290,24 @@ train_mmnist_recon_s3vae_def_sa:
   slot_size: 32
   encoder: 'default'
   slot_att: True
-  unmasked: True
+
+test_mmnist_recon_s3vae_def_sa:
+  # python main.py --config defaults flownet_args test_mmnist_recon_s3vae_def_sa experimental
+  id: 'recon_s3vae_def_sa_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_recon_s3vae_def_sa'
+  data_dir: "datasets/MovingMNIST_video/test"
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  test_seq: 200
+  test_in_seq: 20
+  test_out_seq: 180
+  d_zf: 128
+  d_zt: 32
+  slot_size: 32
+  encoder: 'default'
+  slot_att: True
 
 
 
@@ -302,7 +328,6 @@ train_mmnist_recon_s3vaecgru_sa:
   slot_size: 32
   encoder: 'cgru_sa'
   slot_att: True
-  unmasked: True
 
 test_mmnist_recon_s3vaecgru_sa:
   # python main.py --config defaults flownet_args test_mmnist_recon_s3vaecgru_sa experimental
@@ -316,16 +341,15 @@ test_mmnist_recon_s3vaecgru_sa:
   test_seq: 200
   test_in_seq: 20
   test_out_seq: 180
-  step: 50000
   d_zf: 64
   d_zt: 32
   slot_size: 32
   encoder: 'cgru_sa'
   slot_att: True
-  unmasked: True
 
 
 
+  
 
 
 
