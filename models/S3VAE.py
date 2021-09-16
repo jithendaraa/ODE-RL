@@ -37,12 +37,16 @@ class S3VAE(nn.Module):
         self.in_ch = in_ch
         d_zf, d_zt = opt.d_zf, opt.d_zt
         n_hid = 256
-        if self.opt.rim is True: n_hid=opt.n_hid[0]
 
-        # Only relevant for slto attention
+        if self.opt.rim is True: 
+            n_hid=opt.n_hid[0]
+            self.num_rims = self.opt.n_hid[0] // self.opt.unit_per_rim
+        else:
+            self.num_rims = 1
+
+        # Only relevant for slot attention
         broadcast = False
-        if opt.encoder in ['cgru_sa']:
-            broadcast = True
+        if opt.encoder in ['cgru_sa']:  broadcast = True
         
         # For SCC Loss
         self._triplet_loss = nn.TripletMarginLoss(margin=opt.m)
@@ -54,7 +58,7 @@ class S3VAE(nn.Module):
         if opt.encoder == 'default':
             self.static_rnn = GRUEncoder(128, n_hid, d_zf, ode=False, device=device, type='static', batch_first=True, opt=opt).to(device)
             self.dynamic_rnn = GRUEncoder(128, n_hid, d_zt, ode=opt.ode, device=device, type='dynamic', batch_first=True, rim=opt.rim, opt=opt).to(device)
-            self.prior_rnn = GRUEncoder(d_zt*2, n_hid, d_zt, ode=False, device=device, type='prior', batch_first=True, opt=opt).to(device)
+            self.prior_rnn = GRUEncoder(d_zt * 2 * self.num_rims, n_hid, d_zt * self.num_rims, ode=False, device=device, type='prior', batch_first=True, opt=opt).to(device)
         
         elif opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:
             conv_encoder_out_ch = self.conv_encoder.layers[-3].out_channels
@@ -66,16 +70,15 @@ class S3VAE(nn.Module):
             self.mu_slot_att = SlotAttentionAutoEncoder(opt, resolution=(self.h // resize, self.w // (resize)), num_slots=opt.num_slots, num_iterations=opt.num_iterations, device=device, resize=resize, broadcast=broadcast).to(device)
             self.std_slot_att = SlotAttentionAutoEncoder(opt, resolution=(self.h // resize, self.w // (resize)), num_slots=opt.num_slots, num_iterations=opt.num_iterations, device=device, resize=resize, std=True, broadcast=broadcast).to(device)
             
-            if opt.unmasked is True:
-                self.conv_decoder = Decoder((opt.num_slots * self.opt.slot_size) + d_zt, in_ch, opt).to(device)
-            else:
-                self.conv_decoder = Decoder((opt.num_slots * self.opt.slot_size) + d_zt, in_ch+1, opt).to(device)
+            if opt.unmasked is False: ch_ = in_ch + 1
+            else: ch_ = in_ch
+            self.conv_decoder = Decoder((opt.num_slots * self.opt.slot_size) + (d_zt * self.num_rims), ch_, opt).to(device)
 
         else:
             self.conv_decoder = Decoder(d_zf + d_zt, in_ch, opt).to(device)
             
         # TODO Dynamic Factor Prediction
-        self.dfp_net = DFP(z_size=d_zt)
+        # self.dfp_net = DFP(z_size=d_zt)
         # self.flownet = FlowNet2(opt)
         # self.flownet.load_state_dict(torch.load(opt.flownet_params_path))
         # print("Loaded params for FlowNet model")
@@ -135,7 +138,7 @@ class S3VAE(nn.Module):
             mu_zt, std_zt = self.dynamic_rnn(encoded_inputs.view(b, t, num_features), self.out_seq)
             mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
             prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt)   # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
-            
+
         return mu_zt, std_zt, prior_mu_zt, prior_std_zt
 
     def forward(self, inputs):
@@ -155,7 +158,8 @@ class S3VAE(nn.Module):
         # Get mu and std of static latent variable zf, zf_pos, zf_neg each of dim d_zf
         mu_zf, std_zf, zf_pos_mu, zf_pos_std, zf_neg_mu, zf_neg_std = self.get_static_rep(encoded_inputs, shuffled_encoded_inputs, another_encoded_tensor)
         mu_zt, std_zt, prior_mu_zt, prior_std_zt = self.get_dynamic_rep(encoded_inputs)
-        print("Got dynamic rep!", mu_zt.size())
+        # print("Static rep", mu_zf.size(), std_zf.size())
+        # print("Dynamic rep", mu_zt.size(), std_zt.size())
 
         # zf prior p(z_f) ~ N(0, 1) and zf posterior q(z_f | x_1:T)
         if self.opt.slot_att is True and self.opt.encoder in ['cgru_sa']:
@@ -207,6 +211,7 @@ class S3VAE(nn.Module):
         if self.opt.phase == 'train':
             # 1. VAE ELBO Loss
             self.get_vae_loss(x_hat, inputs, zf_sample, zt_sample) 
+            # print("Got VAE Loss")
 
             # 2. SCC Loss
             if self.opt.encoder in ['cgru_sa']:
@@ -260,7 +265,6 @@ class S3VAE(nn.Module):
 
         # 2. KL for static latent variable zf
         zf_KL_div_loss = self.kl_divergence(self.p_zf, self.q_zf_xT, zf)
-        
         # 3. Sum KL across time dimension for dynamic latent variable zt
         zt_KL_div_loss = self.kl_divergence(self.p_zt, self.q_zt_xt, zt).sum(dim=(1))
         

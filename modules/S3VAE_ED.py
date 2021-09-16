@@ -55,6 +55,7 @@ class GRUEncoder(nn.Module):
         self.hidden_size = hidden_size
         self.rim = rim
         self.opt = opt
+        self.num_rims = self.opt.n_hid[0] // self.opt.unit_per_rim
 
         if ode is True:
             z0_outs = hidden_size // 2
@@ -73,14 +74,18 @@ class GRUEncoder(nn.Module):
             self.gru_net = nn.GRU(input_size, hidden_size, num_layers=1, batch_first=batch_first)
             if self.type == 'dynamic':
                 if rim is True:
-                    self.dynamic_net = RIM_GRU(opt.ntokens, opt.emsize, [hidden_size], opt)
+                    self.dynamic_net = RIM_GRU(opt.ntokens, opt.emsize, [hidden_size], opt, num_blocks=opt.num_blocks, topk=opt.topk)
                     total_params = sum(p.numel() for p in self.dynamic_net.parameters() if p.requires_grad)
                     print("Model Built with Total Number of Trainable Parameters: " + str(total_params))
                 else:
                     self.dynamic_net = nn.GRU(hidden_size, hidden_size, num_layers=1, batch_first=batch_first)
         
-        self.mean_net = nn.Linear(hidden_size, z_size)
-        self.std_net = nn.Linear(hidden_size, z_size)
+        if rim is True:
+            self.mean_net = nn.Linear(hidden_size // self.num_rims, z_size)
+            self.std_net = nn.Linear(hidden_size // self.num_rims, z_size)
+        else:
+            self.mean_net = nn.Linear(hidden_size, z_size)
+            self.std_net = nn.Linear(hidden_size, z_size)
     
     def forward(self, inputs, seq_len=10):
         timesteps_to_predict = torch.from_numpy(np.arange(seq_len, dtype=np.int64)) / seq_len
@@ -106,13 +111,14 @@ class GRUEncoder(nn.Module):
             if self.rim is True:
                 hidden = hidden.squeeze(0)
                 inp = inp_zeros.repeat(1, seq_len, 1).permute(1, 0, 2) # t, b, f
-                dynamic_hiddens, _ = self.dynamic_net(inp, hidden, seq_len)
+                dynamic_hiddens, _ = self.dynamic_net(inp, hidden, seq_len) # t, b, opt.n_hid[0]
                 t, b, f = dynamic_hiddens.size()
-                print("dynamic hiddens", dynamic_hiddens.size())
-                mean = self.mean_net(dynamic_hiddens.view(-1, f))
-                std = F.softplus(self.std_net(dynamic_hiddens.view(-1, f)))
-                mean = mean.view(t, b, -1).permute(1, 0, 2)
-                std = std.view(t, b, -1).permute(1, 0, 2)
+                dynamic_hiddens = dynamic_hiddens.view(b, t, -1, self.num_rims).permute(0, 1, 3, 2) # b, t, num_rims, unit_per_rim
+
+                mean = self.mean_net(dynamic_hiddens)
+                std = F.softplus(self.std_net(dynamic_hiddens))
+                mean = mean.permute(0, 1, 3, 2).reshape(b, t, -1)
+                std = std.permute(0, 1, 3, 2).reshape(b, t, -1)
 
             else:
                 dynamic_hiddens = []

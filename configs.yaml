@@ -28,12 +28,15 @@ defaults:
   rim: False
 
   # RIM params
-  emsize: 600
+  emsize: 300
   ntokens: 10
   nlayers: 1
-  n_hid: [600]
+  n_hid: [300]
   sparse_comm: False
   inactive_rims: True
+  num_blocks: [3]
+  topk: [3]
+  unit_per_rim: 100
 
   # Directories
   logdir: "logs"
