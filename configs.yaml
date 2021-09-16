@@ -25,6 +25,15 @@ defaults:
   num_iterations: 3
   slot_size: 64
   unmasked: True
+  rim: False
+
+  # RIM params
+  emsize: 600
+  ntokens: 10
+  nlayers: 1
+  n_hid: [600]
+  sparse_comm: False
+  inactive_rims: True
 
   # Directories
   logdir: "logs"
@@ -207,7 +216,7 @@ test_mmnist_odecgrumem_len20_1ch:
 
 # Experiment 4: S3VAE on MMNIST 50K steps (Train by reconstructing or extrapolation)
 train_mmnist_recon_s3vae_def:
-  # python main.py --config defaults flownet_args train_mmnist_recon_s3vae_def experimental
+  # python main.py --config defaults train_mmnist_recon_s3vae_def experimental
   id: 'recon_s3vae_def_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vae_def'
   lr: 1e-3
@@ -237,11 +246,9 @@ test_mmnist_recon_s3vae_def:
 
 
 
-
-
 # Experiment 5: S3VAE with ConvGRU MMNIST, 50K steps (Train by reconstructing or extrapolation)
 train_mmnist_recon_s3vaecgru:
-  # python main.py --config defaults flownet_args train_mmnist_recon_s3vaecgru experimental
+  # python main.py --config defaults train_mmnist_recon_s3vaecgru experimental
   id: 'recon_s3vaecgru_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vaecgru'
   lr: 6e-4
@@ -273,10 +280,9 @@ test_mmnist_recon_s3vaecgru:
 
 
 
-
 # Experiment 6: Slotted S3VAE MMNIST, 50K steps
 train_mmnist_recon_s3vae_def_sa:
-  # python main.py --config defaults flownet_args train_mmnist_recon_s3vae_def_sa experimental
+  # python main.py --config defaults train_mmnist_recon_s3vae_def_sa experimental
   id: 'recon_s3vae_def_sa_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vae_def_sa'
   lr: 1e-3
@@ -311,10 +317,9 @@ test_mmnist_recon_s3vae_def_sa:
 
 
 
-
 # Experiment 7: Slotted S3VAE with ConvGRU MMNIST, 50K steps
 train_mmnist_recon_s3vaecgru_sa:
-  # python main.py --config defaults flownet_args train_mmnist_recon_s3vaecgru_sa experimental
+  # python main.py --config defaults train_mmnist_recon_s3vaecgru_sa experimental
   id: 'recon_s3vaecgru_sa_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vaecgru_sa'
   lr: 1e-3
@@ -349,18 +354,44 @@ test_mmnist_recon_s3vaecgru_sa:
 
 
 
+# Experiment 8: RIM + Slotted S3VAE
+train_mmnist_recon_rims3vae_def_sa:
+  # python main.py --config defaults train_mmnist_recon_rims3vae_def_sa experimental
+  id: 'recon_rims3vae_def_sa_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_rims3vae_def_sa'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 128
+  d_zt: 32
+  slot_size: 32
+  encoder: 'default'
+  slot_att: True
+  rim: True
+
+test_mmnist_recon_rims3vae_def_sa:
+  # python main.py --config defaults flownet_args test_mmnist_recon_rims3vae_def_sa experimental
+  id: 'recon_rims3vae_def_sa_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_recon_rims3vae_def_sa'
+  data_dir: "datasets/MovingMNIST_video/test"
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  test_seq: 200
+  test_in_seq: 20
+  test_out_seq: 180
+  d_zf: 128
+  d_zt: 32
+  slot_size: 32
+  encoder: 'default'
+  slot_att: True
+  rim: True
+
   
-
-
-
-
-
-
-
-
-
-
-
 
 
 

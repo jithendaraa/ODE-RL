@@ -1,9 +1,9 @@
 import sys
 sys.path.append('..')
-sys.path.append('./flownet2_pytorch/networks')
-sys.path.append('./flownet2_pytorch/networks/channelnorm_package')
-sys.path.append('./flownet2_pytorch/networks/correlation_package')
-sys.path.append('./flownet2_pytorch/networks/resample2d_package')
+# sys.path.append('./flownet2_pytorch/networks')
+# sys.path.append('./flownet2_pytorch/networks/channelnorm_package')
+# sys.path.append('./flownet2_pytorch/networks/correlation_package')
+# sys.path.append('./flownet2_pytorch/networks/resample2d_package')
 
 import torch
 import torch.nn as nn
@@ -12,9 +12,10 @@ from torch import distributions as dist
 import numpy as np
 
 from modules.S3VAE_ED import Encoder, GRUEncoder, ConvGRUEncoder, Decoder, DFP
-from flownet2_pytorch.models import FlowNet2
+# from flownet2_pytorch.models import FlowNet2
 
 from modules.SlotAttention import SlotAttentionAutoEncoder
+from helpers.utils import *
 
 class S3VAE(nn.Module):
     def __init__(self, opt, device):
@@ -35,10 +36,11 @@ class S3VAE(nn.Module):
         in_ch = opt.in_channels
         self.in_ch = in_ch
         d_zf, d_zt = opt.d_zf, opt.d_zt
+        n_hid = 256
+        if self.opt.rim is True: n_hid=opt.n_hid[0]
 
         # Only relevant for slto attention
         broadcast = False
-
         if opt.encoder in ['cgru_sa']:
             broadcast = True
         
@@ -50,9 +52,9 @@ class S3VAE(nn.Module):
         self.res_after_encoder = opt.resolution // resize
         
         if opt.encoder == 'default':
-            self.static_rnn = GRUEncoder(128, 256, d_zf, ode=False, device=device, type='static', batch_first=True).to(device)
-            self.dynamic_rnn = GRUEncoder(128, 256, d_zt, ode=opt.ode, device=device, type='dynamic', batch_first=True).to(device)
-            self.prior_rnn = GRUEncoder(d_zt*2, 256, d_zt, ode=False, device=device, type='prior', batch_first=True).to(device)
+            self.static_rnn = GRUEncoder(128, n_hid, d_zf, ode=False, device=device, type='static', batch_first=True, opt=opt).to(device)
+            self.dynamic_rnn = GRUEncoder(128, n_hid, d_zt, ode=opt.ode, device=device, type='dynamic', batch_first=True, rim=opt.rim, opt=opt).to(device)
+            self.prior_rnn = GRUEncoder(d_zt*2, n_hid, d_zt, ode=False, device=device, type='prior', batch_first=True, opt=opt).to(device)
         
         elif opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:
             conv_encoder_out_ch = self.conv_encoder.layers[-3].out_channels
@@ -74,7 +76,7 @@ class S3VAE(nn.Module):
             
         # TODO Dynamic Factor Prediction
         self.dfp_net = DFP(z_size=d_zt)
-        self.flownet = FlowNet2(opt)
+        # self.flownet = FlowNet2(opt)
         # self.flownet.load_state_dict(torch.load(opt.flownet_params_path))
         # print("Loaded params for FlowNet model")
 
@@ -84,24 +86,10 @@ class S3VAE(nn.Module):
         self.dfp_loss = 0
         self.mi_loss = 0
 
-    def forward(self, inputs):
-        self.set_zero_losses()
-        # Shuffled inputs to generate zf_neg
-        other = inputs[torch.from_numpy(np.random.permutation(len(inputs)))].to(self.device)
-        b, t, c, h, w = inputs.size()
-        assert t == self.in_seq
+    def get_static_rep(self, encoded_inputs, shuffled_encoded_inputs, another_encoded_tensor):
+        b = self.opt.batch_size
+        t = encoded_inputs.size()[0] // b
 
-        # Conv Encoding
-        encoded_inputs = self.conv_encoder(inputs.view(b*t, c, h, w))
-
-        # shuffle batch to get zf_pos
-        shuffle_idx = torch.randperm(encoded_inputs.shape[1])
-        shuffled_encoded_inputs = encoded_inputs[:, shuffle_idx].contiguous()
-        
-        # Encode from another sequence for zf_neg
-        another_encoded_tensor = self.conv_encoder(other.view(b*t, c, h, w))  
-
-        # Get mu and std of static latent variable zf of dim d_zf
         if self.opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:
             bt, c_, h_, w_ = encoded_inputs.size()
             encoded_inputs = encoded_inputs.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
@@ -119,15 +107,7 @@ class S3VAE(nn.Module):
                 zf_pos_mu, zf_pos_std = self.mu_slot_att(zf_pos_mu), self.std_slot_att(zf_pos_std)
                 zf_neg_mu, zf_neg_std = self.mu_slot_att(zf_neg_mu), self.std_slot_att(zf_neg_std)
             
-            # Get posterior mu and std of dynamic latent variables z1....zt each of channel dim d_zt
-            mu_zt, std_zt = self.dynamic_rnn(encoded_inputs, self.out_seq)
-            b, _, _, h, w = mu_zt.size()
-            mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
-            
-            # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
-            prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt.permute(1, 0, 2, 3, 4), self.out_seq)
-
-        elif self.opt.encoder == 'default':
+        elif self.opt.encoder in ['default']:
             num_features = encoded_inputs.size()[1]
             mu_zf, std_zf = self.static_rnn(encoded_inputs.view(b, t, num_features))
             zf_pos_mu, zf_pos_std = self.static_rnn(shuffled_encoded_inputs.view(b, t, num_features))
@@ -139,13 +119,44 @@ class S3VAE(nn.Module):
                 zf_pos_mu, zf_pos_std = self.mu_slot_att(zf_pos_mu), self.std_slot_att(zf_pos_std)
                 zf_neg_mu, zf_neg_std = self.mu_slot_att(zf_neg_mu), self.std_slot_att(zf_neg_std)
             
-            # Get posterior mu and std of dynamic latent variables z1....zt each of dim d_zt
+        return mu_zf, std_zf, zf_pos_mu, zf_pos_std, zf_neg_mu, zf_neg_std
+
+    def get_dynamic_rep(self, encoded_inputs):
+        b = self.opt.batch_size
+
+        if self.opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:
+            mu_zt, std_zt = self.dynamic_rnn(encoded_inputs, self.out_seq)  # Get posterior mu and std of dynamic latent variables z1....zt each of channel dim d_zt
+            mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
+            prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt.permute(1, 0, 2, 3, 4), self.out_seq)  # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
+
+        elif self.opt.encoder in ['default']:
+            bt, num_features = encoded_inputs.size()[0], encoded_inputs.size()[1]
+            t = bt // b
             mu_zt, std_zt = self.dynamic_rnn(encoded_inputs.view(b, t, num_features), self.out_seq)
             mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
+            prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt)   # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
+            
+        return mu_zt, std_zt, prior_mu_zt, prior_std_zt
 
-            # # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
-            prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt)
-        
+    def forward(self, inputs):
+        self.set_zero_losses()
+        other = inputs[torch.from_numpy(np.random.permutation(len(inputs)))].to(self.device)
+        b, t, c, h, w = inputs.size()
+        assert t == self.in_seq
+
+        # Conv Encoding
+        encoded_inputs = self.conv_encoder(inputs.view(b*t, c, h, w))
+
+        # shuffle batch to get zf_pos and use another sequence for zf_neg
+        shuffle_idx = torch.randperm(encoded_inputs.shape[1])
+        shuffled_encoded_inputs = encoded_inputs[:, shuffle_idx].contiguous()
+        another_encoded_tensor = self.conv_encoder(other.view(b*t, c, h, w))  
+
+        # Get mu and std of static latent variable zf, zf_pos, zf_neg each of dim d_zf
+        mu_zf, std_zf, zf_pos_mu, zf_pos_std, zf_neg_mu, zf_neg_std = self.get_static_rep(encoded_inputs, shuffled_encoded_inputs, another_encoded_tensor)
+        mu_zt, std_zt, prior_mu_zt, prior_std_zt = self.get_dynamic_rep(encoded_inputs)
+        print("Got dynamic rep!", mu_zt.size())
+
         # zf prior p(z_f) ~ N(0, 1) and zf posterior q(z_f | x_1:T)
         if self.opt.slot_att is True and self.opt.encoder in ['cgru_sa']:
             reshaped_mu_zf = mu_zf.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder)
@@ -194,8 +205,8 @@ class S3VAE(nn.Module):
             x_hat = F.sigmoid(x_hat)
         
         if self.opt.phase == 'train':
-            
-            self.get_vae_loss(x_hat, inputs, zf_sample, zt_sample) # 1. VAE ELBO Loss
+            # 1. VAE ELBO Loss
+            self.get_vae_loss(x_hat, inputs, zf_sample, zt_sample) 
 
             # 2. SCC Loss
             if self.opt.encoder in ['cgru_sa']:
@@ -208,9 +219,13 @@ class S3VAE(nn.Module):
             zf_neg = dist.Normal(loc=zf_neg_mu, scale=zf_neg_std)
             self.get_scc_loss(zf_pos, zf_neg)
 
-            # self.get_dfp_loss(x_hat)  # 3. TODO: DFP Loss
-            self.get_mi_loss()  # 4. MI Loss
+            # 3. TODO: DFP Loss
+            # self.get_dfp_loss(x_hat)  
 
+            # 4. MI Loss
+            self.get_mi_loss()  
+
+        # print("[End of forward: S3VAE]")
         return x_hat
 
     def get_prediction(self, inputs, batch_dict=None):

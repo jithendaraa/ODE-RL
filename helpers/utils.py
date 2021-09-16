@@ -275,3 +275,13 @@ def xavier_uniform_init(module, gain=1.0):
         nn.init.xavier_uniform_(module.weight.data, gain)
         nn.init.constant_(module.bias.data, 0)
     return module
+
+def repackage_hidden(h):
+    """Wraps hidden states in new Tensors, to detach them from their history."""
+    hidden = []
+    for i in range(args.nlayers):
+        if isinstance(h[i], torch.Tensor):
+            hidden.append(h[i].detach())
+        else:
+            hidden.append(tuple((h[i][0].detach(), h[i][1].detach())))
+    return hidden

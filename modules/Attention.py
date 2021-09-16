@@ -1,9 +1,11 @@
+import sys
+sys.path.append('..')
+
 import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
-from GroupLinearLayer import GroupLinearLayer
-from sparse_grad_attn import Sparse_grad_attention
+from modules.GroupLinearLayer import GroupLinearLayer
 
 class Sparse_attention(nn.Module):
     def __init__(self, top_k = 5):
@@ -87,7 +89,6 @@ class ScaledDotProductAttention(nn.Module):
 
         return output, attn, extra_loss
     
-
 class MultiHeadAttention(nn.Module):
     ''' Multi-Head Attention module '''
     def __init__(self, n_head, d_model_read, d_model_write, d_model_out, d_k, d_v, num_blocks_read, num_blocks_write, topk, grad_sparse, residual=True, dropout=0.1, skip_write=False):

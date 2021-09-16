@@ -16,12 +16,9 @@ def zero_matrix_elements(matrix, k):
     matrix *= 0.0
     matrix += new_mat
 
-
 class BlockGRU(nn.Module):
-    """Container module with an encoder, a recurrent module, and a decoder."""
     def __init__(self, ninp, nhid, k):
         super(BlockGRU, self).__init__()
-
         assert ninp % k == 0
         assert nhid % k == 0
 
@@ -44,3 +41,8 @@ class BlockGRU(nn.Module):
     def forward(self, input, h):
         hnext = self.gru(input, h)
         return hnext
+
+class BlockCGRU(nn.Module):
+    def __init__(self, ninp, nhid, k):
+        super(BlockCGRU, self).__init__()
+        

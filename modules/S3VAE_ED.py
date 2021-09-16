@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../')
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,6 +9,8 @@ import numpy as np
 from modules.DiffEqSolver import DiffEqSolver, ODEFunc
 from modules.ConvGRUCell import ConvGRUCell
 from modules.ODEConvGRUCell import ODEConvGRUCell
+from modules.RIM import RIM_GRU
+from helpers.utils import *
 
 class Encoder(nn.Module):
     def __init__(self, in_ch, encoder_type='default'):
@@ -41,13 +46,15 @@ class Encoder(nn.Module):
         return self.layers(inputs)
 
 class GRUEncoder(nn.Module):
-    def __init__(self, input_size=128, hidden_size=256, z_size=256, ode=False, device=None, method='dopri5', type='static', batch_first=True):
+    def __init__(self, input_size=128, hidden_size=256, z_size=256, ode=False, device=None, method='dopri5', type='static', batch_first=True, rim=False, opt=None):
         super().__init__()
         self.ode = ode
         self.device = device
         self.type = type
         self.batch_first = batch_first
         self.hidden_size = hidden_size
+        self.rim = rim
+        self.opt = opt
 
         if ode is True:
             z0_outs = hidden_size // 2
@@ -65,7 +72,12 @@ class GRUEncoder(nn.Module):
         else:
             self.gru_net = nn.GRU(input_size, hidden_size, num_layers=1, batch_first=batch_first)
             if self.type == 'dynamic':
-                self.dynamic_net = nn.GRU(hidden_size, hidden_size, num_layers=1, batch_first=batch_first)
+                if rim is True:
+                    self.dynamic_net = RIM_GRU(opt.ntokens, opt.emsize, [hidden_size], opt)
+                    total_params = sum(p.numel() for p in self.dynamic_net.parameters() if p.requires_grad)
+                    print("Model Built with Total Number of Trainable Parameters: " + str(total_params))
+                else:
+                    self.dynamic_net = nn.GRU(hidden_size, hidden_size, num_layers=1, batch_first=batch_first)
         
         self.mean_net = nn.Linear(hidden_size, z_size)
         self.std_net = nn.Linear(hidden_size, z_size)
@@ -88,26 +100,34 @@ class GRUEncoder(nn.Module):
         
         elif self.type == 'dynamic':
             inp_zeros = torch.zeros_like(hidden)
-
             if self.batch_first is True: 
-                # Make batch as first dim
-                inp_zeros = inp_zeros.permute(1, 0, 2)
-                
-            dynamic_hiddens = []
-            for t in range(seq_len):
-                outs, hidden = self.dynamic_net(inp_zeros, hidden)
-                dynamic_hiddens.append(hidden.squeeze(0))
+                inp_zeros = inp_zeros.permute(1, 0, 2)  # Make batch as first dim
             
-            dynamic_hiddens = torch.stack(dynamic_hiddens).to(self.device)
-            t, b, f = dynamic_hiddens.size()
-            
-            mean = self.mean_net(dynamic_hiddens.view(-1, f))
-            std = F.softplus(self.std_net(dynamic_hiddens.view(-1, f)))
-            mean = mean.view(t, b, -1).permute(1, 0, 2)
-            std = std.view(t, b, -1).permute(1, 0, 2)
+            if self.rim is True:
+                hidden = hidden.squeeze(0)
+                inp = inp_zeros.repeat(1, seq_len, 1).permute(1, 0, 2) # t, b, f
+                dynamic_hiddens, _ = self.dynamic_net(inp, hidden, seq_len)
+                t, b, f = dynamic_hiddens.size()
+                print("dynamic hiddens", dynamic_hiddens.size())
+                mean = self.mean_net(dynamic_hiddens.view(-1, f))
+                std = F.softplus(self.std_net(dynamic_hiddens.view(-1, f)))
+                mean = mean.view(t, b, -1).permute(1, 0, 2)
+                std = std.view(t, b, -1).permute(1, 0, 2)
 
+            else:
+                dynamic_hiddens = []
+                for t in range(seq_len):
+                    outs, hidden = self.dynamic_net(inp_zeros, hidden)
+                    dynamic_hiddens.append(hidden.squeeze(0))
+
+                dynamic_hiddens = torch.stack(dynamic_hiddens).to(self.device)
+                t, b, f = dynamic_hiddens.size()
+                mean = self.mean_net(dynamic_hiddens.view(-1, f))
+                std = F.softplus(self.std_net(dynamic_hiddens.view(-1, f)))
+                mean = mean.view(t, b, -1).permute(1, 0, 2)
+                std = std.view(t, b, -1).permute(1, 0, 2)
+            
         else: # for 'prior' self.type GRUEncoder
-            print(outs.size())
             mean = self.mean_net(outs)
             std = F.softplus(self.std_net(outs))
 
