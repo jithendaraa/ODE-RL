@@ -10,6 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import distributions as dist
 import numpy as np
+import wandb
+import PIL
 
 from modules.S3VAE_ED import Encoder, GRUEncoder, ConvGRUEncoder, Decoder, DFP
 # from flownet2_pytorch.models import FlowNet2
@@ -37,6 +39,7 @@ class S3VAE(nn.Module):
         self.in_ch = in_ch
         d_zf, d_zt = opt.d_zf, opt.d_zt
         n_hid = 256
+        self.latent_dims = {}
 
         if self.opt.rim is True: 
             n_hid=opt.n_hid[0]
@@ -130,7 +133,6 @@ class S3VAE(nn.Module):
             bt, c, h, w = encoded_inputs.size()
             encoded_inputs = encoded_inputs.view(b, self.in_seq, c, h, w).permute(1, 0, 2, 3, 4)
             mu_zt, std_zt = self.dynamic_rnn(encoded_inputs, self.out_seq)  # Get posterior mu and std of dynamic latent variables z1....zt each of channel dim d_zt
-            print("dyn mu size", mu_zt.size())
             mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
             prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt.permute(1, 0, 2, 3, 4), self.out_seq)  # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
 
@@ -142,6 +144,32 @@ class S3VAE(nn.Module):
             prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt)   # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
 
         return mu_zt, std_zt, prior_mu_zt, prior_std_zt
+
+    def visualize_latent_dims(self, mu, std, sampled_z, type='static'):
+        t = self.in_seq
+        b = self.opt.batch_size
+        mu = ((torch.tanh(mu) + 1.0)/2) * 255.0
+        std = ((torch.tanh(std) + 1.0)/2) * 255.0
+        sampled_z = ((torch.tanh(sampled_z) + 1.0)/2) * 255.0
+
+        if self.opt.encoder in ['default']:
+            if type == 'static':
+                mu = mu.unsqueeze(1).repeat(1, t, 1).unsqueeze(3).cpu().detach().numpy()
+                std = std.unsqueeze(1).repeat(1, t, 1).unsqueeze(3).cpu().detach().numpy()
+                sampled_z = sampled_z.unsqueeze(1).repeat(1, t, 1).unsqueeze(3).cpu().detach().numpy()
+
+                self.latent_dims['static_mu'] = [wandb.Image(m) for m in mu]
+                self.latent_dims['static_std'] = [wandb.Image(m) for m in std]
+                self.latent_dims['static_sampled'] = [wandb.Image(m) for m in sampled_z]
+            else:
+                mu = mu.unsqueeze(-1).cpu().detach().numpy()
+                std = std.unsqueeze(-1).cpu().detach().numpy()
+                sampled_z = sampled_z.unsqueeze(-1).cpu().detach().numpy()
+
+                self.latent_dims['dynamic_mu'] = [wandb.Image(m) for m in mu]
+                self.latent_dims['dynamic_std'] = [wandb.Image(m) for m in std]
+                self.latent_dims['dynamic_sampled'] = [wandb.Image(m) for m in sampled_z]
+
 
     def forward(self, inputs):
         self.set_zero_losses()
@@ -179,6 +207,9 @@ class S3VAE(nn.Module):
         self.q_zt_xt = dist.Normal(loc=mu_zt, scale=std_zt)
         zf_sample = self.q_zf_xT.rsample()
         zt_sample = self.q_zt_xt.rsample()
+
+        self.visualize_latent_dims(mu_zf, std_zf, zf_sample, 'static')
+        self.visualize_latent_dims(mu_zt, std_zt, zt_sample, 'dynamic')
 
         if self.opt.encoder == 'default' and self.opt.slot_att is True:
             zf_zt = torch.cat((zf_sample.reshape(b, 1, -1).repeat(1, self.out_seq, 1), zt_sample), dim=2).view(b*self.out_seq, -1, 1, 1)
@@ -262,7 +293,7 @@ class S3VAE(nn.Module):
         # 1. Reconstruction loss: p(xt | zf, zt)
         scale = torch.exp(self.log_scale)
         log_pxz = dist.Normal(x_hat, scale).log_prob(x)
-        recon_loss = log_pxz.sum(dim=(1,2,3,4))   # sum over t = 1..T log p(xt| zf, zt)  {dim 1 sum over time, dims 2,3,4 sum over c,h,w}
+        recon_loss = log_pxz.mean(dim=(1,2,3,4))   # sum over t = 1..T log p(xt| zf, zt)  {dim 1 sum over time, dims 2,3,4 sum over c,h,w}
 
         # 2. KL for static latent variable zf
         zf_KL_div_loss = self.kl_divergence(self.p_zf, self.q_zf_xT, zf)

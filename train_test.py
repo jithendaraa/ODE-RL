@@ -54,7 +54,11 @@ def train(opt, model, loader_objs, device, exp_config_dict):
                     wandb.log(loss_dict, step=step)
 
                 if step == 1 or step % opt.video_log_freq == 0:
-                    wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)
+                    log_dict = {}
+                    if opt.model in ['S3VAE']:
+                        log_dict = model.latent_dims
+                    log_dict['Pred_GT'] = wandb.Video(pred_gt) 
+                    wandb.log(log_dict, step=step)
                     print("Logged video")
                 
             print(f"step {step}; Step loss {step_loss}")
@@ -172,6 +176,7 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     if opt.model in ['S3VAE']:  
         train_loss, loss_dict = model.get_loss()
         train_loss.backward()
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
         optimizer.step()
         return predicted_frames * 255.0, input_frames * 255.0, train_loss.item(), loss_dict
 
