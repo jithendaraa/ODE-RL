@@ -51,7 +51,7 @@ def train(opt, model, loader_objs, device, exp_config_dict):
             if opt.off_wandb is False:
                 # Log losses and pred, gt videos
                 if step % opt.loss_log_freq == 0:
-                    wandb.log( loss_dict, step=step)
+                    wandb.log(loss_dict, step=step)
 
                 if step == 1 or step % opt.video_log_freq == 0:
                     wandb.log({ 'Pred_GT': wandb.Video(pred_gt) }, step=step)

@@ -20,7 +20,7 @@ Core blocks module.  Takes:
 '''
 
 class RIM_GRU(nn.Module):
-    def __init__(self, ntoken, ninp, n_hid, opt, num_blocks=[6], topk=[4], dropout=0.5, nlayers=1, 
+    def __init__(self, ninp, n_hid, opt, dropout=0.5, nlayers=1, 
                 discrete_input=False, use_inactive=False, blocked_grad=False,
                 num_modules_read_input=2):
 
@@ -32,27 +32,27 @@ class RIM_GRU(nn.Module):
         self.layer_dilation = [1] * nlayers
         self.block_dilation = [1] * nlayers
         self.bc_list, self.dropout_list = [], []
-        self.num_blocks = num_blocks
+        self.num_blocks = opt.num_blocks
 
         print()
-        print('Top k Blocks: ', topk)
+        print('Top k Blocks: ', opt.topk)
         print('Number of Inputs, ninp: ', ninp)
         print('Dimensions of Hidden Layers: ', n_hid)
-        print('Number of Blocks: ', num_blocks)
+        print('Number of Blocks: ', opt.num_blocks)
         print("Dropout rate", dropout)
         print('Is the model using inactive blocks for higher representations? ', use_inactive)
 
         self.drop = nn.Dropout(dropout)
         self.sigmoid = nn.Sigmoid()
         self.sm = nn.Softmax(dim=1)
-        num_blocks_in = [1 for _ in topk]
+        num_blocks_in = [1 for _ in opt.topk]
 
         # Blocks Core and Dropout networks
         for i in range(nlayers):
             if i==0:
-                self.bc_list.append(BlocksCore(ninp, n_hid[i], num_blocks_in[i], num_blocks[i], topk[i], True, opt, num_modules_read_input=num_modules_read_input))
+                self.bc_list.append(BlocksCore(ninp, n_hid[i], num_blocks_in[i], opt.num_blocks[i], opt.topk[i], True, opt, num_modules_read_input=num_modules_read_input))
             else:
-                self.bc_list.append(BlocksCore(n_hid[i-1], n_hid[i], num_blocks_in[i], num_blocks[i], topk[i], True, opt, num_modules_read_input=num_modules_read_input))
+                self.bc_list.append(BlocksCore(n_hid[i-1], n_hid[i], num_blocks_in[i], opt.num_blocks[i], opt.topk[i], True, opt, num_modules_read_input=num_modules_read_input))
         for i in range(nlayers - 1):
             self.dropout_list.append(nn.Dropout(dropout))
         

@@ -43,6 +43,8 @@ class BlockGRU(nn.Module):
         return hnext
 
 class BlockCGRU(nn.Module):
-    def __init__(self, ninp, nhid, k):
+    def __init__(self):
         super(BlockCGRU, self).__init__()
+
+        print("Block CGRU init")
         

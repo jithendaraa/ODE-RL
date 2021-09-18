@@ -29,7 +29,6 @@ defaults:
 
   # RIM params
   emsize: 300
-  ntokens: 10
   nlayers: 1
   n_hid: [300]
   sparse_comm: False
@@ -73,7 +72,7 @@ defaults:
 
   wandb_project: 'ODE-RL'
   wandb_entity: 'jithendaraa'
-  offline: False                         # Beluga does not have internet; can set to False on cedar
+  offline: True                         # Beluga does not have internet; can set to False on cedar
   reconstruct: False                     # Set true if you want to train x frames and reconstruct back the same x frames
   extrapolate: False
 
@@ -97,6 +96,9 @@ losses:
 
 experimental:
   off_wandb: True
+
+smol:
+  epochs: 1
 
 # Experiment 1: Train and test ConvGRU on Moving MNIST with 2M frames, 50000 steps, batch size 4
 train_mmnist_cgru_len20:
@@ -226,7 +228,7 @@ train_mmnist_recon_s3vae_def:
   model: 'S3VAE'
   reconstruct: True
   train_seq: 40
-  train_in_seq: 20
+  train_in_seq: 20 
   train_out_seq: 20
   d_zf: 64
   d_zt: 64
@@ -254,7 +256,7 @@ train_mmnist_recon_s3vaecgru:
   # python main.py --config defaults train_mmnist_recon_s3vaecgru experimental
   id: 'recon_s3vaecgru_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vaecgru'
-  lr: 6e-4
+  lr: 1e-3
   model: 'S3VAE'
   reconstruct: True
   train_seq: 40
@@ -395,7 +397,23 @@ test_mmnist_recon_rims3vae_def_sa:
   rim: True
 
   
-
+# Experiment 9: RIM + Conv. Slotted S3VAE
+train_mmnist_recon_rimconvs4vae_def_sa:
+  # python main.py --config defaults train_mmnist_recon_rimconvs4vae_def_sa experimental
+  id: 'recon_rimconvs4vae_def_sa_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_rimconvs4vae_def_sa'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 64
+  d_zt: 32
+  slot_size: 32
+  encoder: 'cgru_sa' 
+  slot_att: True
+  rim: True
 
 
 

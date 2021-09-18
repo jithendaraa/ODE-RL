@@ -57,7 +57,7 @@ class S3VAE(nn.Module):
         
         if opt.encoder == 'default':
             self.static_rnn = GRUEncoder(128, n_hid, d_zf, ode=False, device=device, type='static', batch_first=True, opt=opt).to(device)
-            self.dynamic_rnn = GRUEncoder(128, n_hid, d_zt, ode=opt.ode, device=device, type='dynamic', batch_first=True, rim=opt.rim, opt=opt).to(device)
+            self.dynamic_rnn = GRUEncoder(128, n_hid, d_zt, ode=opt.ode, device=device, type='dynamic', batch_first=True, opt=opt).to(device)
             self.prior_rnn = GRUEncoder(d_zt * 2 * self.num_rims, n_hid, d_zt * self.num_rims, ode=False, device=device, type='prior', batch_first=True, opt=opt).to(device)
         
         elif opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:
@@ -90,11 +90,10 @@ class S3VAE(nn.Module):
         self.mi_loss = 0
 
     def get_static_rep(self, encoded_inputs, shuffled_encoded_inputs, another_encoded_tensor):
-        b = self.opt.batch_size
-        t = encoded_inputs.size()[0] // b
+        b, t = self.opt.batch_size, self.in_seq
 
         if self.opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:
-            bt, c_, h_, w_ = encoded_inputs.size()
+            _, c_, h_, w_ = encoded_inputs.size()
             encoded_inputs = encoded_inputs.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
             shuffled_encoded_inputs = shuffled_encoded_inputs.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
             another_encoded_tensor = another_encoded_tensor.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
@@ -128,7 +127,10 @@ class S3VAE(nn.Module):
         b = self.opt.batch_size
 
         if self.opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:
+            bt, c, h, w = encoded_inputs.size()
+            encoded_inputs = encoded_inputs.view(b, self.in_seq, c, h, w).permute(1, 0, 2, 3, 4)
             mu_zt, std_zt = self.dynamic_rnn(encoded_inputs, self.out_seq)  # Get posterior mu and std of dynamic latent variables z1....zt each of channel dim d_zt
+            print("dyn mu size", mu_zt.size())
             mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
             prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt.permute(1, 0, 2, 3, 4), self.out_seq)  # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
 
@@ -151,15 +153,15 @@ class S3VAE(nn.Module):
         encoded_inputs = self.conv_encoder(inputs.view(b*t, c, h, w))
 
         # shuffle batch to get zf_pos and use another sequence for zf_neg
-        shuffle_idx = torch.randperm(encoded_inputs.shape[1])
-        shuffled_encoded_inputs = encoded_inputs[:, shuffle_idx].contiguous()
+        _h, _w = encoded_inputs.size()[-2], encoded_inputs.size()[-1]
+        _5d_encoded_input = encoded_inputs.view(b, t, -1, _h, _w)
+        shuffle_idx = torch.randperm(t)
+        shuffled_encoded_inputs = _5d_encoded_input[:, shuffle_idx].contiguous().view(b*t, -1, _h, _w)
         another_encoded_tensor = self.conv_encoder(other.view(b*t, c, h, w))  
 
         # Get mu and std of static latent variable zf, zf_pos, zf_neg each of dim d_zf
         mu_zf, std_zf, zf_pos_mu, zf_pos_std, zf_neg_mu, zf_neg_std = self.get_static_rep(encoded_inputs, shuffled_encoded_inputs, another_encoded_tensor)
         mu_zt, std_zt, prior_mu_zt, prior_std_zt = self.get_dynamic_rep(encoded_inputs)
-        # print("Static rep", mu_zf.size(), std_zf.size())
-        # print("Dynamic rep", mu_zt.size(), std_zt.size())
 
         # zf prior p(z_f) ~ N(0, 1) and zf posterior q(z_f | x_1:T)
         if self.opt.slot_att is True and self.opt.encoder in ['cgru_sa']:
@@ -211,7 +213,6 @@ class S3VAE(nn.Module):
         if self.opt.phase == 'train':
             # 1. VAE ELBO Loss
             self.get_vae_loss(x_hat, inputs, zf_sample, zt_sample) 
-            # print("Got VAE Loss")
 
             # 2. SCC Loss
             if self.opt.encoder in ['cgru_sa']:
@@ -245,7 +246,7 @@ class S3VAE(nn.Module):
         kl = (log_qzx - log_pz)
         
         if self.opt.encoder == 'default':   
-            kl = kl.sum(-1)
+            kl = kl.mean(-1)
 
         elif self.opt.encoder in ['odecgru', 'cgru', 'cgru_sa']: 
             dims = len(kl.size())
@@ -261,7 +262,7 @@ class S3VAE(nn.Module):
         # 1. Reconstruction loss: p(xt | zf, zt)
         scale = torch.exp(self.log_scale)
         log_pxz = dist.Normal(x_hat, scale).log_prob(x)
-        recon_loss = log_pxz.sum(dim=(1,2,3,4))   # Sum over t = 1..T log p(xt| zf, zt)  {dim 1 sums over time, dims 2,3,4 sum over c,h,w}
+        recon_loss = log_pxz.sum(dim=(1,2,3,4))   # sum over t = 1..T log p(xt| zf, zt)  {dim 1 sum over time, dims 2,3,4 sum over c,h,w}
 
         # 2. KL for static latent variable zf
         zf_KL_div_loss = self.kl_divergence(self.p_zf, self.q_zf_xT, zf)
@@ -355,7 +356,6 @@ class S3VAE(nn.Module):
     def get_loss(self):
         # TODO: add self.opt.l2 * self.dfp_loss after adding DFP and uncomment DFP Loss in loss_dict below
         loss = self.vae_loss + (self.opt.l1 * self.scc_loss) + (self.opt.l3 * self.mi_loss)
-        # loss = self.vae_loss + (self.opt.l3 * self.mi_loss)
 
         loss_dict = {
             'Loss': loss.item(),
@@ -368,6 +368,7 @@ class S3VAE(nn.Module):
             # 'DFP Loss': self.dfp_loss.item(),
             'MI Loss': self.mi_loss.item()
         }
+        print("VAE Loss:", loss_dict['VAE Loss'], "|", 'Reconstruction Loss:', loss_dict['Reconstruction Loss'], "| SCC Loss:", loss_dict['SCC Loss'], "| MI Loss:", loss_dict['MI Loss'])
         return loss, loss_dict
 
 def unstack_and_split(x, batch_size, num_channels=3):

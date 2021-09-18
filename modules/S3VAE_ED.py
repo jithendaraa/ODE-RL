@@ -9,7 +9,8 @@ import numpy as np
 from modules.DiffEqSolver import DiffEqSolver, ODEFunc
 from modules.ConvGRUCell import ConvGRUCell
 from modules.ODEConvGRUCell import ODEConvGRUCell
-from modules.RIM import RIM_GRU
+from modules.RIM_GRU import RIM_GRU
+from modules.RIM_CGRU import RIM_CGRU
 from helpers.utils import *
 
 class Encoder(nn.Module):
@@ -46,14 +47,14 @@ class Encoder(nn.Module):
         return self.layers(inputs)
 
 class GRUEncoder(nn.Module):
-    def __init__(self, input_size=128, hidden_size=256, z_size=256, ode=False, device=None, method='dopri5', type='static', batch_first=True, rim=False, opt=None):
+    def __init__(self, input_size=128, hidden_size=256, z_size=256, ode=False, device=None, method='dopri5', type='static', batch_first=True, opt=None):
         super().__init__()
         self.ode = ode
         self.device = device
         self.type = type
         self.batch_first = batch_first
         self.hidden_size = hidden_size
-        self.rim = rim
+        self.rim = opt.rim
         self.opt = opt
         self.num_rims = self.opt.n_hid[0] // self.opt.unit_per_rim
 
@@ -73,14 +74,20 @@ class GRUEncoder(nn.Module):
         else:
             self.gru_net = nn.GRU(input_size, hidden_size, num_layers=1, batch_first=batch_first)
             if self.type == 'dynamic':
-                if rim is True:
-                    self.dynamic_net = RIM_GRU(opt.ntokens, opt.emsize, [hidden_size], opt, num_blocks=opt.num_blocks, topk=opt.topk)
-                    total_params = sum(p.numel() for p in self.dynamic_net.parameters() if p.requires_grad)
-                    print("Model Built with Total Number of Trainable Parameters: " + str(total_params))
+                
+                if self.rim is True:
+                    if opt.encoder in ['default']:
+                        self.dynamic_net = RIM_GRU(opt.emsize, [hidden_size], opt)
+                    
+                    else:
+                        NotImplementedError('Not implemented RIMs for encoder type ' + opt.encoder)
                 else:
                     self.dynamic_net = nn.GRU(hidden_size, hidden_size, num_layers=1, batch_first=batch_first)
+                
+                total_params = sum(p.numel() for p in self.dynamic_net.parameters() if p.requires_grad)
+                print("Model Built with Total Number of Trainable Parameters: " + str(total_params))
         
-        if rim is True:
+        if self.rim is True:
             self.mean_net = nn.Linear(hidden_size // self.num_rims, z_size)
             self.std_net = nn.Linear(hidden_size // self.num_rims, z_size)
         else:
@@ -104,7 +111,7 @@ class GRUEncoder(nn.Module):
             std = F.softplus(self.std_net(hidden))
         
         elif self.type == 'dynamic':
-            inp_zeros = torch.zeros_like(hidden)
+            inp_zeros = torch.zeros_like(hidden) # 1, b, f
             if self.batch_first is True: 
                 inp_zeros = inp_zeros.permute(1, 0, 2)  # Make batch as first dim
             
@@ -198,11 +205,13 @@ class ConvGRUEncoder(nn.Module):
         if opt.encoder in ['cgru', 'cgru_sa']:
             self.convgru_cell = ConvGRUCell(self.resolution_after_encoder, in_ch, out_ch, 5).to(device)
             if self.type == 'dynamic':
-                self.dynamic_convgru_cell = ConvGRUCell(self.resolution_after_encoder, out_ch, out_ch, 5).to(device)
+                if opt.rim is True:
+                    self.dynamic_net = RIM_CGRU(opt.emsize, opt)
+                else:
+                    self.dynamic_convgru_cell = ConvGRUCell(self.resolution_after_encoder, out_ch, out_ch, 5).to(device)
 
-        else:
-            if opt.encoder == 'odecgru':
-                self.build_odecgru_nets()
+        elif opt.encoder == 'odecgru':
+            self.build_odecgru_nets()
                 
         self.mean_net = nn.Sequential(
             nn.Conv2d(out_ch, out_ch, 3, 1, 1), nn.ReLU(),
@@ -223,6 +232,7 @@ class ConvGRUEncoder(nn.Module):
         self.diffeq_solver = DiffEqSolver(self.ode_decoder_func, self.opt.decode_diff_method, device=self.device, memory=False)
 
     def forward(self, inputs, seq_len=10):
+
         hiddens, hidden = self.convgru_cell(inputs, None, inputs.size()[0])
         
         if self.type == 'static':
