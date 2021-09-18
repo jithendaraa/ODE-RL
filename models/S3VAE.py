@@ -170,6 +170,26 @@ class S3VAE(nn.Module):
                 self.latent_dims['dynamic_std'] = [wandb.Image(m) for m in std]
                 self.latent_dims['dynamic_sampled'] = [wandb.Image(m) for m in sampled_z]
 
+        elif self.opt.encoder in ['cgru']:
+            if type == 'static':
+                mu = mu[:, :3, :, :].cpu().detach().permute(0, 2, 3, 1).numpy()
+                std = std[:, :3, :, :].cpu().detach().permute(0, 2, 3, 1).numpy()
+                sampled_z = sampled_z[:, :3, :, :].cpu().detach().permute(0, 2, 3, 1).numpy()
+
+                self.latent_dims['static_mu'] = [wandb.Image(m) for m in mu]
+                self.latent_dims['static_std'] = [wandb.Image(m) for m in std]
+                self.latent_dims['static_sampled'] = [wandb.Image(m) for m in sampled_z]
+
+            else:
+                mu = mu[:, :, :3, :, :].cpu().detach().permute(0, 1, 3, 4, 2).numpy()
+                std = std[:, :, :3, :, :].cpu().detach().permute(0, 1, 3, 4, 2).numpy()
+                sampled_z = sampled_z[:, :, :3, :, :].cpu().detach().permute(0, 1, 3, 4, 2).numpy()
+
+                self.latent_dims['dynamic_mu'] = [wandb.Video(m) for m in mu]
+                self.latent_dims['dynamic_std'] = [wandb.Video(m) for m in std]
+                self.latent_dims['dynamic_sampled'] = [wandb.Video(m) for m in sampled_z]
+                
+
 
     def forward(self, inputs):
         self.set_zero_losses()
