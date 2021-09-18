@@ -172,12 +172,18 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     # change input_frames and ground_truth from [-0.5, 0.5] to [0, 1]
     input_frames, ground_truth = (input_frames + 0.5).to(device), (ground_truth + 0.5).to(device) 
     predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
-    
+    total_norm = 0
+
     if opt.model in ['S3VAE']:  
         train_loss, loss_dict = model.get_loss()
         train_loss.backward()
         # torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
         optimizer.step()
+        for p in model.parameters():
+            param_norm = p.grad.detach().data.norm(2)
+            total_norm += param_norm.item() ** 2
+        total_norm = total_norm ** 0.5
+        loss_dict['Gradient Norm'] = total_norm
         return predicted_frames * 255.0, input_frames * 255.0, train_loss.item(), loss_dict
 
     else: 
