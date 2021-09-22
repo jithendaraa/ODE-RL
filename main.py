@@ -15,6 +15,8 @@ from models.ODEConvGRU import ODEConvGRU
 # from models.VidODE import VidODE
 from models.S3VAE import S3VAE
 from train_test import train, test
+from torch.utils.tensorboard import SummaryWriter
+
 
 def get_opt():
     parser = argparse.ArgumentParser()
@@ -47,6 +49,7 @@ def get_opt():
 def init_model(opt, device):
 
     implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv', 'S3VAE']
+    
 
     if opt.model in ['ConvGRU', 'cgrudecODE']:
       model = ConvGRU(opt, device, decODE=opt.decODE)
@@ -75,13 +78,14 @@ def main(opt, exp_config):
     print("Loaded", opt.dataset, "dataset")
     print("Args:", opt)
 
+    writer = SummaryWriter(opt.rundir)
     model = init_model(opt, device)
 
     if opt.load_model is True:
       model = utils.load_model_params(model, opt)
 
     if opt.phase == 'train':
-      train(opt, model, loader_objs, device, exp_config)
+      train(opt, model, loader_objs, device, exp_config, writer)
       
     elif opt.phase == 'test':
       test(opt, model, loader_objs, device, exp_config)

@@ -11,10 +11,8 @@ import torch.nn.functional as F
 from torch import distributions as dist
 import numpy as np
 import wandb
-import PIL
 
 from modules.S3VAE_ED import Encoder, GRUEncoder, ConvGRUEncoder, Decoder, DFP
-# from flownet2_pytorch.models import FlowNet2
 
 from modules.SlotAttention import SlotAttentionAutoEncoder
 from helpers.utils import *
@@ -23,7 +21,7 @@ class S3VAE(nn.Module):
     def __init__(self, opt, device):
         super(S3VAE, self).__init__()
         self.opt = opt
-        
+
         if opt.phase == 'train':
             self.in_seq = opt.train_in_seq
             self.out_seq = opt.train_in_seq
@@ -185,27 +183,29 @@ class S3VAE(nn.Module):
                 std = std[:, :, :3, :, :].cpu().detach().permute(0, 1, 3, 4, 2).numpy()
                 sampled_z = sampled_z[:, :, :3, :, :].cpu().detach().permute(0, 1, 3, 4, 2).numpy()
 
-                self.latent_dims['dynamic_mu'] = [wandb.Video(m) for m in mu]
-                self.latent_dims['dynamic_std'] = [wandb.Video(m) for m in std]
-                self.latent_dims['dynamic_sampled'] = [wandb.Video(m) for m in sampled_z]
+                self.latent_dims['dynamic_mu'] = wandb.Video(mu)
+                self.latent_dims['dynamic_std'] = wandb.Video(std)
+                self.latent_dims['dynamic_sampled'] = wandb.Video(sampled_z)
                 
-
+        return mu, std, sampled_z
 
     def forward(self, inputs):
-        self.set_zero_losses()
-        other = inputs[torch.from_numpy(np.random.permutation(len(inputs)))].to(self.device)
         b, t, c, h, w = inputs.size()
         assert t == self.in_seq
+
+        self.set_zero_losses()
 
         # Conv Encoding
         encoded_inputs = self.conv_encoder(inputs.view(b*t, c, h, w))
 
         # shuffle batch to get zf_pos and use another sequence for zf_neg
         _h, _w = encoded_inputs.size()[-2], encoded_inputs.size()[-1]
-        _5d_encoded_input = encoded_inputs.view(b, t, -1, _h, _w)
         shuffle_idx = torch.randperm(t)
-        shuffled_encoded_inputs = _5d_encoded_input[:, shuffle_idx].contiguous().view(b*t, -1, _h, _w)
-        another_encoded_tensor = self.conv_encoder(other.view(b*t, c, h, w))  
+        _5d_encoded_input = encoded_inputs.view(b, t, -1, _h, _w)
+        shuffled_encoded_inputs = _5d_encoded_input[:, shuffle_idx, :, :, :].contiguous().view(b*t, -1, _h, _w)
+        
+        other = inputs[torch.from_numpy(np.random.permutation(len(inputs)))].to(self.device).view(b*t, c, h, w)
+        another_encoded_tensor = self.conv_encoder(other)  
 
         # Get mu and std of static latent variable zf, zf_pos, zf_neg each of dim d_zf
         mu_zf, std_zf, zf_pos_mu, zf_pos_std, zf_neg_mu, zf_neg_std = self.get_static_rep(encoded_inputs, shuffled_encoded_inputs, another_encoded_tensor)
@@ -228,8 +228,8 @@ class S3VAE(nn.Module):
         zf_sample = self.q_zf_xT.rsample()
         zt_sample = self.q_zt_xt.rsample()
 
-        self.visualize_latent_dims(mu_zf, std_zf, zf_sample, 'static')
-        self.visualize_latent_dims(mu_zt, std_zt, zt_sample, 'dynamic')
+        self.mu_zf, self.std_zf, self.sampled_zf = self.visualize_latent_dims(mu_zf, std_zf, zf_sample, 'static')
+        self.mu_zt, self.std_zt, self.sampled_zt = self.visualize_latent_dims(mu_zt, std_zt, zt_sample, 'dynamic')
 
         if self.opt.encoder == 'default' and self.opt.slot_att is True:
             zf_zt = torch.cat((zf_sample.reshape(b, 1, -1).repeat(1, self.out_seq, 1), zt_sample), dim=2).view(b*self.out_seq, -1, 1, 1)
@@ -313,7 +313,7 @@ class S3VAE(nn.Module):
         # 1. Reconstruction loss: p(xt | zf, zt)
         scale = torch.exp(self.log_scale)
         log_pxz = dist.Normal(x_hat, scale).log_prob(x)
-        recon_loss = log_pxz.mean(dim=(1,2,3,4))   # sum over t = 1..T log p(xt| zf, zt)  {dim 1 sum over time, dims 2,3,4 sum over c,h,w}
+        recon_loss = log_pxz.sum(dim=(1,2,3,4))   # sum over t = 1..T log p(xt| zf, zt)  {dim 1 sum over time, dims 2,3,4 sum over c,h,w}
 
         # 2. KL for static latent variable zf
         zf_KL_div_loss = self.kl_divergence(self.p_zf, self.q_zf_xT, zf)

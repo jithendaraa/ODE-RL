@@ -111,13 +111,11 @@ class GRUEncoder(nn.Module):
             std = F.softplus(self.std_net(hidden))
         
         elif self.type == 'dynamic':
-            inp_zeros = torch.zeros_like(hidden) # 1, b, f
-            if self.batch_first is True: 
-                inp_zeros = inp_zeros.permute(1, 0, 2)  # Make batch as first dim
+            inp_ones = torch.ones_like(hidden) # 1, b, f
             
             if self.rim is True:
                 hidden = hidden.squeeze(0)
-                inp = inp_zeros.repeat(1, seq_len, 1).permute(1, 0, 2) # t, b, f
+                inp = inp_ones.repeat(seq_len, 1, 1) # t, b, f
                 dynamic_hiddens, _ = self.dynamic_net(inp, hidden, seq_len) # t, b, opt.n_hid[0]
                 t, b, f = dynamic_hiddens.size()
                 dynamic_hiddens = dynamic_hiddens.view(b, t, -1, self.num_rims).permute(0, 1, 3, 2) # b, t, num_rims, unit_per_rim
@@ -129,8 +127,9 @@ class GRUEncoder(nn.Module):
 
             else:
                 dynamic_hiddens = []
+                inp_ones = inp_ones.permute(1, 0, 2)
                 for t in range(seq_len):
-                    outs, hidden = self.dynamic_net(inp_zeros, hidden)
+                    outs, hidden = self.dynamic_net(inp_ones, hidden)
                     dynamic_hiddens.append(hidden.squeeze(0))
 
                 dynamic_hiddens = torch.stack(dynamic_hiddens).to(self.device)

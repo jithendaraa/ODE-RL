@@ -11,14 +11,15 @@ import os
 import math
 import wandb
 
+
 import helpers.utils as utils
 import helpers.loggers as loggers
 
 
-def train(opt, model, loader_objs, device, exp_config_dict):
+def train(opt, model, loader_objs, device, exp_config_dict, writer):
     step = 0
     start_time = time.time()
-
+    
     # Data loaders
     train_dataloader = loader_objs['train_dataloader']
     n_train_batches = loader_objs['n_train_batches']
@@ -43,10 +44,13 @@ def train(opt, model, loader_objs, device, exp_config_dict):
         epoch_loss = 0
 
         for it in range(n_train_batches):   # n_train_batches steps
-            pred, gt, step_loss, loss_dict = train_batch(model, train_dataloader, optimizer, opt, device)
+            pred, gt, step_loss, loss_dict = train_batch(model, train_dataloader, optimizer, opt, device, writer)
             pred_gt = torch.cat((pred.detach().cpu(), gt.cpu()), 0).numpy()
             epoch_loss += step_loss
             step += 1
+
+            # tboard_log_dict = {}
+            # tboard_log_dict = visualize_latent_dims(opt, model, tboard_log_dict)
 
             if opt.off_wandb is False:
                 # Log losses and pred, gt videos
@@ -54,9 +58,7 @@ def train(opt, model, loader_objs, device, exp_config_dict):
                     wandb.log(loss_dict, step=step)
 
                 if step == 1 or step % opt.video_log_freq == 0:
-                    log_dict = {}
-                    if opt.model in ['S3VAE']:
-                        log_dict = model.latent_dims
+                    if opt.model in ['S3VAE']:  log_dict = model.latent_dims
                     log_dict['Pred_GT'] = wandb.Video(pred_gt) 
                     wandb.log(log_dict, step=step)
                     print("Logged video")
@@ -69,6 +71,8 @@ def train(opt, model, loader_objs, device, exp_config_dict):
         epoch_loss /= n_train_batches # Avg loss over all batches for this epoch
         wandb.log({"Per Epoch Loss": epoch_loss})
         loggers.log_after_epoch(epoch, epoch_loss, step, start_time, total_steps, opt=opt)
+
+    writer.close()
 
 def test(opt, model, loader_objs, device, exp_config_dict, step=None, metrics=None, lr_schedule=None):
     test_loss = 0
@@ -160,7 +164,7 @@ def test_batch(model, test_dataloader, opt, device):
 
     return predicted_frames, ground_truth, loss
 
-def train_batch(model, train_dataloader, optimizer, opt, device):
+def train_batch(model, train_dataloader, optimizer, opt, device, writer):
     # Get batch data & Get input sequence and output ground truth 
     data_dict = utils.get_data_dict(train_dataloader)
     batch_dict = utils.get_next_batch(data_dict, opt)
@@ -177,13 +181,17 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
     if opt.model in ['S3VAE']:  
         train_loss, loss_dict = model.get_loss()
         train_loss.backward()
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
+
+        if opt.clip != -1:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), float(opt.clip))
+
         optimizer.step()
         for p in model.parameters():
             param_norm = p.grad.detach().data.norm(2)
             total_norm += param_norm.item() ** 2
         total_norm = total_norm ** 0.5
         loss_dict['Gradient Norm'] = total_norm
+
         return predicted_frames * 255.0, input_frames * 255.0, train_loss.item(), loss_dict
 
     else: 
@@ -192,3 +200,13 @@ def train_batch(model, train_dataloader, optimizer, opt, device):
         optimizer.step()
         loss_dict = {'Per Step Loss': train_loss.item()}
         return predicted_frames * 255.0, ground_truth * 255.0, train_loss.item(), loss_dict
+
+
+def visualize_latent_dims(opt, model, log_dict={}):
+    log_dict = model.latent_dims
+    
+    for key in log_dict.keys():
+        value = log_dict[key]
+        print(type(value))
+
+    return log_dict

@@ -12,6 +12,7 @@ defaults:
   off_wandb: False
   step: 50000
   z_sample: False
+  clip: -1
 
   # losses
   static_contrastive: False
@@ -39,6 +40,7 @@ defaults:
 
   # Directories
   logdir: "logs"
+  rundir: 'runs'
   user_dir: "/home/jithen"            
   storage_dir: "scratch"
   data_dir: "datasets/MovingMNIST_video/train"    # user_dir/storage_dir/data_dir
@@ -81,7 +83,7 @@ defaults:
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
   n_ode_layers: 2
   convgru_out_ch: 256
-  l1: 1000
+  l1: 10000
   l2: 100
   l3: 1
   m: 1      # Margin for triplet loss
@@ -225,7 +227,7 @@ train_mmnist_recon_s3vae_def:
   id: 'recon_s3vae_def_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vae_def'
   lr: 1e-3
-  model: 'S3VAE'
+  model: 'S3VAE' 
   reconstruct: True
   train_seq: 40
   train_in_seq: 20 
@@ -233,6 +235,8 @@ train_mmnist_recon_s3vae_def:
   d_zf: 64
   d_zt: 64
   encoder: 'default'
+  rundir: 'runs/S3VAE'
+  epochs: 35
 
 test_mmnist_recon_s3vae_def:
   id: 'recon_s3vae_def_mmnist_test'
@@ -256,7 +260,8 @@ train_mmnist_recon_s3vaecgru:
   # python main.py --config defaults train_mmnist_recon_s3vaecgru experimental
   id: 'recon_s3vaecgru_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vaecgru'
-  lr: 1e-3
+  lr: 5e-4
+  clip: 2e4
   model: 'S3VAE'
   reconstruct: True
   train_seq: 40
@@ -266,6 +271,7 @@ train_mmnist_recon_s3vaecgru:
   d_zt: 32
   encoder: 'cgru'
   unmasked: True
+  epochs: 35
 
 test_mmnist_recon_s3vaecgru:
   # python main.py --config defaults flownet_args test_mmnist_recon_s3vaecgru experimental
@@ -290,7 +296,8 @@ train_mmnist_recon_s3vae_def_sa:
   # python main.py --config defaults train_mmnist_recon_s3vae_def_sa experimental
   id: 'recon_s3vae_def_sa_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vae_def_sa'
-  lr: 1e-3
+  lr: 5e-4
+  clip: 1e3
   model: 'S3VAE'
   reconstruct: True
   train_seq: 40
@@ -327,7 +334,7 @@ train_mmnist_recon_s3vaecgru_sa:
   # python main.py --config defaults train_mmnist_recon_s3vaecgru_sa experimental
   id: 'recon_s3vaecgru_sa_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vaecgru_sa'
-  lr: 1e-3
+  lr: 7e-4
   model: 'S3VAE'
   reconstruct: True
   train_seq: 40
