@@ -1,0 +1,3 @@
+# ninja log v5
+1	19916	1632441139000000000	/lustre03/project/6061875/jithen/ODE-RL/flownet2-pytorch/networks/resample2d_package/build/temp.linux-x86_64-3.6/resample2d_cuda.o	63ae238881bbdede
+19920	35446	1632441155000000000	/lustre03/project/6061875/jithen/ODE-RL/flownet2-pytorch/networks/resample2d_package/build/temp.linux-x86_64-3.6/resample2d_kernel.o	5b3148d210658296

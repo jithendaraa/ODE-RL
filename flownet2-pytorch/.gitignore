@@ -1,0 +1,9 @@
+*.pyc
+.torch
+_ext
+*.o
+work
+work/*
+_ext/
+*.pth.tar
+flownet_env/

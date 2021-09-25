@@ -1,0 +1,3 @@
+# ninja log v5
+0	21674	1632441095000000000	/lustre03/project/6061875/jithen/ODE-RL/flownet2-pytorch/networks/correlation_package/build/temp.linux-x86_64-3.6/correlation_cuda.o	838f306203b864e9
+21678	41134	1632441115000000000	/lustre03/project/6061875/jithen/ODE-RL/flownet2-pytorch/networks/correlation_package/build/temp.linux-x86_64-3.6/correlation_cuda_kernel.o	93e86d8061896bda
