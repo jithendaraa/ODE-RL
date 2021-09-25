@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --time=27:00:00
+#SBATCH --time=12:00:00
 #SBATCH --account=def-ebrahimi
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:v100:1
-#SBATCH --job-name=MovingMNIST
+#SBATCH --job-name=FlowNet_S3VAE
 #SBATCH --cpus-per-task=6
 #SBATCH --mail-user=jithen.subra@gmail.com
 #SBATCH --mail-type=BEGIN
@@ -11,11 +11,12 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-type=REQUEUE
 #SBATCH --mail-type=ALL
+#SBATCH --output=out/FlowNet/FlowNet-%j.out
 
-id=$1
 start=`date +%s`
 echo "Starting run at: `date`"
-python main.py --config flownet_args defaults ${id}
+cd ~/projects/rrg-ebrahimi/jithen/ODE-RL/flownet2-pytorch && source flownet_env/bin/activate
+python main.py --inference --model FlowNet2 --save_flow --inference_dataset MMNIST --inference_dataset_root ~/scratch/datasets/MovingMNIST_video
 echo "Ending run at: `date`"
 end=`date +%s`
 runtime=$((end-start))
