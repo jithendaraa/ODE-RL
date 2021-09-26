@@ -16,7 +16,7 @@
 start=`date +%s`
 echo "Starting run at: `date`"
 cd ~/projects/rrg-ebrahimi/jithen/ODE-RL/flownet2-pytorch && source flownet_env/bin/activate
-python main.py --inference --model FlowNet2 --save_flow --inference_dataset MMNIST --inference_dataset_root ~/scratch/datasets/MovingMNIST_video
+python main.py --inference --model FlowNet2 --save_flow --inference_dataset MMNIST --inference_dataset_root ~/scratch/datasets/MovingMNIST_video --inference_visualize
 echo "Ending run at: `date`"
 end=`date +%s`
 runtime=$((end-start))
