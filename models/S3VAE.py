@@ -1,9 +1,5 @@
 import sys
 sys.path.append('..')
-# sys.path.append('./flownet2_pytorch/networks')
-# sys.path.append('./flownet2_pytorch/networks/channelnorm_package')
-# sys.path.append('./flownet2_pytorch/networks/correlation_package')
-# sys.path.append('./flownet2_pytorch/networks/resample2d_package')
 
 import torch
 import torch.nn as nn
@@ -52,6 +48,11 @@ class S3VAE(nn.Module):
         # For SCC Loss
         self._triplet_loss = nn.TripletMarginLoss(margin=opt.m)
         self._triplet_loss_sc = nn.TripletMarginLoss(margin=opt.m)
+        
+        # For DFP Loss
+        self.dfp_net = DFP(z_size=d_zt).to(device)
+
+        # Encoder, dynamics and Decoder networks
         self.conv_encoder = Encoder(in_ch, opt.encoder).to(device)
         resize = self.conv_encoder.resize
         self.res_after_encoder = opt.resolution // resize
@@ -78,11 +79,6 @@ class S3VAE(nn.Module):
         else:
             self.conv_decoder = Decoder(d_zf + d_zt, in_ch, opt).to(device)
             
-        # TODO Dynamic Factor Prediction
-        # self.dfp_net = DFP(z_size=d_zt)
-        # self.flownet = FlowNet2(opt)
-        # self.flownet.load_state_dict(torch.load(opt.flownet_params_path))
-        # print("Loaded params for FlowNet model")
 
     def set_zero_losses(self):
         self.vae_loss = 0
@@ -277,7 +273,7 @@ class S3VAE(nn.Module):
             self.get_scc_loss(zf_pos, zf_neg)
 
             # 3. TODO: DFP Loss
-            # self.get_dfp_loss(x_hat)  
+            self.get_dfp_loss(zt_sample)  
 
             # 4. MI Loss
             self.get_mi_loss()  
@@ -287,6 +283,7 @@ class S3VAE(nn.Module):
 
     def get_prediction(self, inputs, batch_dict=None):
         self.ground_truth = batch_dict['data_to_predict'].to(self.device)
+        self.in_flow_labels = batch_dict['in_flow_labels'].to(self.device)
         self.ground_truth = (self.ground_truth + 0.5)
         pred_frames = self(inputs)
         return pred_frames
@@ -348,8 +345,12 @@ class S3VAE(nn.Module):
         # max(D(zf, zf_pos) - D(zf, zf_neg) + margin, 0)
         self.scc_loss = self._triplet_loss(zf_sample, zf_pos_sample, zf_neg_sample)
 
-    def get_dfp_loss(self, x_hat):
-        pass
+    def get_dfp_loss(self, zt):
+        pred_area = self.dfp_net(zt)
+        motion_mag_label = self.in_flow_labels.float()
+        self.dfp_loss = F.binary_cross_entropy(torch.sigmoid(pred_area), motion_mag_label)
+        return
+
 
     def get_mi_loss(self):
         # sum t from 1..T H(zf) + H(zt) - H(zf, zt)
@@ -406,7 +407,7 @@ class S3VAE(nn.Module):
         
     def get_loss(self):
         # TODO: add self.opt.l2 * self.dfp_loss after adding DFP and uncomment DFP Loss in loss_dict below
-        loss = self.vae_loss + (self.opt.l1 * self.scc_loss) + (self.opt.l3 * self.mi_loss)
+        loss = self.vae_loss + (self.opt.l1 * self.scc_loss) + (self.opt.l2 * self.dfp_loss) + (self.opt.l3 * self.mi_loss)
 
         loss_dict = {
             'Loss': loss.item(),
@@ -416,7 +417,7 @@ class S3VAE(nn.Module):
             'Static Latent KL Loss': self.zf_KL_div_loss.item(),
             'Dynamic Latent KL Loss': self.zt_KL_div_loss.item(),
             'SCC Loss': self.scc_loss.item(),
-            # 'DFP Loss': self.dfp_loss.item(),
+            'DFP Loss': self.dfp_loss.item(),
             'MI Loss': self.mi_loss.item()
         }
         print("VAE Loss:", loss_dict['VAE Loss'], "|", 'Reconstruction Loss:', loss_dict['Reconstruction Loss'], "| SCC Loss:", loss_dict['SCC Loss'], "| MI Loss:", loss_dict['MI Loss'])

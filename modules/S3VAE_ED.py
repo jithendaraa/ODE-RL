@@ -295,24 +295,20 @@ class Decoder(nn.Module):
         return self.layers(inputs)
 
 class DFP(nn.Module):
-    def __init__(self, z_size=128):
-        super().__init__()
+    def __init__(self, z_size=128, grids=9):
+        super(DFP, self).__init__()
         self.main_net = nn.Sequential(
             nn.Linear(in_features=z_size, out_features=z_size),
-            nn.Linear(in_features=z_size, out_features=z_size)
+            nn.Linear(in_features=z_size, out_features=z_size),
+            nn.Linear(in_features=z_size, out_features=grids),
         )
-        self.mean = nn.Linear(in_features=z_size, out_features=3)
-        self.std = nn.Linear(in_features=z_size, out_features=3)
+        print("INIT DFP model")
 
 
-    def forward(self, batch):
-        shape, feature_shape = batch.shape[:-1], batch.shape[-1]
-        print(shape, feature_shape)
-        batch = batch.reshape(-1, feature_shape)
-        features = self.main_net(batch)
-        feature_shape = features.shape[1:]
-        features = features.reshape(*shape, *feature_shape)
-        # features = self.main_net(z_t)
-        mean = F.softmax(self.mean(features))
-        std = F.softplus(self.std(features))
-        return dist.Normal(loc=mean, scale=std)
+    def forward(self, x):
+        b, t, f = x.size()
+        # motion mag labels are t-1 labels for t frames. So ignore first element of time dimension during DFP 
+        res = F.sigmoid(self.main_net(x[:, 1:, :]))
+        return res
+        
+        
