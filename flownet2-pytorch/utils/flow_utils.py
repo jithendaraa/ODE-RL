@@ -62,11 +62,9 @@ def writeFlow(filename,uv,v=None):
 def visulize_flow_file(flow_filename, save_dir=None):
 	flow_data = readFlow(flow_filename)
 	img = flow2img(flow_data)
-	# plt.imshow(img)
-	# plt.show()
 	if save_dir:
 		idx = flow_filename.rfind("/") + 1
-		plt.imsave(os.path.join(save_dir, "%s-vis.png" % flow_filename[idx:-4]), img)
+		plt.imsave(os.path.join(save_dir, "%s.png" % flow_filename[idx:-4]), img)
 
 
 def flow2img(flow_data):

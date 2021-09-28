@@ -13,6 +13,7 @@ from tqdm import tqdm
 from glob import glob
 from os.path import *
 import time
+import cv2
 
 import models, losses, datasets
 from utils import flow_utils, tools
@@ -52,6 +53,7 @@ if __name__ == '__main__':
     parser.add_argument('--inference_batch_size', type=int, default=1)
     parser.add_argument('--inference_n_batches', type=int, default=-1)
     parser.add_argument('--save_flow', action='store_true', help='save predicted flows to file')
+    parser.add_argument('--vid', type=int)
 
     parser.add_argument('--resume', default='FlowNet2_checkpoint.pth.tar', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
     parser.add_argument('--log_frequency', '--summ_iter', type=int, default=1, help="Log every n batches")
@@ -82,7 +84,9 @@ if __name__ == '__main__':
                                     parameter_defaults={'root': '~/scratch/datasets/MPI-Sintel-complete/training',
                                                         'replicates': 1})
 
-    # python main.py --inference --model FlowNet2 --save_flow --inference_dataset MMNIST --inference_dataset_root ~/scratch/datasets/MovingMNIST_video
+
+
+    # python main.py --inference --model FlowNet2 --save_flow --inference_dataset MMNIST --inference_dataset_root ~/scratch/datasets/MovingMNIST_video --inference_visualize
     # python main.py --inference --model FlowNet2 --save_flow --inference_dataset MpiSintelClean --inference_dataset_root ~/scratch/datasets/MPI-Sintel-complete/training
     #  
     main_dir = os.path.dirname(os.path.realpath(__file__))
@@ -123,6 +127,11 @@ if __name__ == '__main__':
             args.skip_training = True
             args.total_epochs = 1
             args.inference_dir = "{}/inference".format(args.save)
+
+
+    if args.inference_dataset == 'MMNIST':
+        args.save = '/home/jithen/scratch/datasets/FlowNet_vis/MMNIST'
+        
 
     print('Source Code')
     print(('  Current Git Hash: {}\n'.format(args.current_hash)))
@@ -344,11 +353,39 @@ if __name__ == '__main__':
 
         return total_loss / float(batch_idx + 1), (batch_idx + 1)
 
+    def convert_flow_png_to_mp4(video_dir, rootdir='/lustre04/scratch/jithen/datasets/FlowNet_vis/MMNIST/inference/run.epoch-0-flow-vis'):
+        flow_video_dir = '/lustre04/scratch/jithen/datasets/FlowNet_vis/MMNIST/inference/run.epoch-0-flow-field'
+        flow_video_dir = join(flow_video_dir, video_dir)
+        os.system('rm -rf ' + flow_video_dir)
+        
+        video_dir = join(rootdir, video_dir)
+        video_file = join(rootdir, video_dir + '.mp4')
+
+        # Get flow png paths
+        pngs = os.listdir(video_dir)
+        pngs = sorted([png for png in pngs if png.endswith('png')])
+
+        # Read flow pngs into 'frames'
+        frames = [cv2.imread(join(video_dir, png)) for png in pngs]
+        assert len(frames) == 199
+        height, width, layers = frames[0].shape
+        size = (width,height)
+
+        # Convert 'frames' to video
+        out = cv2.VideoWriter(video_file, cv2.VideoWriter_fourcc(*'DIVX'), 25.0, size)
+        for i in range(len(frames)):
+            out.write(frames[i])
+        
+        cv2.destroyAllWindows()
+        out.release()
+        print("Saved video at:", video_file)
+        os.system('rm -rf ' + video_dir)
 
     # Reusable function for inference
     def inference(args, epoch, data_loader, model, offset=0):
 
         model.eval()
+        video_dirs = []
         
         if args.save_flow or args.render_validation:
             flow_folder = "{}/inference/{}.epoch-{}-flow-field".format(args.save,args.name.replace('/', '.'),epoch)
@@ -368,11 +405,10 @@ if __name__ == '__main__':
 
         statistics = []
         total_loss = 0
-        for batch_idx, (data, target) in enumerate(progress):
+        for batch_idx, (data, target, flow_file_name) in enumerate(progress):
             if args.cuda:
                 data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
             data, target = [Variable(d) for d in data], [Variable(t) for t in target]
-
             # when ground-truth flows are not available for inference_dataset, 
             # the targets are set to all zeros. thus, losses are actually L1 or L2 norms of compute optical flows, 
             # depending on the type of loss norm passed in
@@ -391,13 +427,26 @@ if __name__ == '__main__':
             if args.save_flow or args.render_validation:
                 for i in range(args.inference_batch_size):
                     _pflow = output[i].data.cpu().numpy().transpose(1, 2, 0)
-                    flow_utils.writeFlow( join(flow_folder, '%06d.flo'%(batch_idx * args.inference_batch_size + i)),  _pflow)
+                    
+                    if flow_file_name is None:
+                        flow_utils.writeFlow( join(flow_folder, '%06d.flo'%(batch_idx * args.inference_batch_size + i)),  _pflow)
+                    else:
+                        dir_name, filename = split(flow_file_name[0])
+                        if isdir(join(flow_folder, dir_name)) is False: os.mkdir(join(flow_folder, dir_name))
+                        flow_utils.writeFlow( join(flow_folder, dir_name, filename),  _pflow)
                     
                     # You can comment out the plt block in visulize_flow_file() for real-time visualization
                     if args.inference_visualize:
-                        flow_utils.visulize_flow_file(
-                            join(flow_folder, '%06d.flo' % (batch_idx * args.inference_batch_size + i)),flow_vis_folder)
-                            
+                        if flow_file_name is None:
+                            flow_utils.visulize_flow_file(join(flow_folder, '%06d.flo' % (batch_idx * args.inference_batch_size + i)), flow_vis_folder)
+                        else:
+                            dir_name, filename = split(flow_file_name[0])
+                            if isdir(join(flow_vis_folder, dir_name)) is False: os.mkdir(join(flow_vis_folder, dir_name))
+                            flow_utils.visulize_flow_file(join(flow_folder, dir_name, filename), join(flow_vis_folder, dir_name))
+                        
+                        if dir_name not in video_dirs: 
+                            video_dirs.append(dir_name)
+
             progress.set_description('Inference Averages for Epoch {}: '.format(epoch) + tools.format_dictionary_of_losses(loss_labels, np.array(statistics).mean(axis=0)))
             progress.update(1)
 
@@ -405,6 +454,10 @@ if __name__ == '__main__':
                 break
 
         progress.close()
+
+        for video_dir in video_dirs:
+            convert_flow_png_to_mp4(video_dir)
+
         return
 
     # Primary epoch loop

@@ -37,48 +37,23 @@ class MMNIST(data.Dataset):
         self.crop_size = args.crop_size
         self.render_size = args.inference_size
         self.channels = 3
-        self.sample = 0
+        self.num_frames_per_video = 200
 
-        train_root = join(root, 'train_np')
-        test_root = join(root, 'test_np')
-        train_video_list = sorted(glob(join(train_root, '*.npy')))
-        test_video_list = sorted(glob(join(test_root, '*.npy')))
-        print(train_video_list, test_video_list)
+        self.train_root = join(root, 'train_np')
+        self.test_root = join(root, 'test_np')
 
-        self.image_list = []
-        self.video_np_array = []
-        video_num = 0
+        train_video_list = sorted(glob(join(self.train_root, '*.npy')))[args.vid:20+args.vid]
+        # train_video_list = []
+        # test_video_list = sorted(glob(join(self.test_root, '*.npy')))[args.vid:20+args.vid]
+        test_video_list = []
+        self.all_video_paths = train_video_list + test_video_list
+
+        # video_num = 0
         # video_num += self.get_all_videos(0, train_video_list, train_root)  
         # video_num += self.get_all_videos(0, test_video_list, test_root)   
         
-        self.get_frames(train_video_list, train_root)
-        self.get_frames(test_video_list, test_root)
-
-        self.video_np_array = np.array(self.video_np_array)
-
-        n, t, h, w, c = self.video_np_array.shape
-        self.img_pairs = np.empty((n, t - 1, 2, h, w, c))
-
-        for i in range(n):
-            video_frames = self.video_np_array[i]
-            for frame_num in range(t-1):
-                img1 = video_frames[frame_num]
-                img2 = video_frames[frame_num + 1]
-                self.img_pairs[i][frame_num][0] = img1
-                self.img_pairs[i][frame_num][1] = img2
-        self.img_pairs = np.reshape(self.img_pairs, (n*(t-1), 2, h, w, c))
-        self.size = self.img_pairs.shape[0]
-    
-    def get_frames(self, video_list, root):
-        count = 0
-        for file in video_list:
-            count += 1
-            np_file_path = join(root, file)
-            frames = np.load(np_file_path)
-            self.video_np_array.append(frames)
-            if count % 100 == 0:
-                print(count, "videos done out of", len(video_list))
-                print("Length:", len(self.video_np_array))
+        self.n, self.t = len(self.all_video_paths), self.num_frames_per_video
+        self.size = self.n * (self.t - 1)
 
     def get_all_videos(self, video_num, video_list, root):
 
@@ -134,15 +109,29 @@ class MMNIST(data.Dataset):
         return video_num
 
     def __getitem__(self, index):
+        index = index % self.size
 
-        # index = index % self.size
-        index = self.sample % self.size
-        img_pair = self.img_pairs[index]
+        video_file = split(self.all_video_paths[index // (self.t - 1)])[-1][:-4]
+        video_num = int(video_file[6:])
+
+        if video_num > 8000:
+            np_file_path = join(self.test_root, video_file+'.npy')
+        else:
+            np_file_path = join(self.train_root, video_file+'.npy')
+        frames = np.load(np_file_path)
+
+        frame_num = index % (self.t - 1)
+        img1, img2 = frames[frame_num, :, :, :], frames[frame_num + 1, :, :, :]
+
+        frame_num = str(frame_num)
+        frame_num = frame_num.rjust(5, '0')
+        flow_file_name = join(video_file, "flow_" + video_file[6:] + "_" + frame_num + '.flo')
+
+        img_pair = [img1, img2]
         img_pair = np.array(img_pair).transpose(3,0,1,2)
         img_pair = torch.from_numpy(img_pair.astype(np.float32))
         _, _, h, w = img_pair.size()
-        self.sample += 1
-        return [img_pair], [torch.zeros((2, h, w))]
+        return [img_pair], [torch.zeros((2, h, w))], flow_file_name
 
     def __len__(self):
         return self.size
@@ -212,14 +201,13 @@ class MpiSintel(data.Dataset):
         
         images = list(map(cropper, images))
         flow = cropper(flow)
-        # print("YEETUS", images.shape, flow.shape)
 
         images = np.array(images).transpose(3,0,1,2)
         flow = flow.transpose(2,0,1)
 
         images = torch.from_numpy(images.astype(np.float32))
         flow = torch.from_numpy(flow.astype(np.float32))
-        return [images], [flow]
+        return [images], [flow], None
 
     def __len__(self):
         return self.size * self.replicates
