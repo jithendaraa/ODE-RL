@@ -15,12 +15,12 @@ class MovingMNIST(Dataset):
         param num_objects: a list of number of possible objects.
         '''
         super(MovingMNIST, self).__init__()
-
         self.frozen = frozen
         self.dataset = None
         self.device = device
         self.offset = offset
         self.channels = ch
+        self.flow_label_dir = '/lustre04/scratch/jithen/datasets/flow_labels/MMNIST'
 
         if is_train and self.frozen is False:
             self.mnist = utils.load_mnist(root)
@@ -107,8 +107,9 @@ class MovingMNIST(Dataset):
         frames = np.empty((200, 64, 64, self.channels), np.dtype('uint8'))
         count = 0
         video_filename = 'video_' + str(idx+1+self.offset) + '.mp4'
+        npy_filename = video_filename[:-4] + '.npy'
+
         video_filename = os.path.join(self.root, video_filename)
-        # print(video_filename)
 
         vidcap = cv2.VideoCapture(video_filename)
         success, image = vidcap.read()
@@ -158,9 +159,13 @@ class MovingMNIST(Dataset):
             print("first_frame:", first_frame, first_frame+total_frames_to_sample)
         
         required_frames = frames[first_frame:first_frame+total_frames_to_sample]
+        # ignore pos 0 which is a dummy flow label and get the flows corresponding to required_frames
+        flow_labels = np.load(os.path.join(self.flow_label_dir, npy_filename))[first_frame + 1: first_frame + total_frames_to_sample]
 
         in_frames = required_frames[:self.n_frames_input]
+        in_flow_labels = flow_labels[:self.n_frames_input-1]
         out_frames = required_frames[self.n_frames_input:]
+        out_flow_labels = flow_labels[- (self.n_frames_input - 1):]
         in_frames = torch.from_numpy( (in_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
         out_frames = torch.from_numpy( (out_frames / 255.0) - 0.5 ).contiguous().float().to(self.device).permute(0, 3, 1, 2)
         
@@ -171,7 +176,9 @@ class MovingMNIST(Dataset):
             "idx": idx, 
             "observed_data": in_frames, 
             "data_to_predict": out_frames,
-            'mask': mask}
+            'mask': mask,
+            'in_flow_labels': in_flow_labels,
+            'out_flow_labels': out_flow_labels}
 
         return out
 

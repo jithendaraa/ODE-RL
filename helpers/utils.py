@@ -97,7 +97,9 @@ def get_dict_template():
             'observed_tp': None,
             'tp_to_predict': None,
             'observed_mask': None,
-            'mask_to_predict': None}
+            'mask_to_predict': None,
+            'in_flow_labels': None,
+            'out_flow_labels': None,}
 
 def get_next_batch(data_dict, opt):
     device = get_device(data_dict["observed_data"])
@@ -108,6 +110,10 @@ def get_next_batch(data_dict, opt):
     input_t = data_dict["observed_data"].size()[1]
     output_t = data_dict["data_to_predict"].size()[1]
     total_t = input_t + output_t
+
+    # Flow motion magnitude labels
+    batch_dict['in_flow_labels'] = data_dict['in_flow_labels'].to(device)
+    batch_dict['out_flow_labels'] = data_dict['in_flow_labels'].to(device)
     
     batch_dict["timesteps"] = torch.tensor(np.arange(0, total_t) / total_t).to(device)
     batch_dict["observed_tp"] = torch.tensor(batch_dict["timesteps"][:input_t]).to(device)
