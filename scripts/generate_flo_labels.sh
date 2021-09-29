@@ -17,7 +17,7 @@ jump=$2
 dataset=$3
 start=`date +%s`
 echo "Starting run at: `date`"
-python get_labels_from_pred_flow.py --vid ${vid} --jump ${jump} --dataset ${datatset}
+python get_labels_from_pred_flow.py --vid ${vid} --jump ${jump} --dataset ${dataset}
 echo "Ending run at: `date`"
 end=`date +%s`
 runtime=$((end-start))
