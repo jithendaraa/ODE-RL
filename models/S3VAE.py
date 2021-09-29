@@ -108,9 +108,14 @@ class S3VAE(nn.Module):
             
         elif self.opt.encoder in ['default']:
             num_features = encoded_inputs.size()[1]
-            mu_zf, std_zf = self.static_rnn(encoded_inputs.view(b, t, num_features))
-            zf_pos_mu, zf_pos_std = self.static_rnn(shuffled_encoded_inputs.view(b, t, num_features))
-            zf_neg_mu, zf_neg_std = self.static_rnn(another_encoded_tensor.view(b, t, num_features))
+            if self.opt.k_stat == -1:
+                in_anch, in_pos, in_neg = encoded_inputs.view(b, t, num_features), shuffled_encoded_inputs.view(b, t, num_features), another_encoded_tensor.view(b, t, num_features)
+            else:
+                in_anch, in_pos, in_neg = encoded_inputs.view(b, t, num_features)[:, :self.opt.k_stat, :], shuffled_encoded_inputs.view(b, t, num_features)[:, :self.opt.k_stat, :], another_encoded_tensor.view(b, t, num_features)[:, :self.opt.k_stat, :]
+            
+            mu_zf, std_zf = self.static_rnn(in_anch)
+            zf_pos_mu, zf_pos_std = self.static_rnn(in_pos)
+            zf_neg_mu, zf_neg_std = self.static_rnn(in_neg)
             
             if self.opt.slot_att is True:
                 # Pass the static representations through slots and hopefully get object-centric representations

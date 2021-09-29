@@ -38,6 +38,9 @@ defaults:
   topk: [3]
   unit_per_rim: 100
 
+  # S3VAE variations
+  k_stat: 5 # set -1 to see all frames to infer zf; else first k frames are seen
+
   # Directories
   logdir: "logs"
   rundir: 'runs'
@@ -83,7 +86,7 @@ defaults:
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
   n_ode_layers: 2
   convgru_out_ch: 256
-  l1: 10000
+  l1: 1000
   l2: 100
   l3: 1
   m: 1      # Margin for triplet loss
@@ -226,17 +229,19 @@ train_mmnist_recon_s3vae_def:
   # python main.py --config defaults train_mmnist_recon_s3vae_def experimental
   id: 'recon_s3vae_def_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vae_def'
-  lr: 1e-3
+  lr: 5e-4
   model: 'S3VAE' 
   reconstruct: True
   train_seq: 40
   train_in_seq: 20 
   train_out_seq: 20
-  d_zf: 64
-  d_zt: 64
+  d_zf: 256
+  d_zt: 32
   encoder: 'default'
   rundir: 'runs/S3VAE'
-  epochs: 35
+  epochs: 25
+  clip: -1
+  k_stat: 5
 
 test_mmnist_recon_s3vae_def:
   id: 'recon_s3vae_def_mmnist_test'
@@ -297,17 +302,18 @@ train_mmnist_recon_s3vae_def_sa:
   id: 'recon_s3vae_def_sa_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vae_def_sa'
   lr: 5e-4
-  clip: 1e3
+  clip: 2e4
   model: 'S3VAE'
   reconstruct: True
   train_seq: 40
   train_in_seq: 20
   train_out_seq: 20
-  d_zf: 128
-  d_zt: 32
-  slot_size: 32
+  d_zf: 256
+  d_zt: 64
+  slot_size: 128
   encoder: 'default'
   slot_att: True
+  l1: 1000
 
 test_mmnist_recon_s3vae_def_sa:
   # python main.py --config defaults flownet_args test_mmnist_recon_s3vae_def_sa experimental
