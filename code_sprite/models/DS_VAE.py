@@ -1040,21 +1040,42 @@ class DisentangledVAE_ICLR_V1(nn.Module):
             conv_x = self.encoder_frame(x[0])
         else:
             conv_x = self.encoder_frame(x)
+        
         # pass the bidirectional lstm
         lstm_out, _ = self.z_lstm(conv_x)
+
+        # for i in range(len(x)):
+        #     val = x[i]
+        #     print("x"+str(i), val.size())
+        # print("conv_x", conv_x.size())
+        # print("lstm_out", lstm_out.size(), self.frames, self.hidden_dim)
+        
         # get f:
         backward = lstm_out[:, 0, self.hidden_dim:2 * self.hidden_dim]
         frontal = lstm_out[:, self.frames - 1, 0:self.hidden_dim]
+        # print("backward", backward.size())
+        # print("frontal", frontal.size())
+
         lstm_out_f = torch.cat((frontal, backward), dim=1)
+        # print("lstm_out_f", lstm_out_f.size())
+
         f_mean = self.f_mean(lstm_out_f)
+        # print("f_mean", f_mean.size())
         f_logvar = self.f_logvar(lstm_out_f)
+        # print("f_logvar", f_logvar.size())
         f_post = self.reparameterize(f_mean, f_logvar, random_sampling=True)
+        # print("f_post", f_post.size())
 
         # pass to one direction rnn
         features, _ = self.z_rnn(lstm_out)
+        # print("features", features.size())
         z_mean = self.z_mean(features)
+        # print("z_mean", z_mean.size())
         z_logvar = self.z_logvar(features)
+        # print("z_logvar", z_logvar.size())
         z_post = self.reparameterize(z_mean, z_logvar, random_sampling=True)
+        # print("z_post" ,z_post.size())
+        # print()
 
         if isinstance(x, list):
             f_mean_list = [f_mean]
@@ -1068,35 +1089,67 @@ class DisentangledVAE_ICLR_V1(nn.Module):
                 f_mean = self.f_mean(lstm_out_f)
                 f_mean_list.append(f_mean)
             f_mean = f_mean_list
+
         # f_mean is list if triple else not
         return f_mean, f_logvar, f_post, z_mean, z_logvar, z_post
 
     def forward(self, x):
         f_mean, f_logvar, f_post, z_mean_post, z_logvar_post, z_post = self.encode_and_sample_post(x)
-        z_mean_prior, z_logvar_prior, z_prior = self.sample_z_prior_train(z_post, random_sampling=self.training)
+        
+        # for i in range(len(f_mean)):
+        #     val = f_mean[i]
+        #     print("f_mean"+str(i), val.size())
+        # print("f_logvar", f_logvar.size() )
+        # print("f_post", f_post.size() )
+        # print("z_mean_post", z_mean_post.size() )
+        # print("z_logvar_post", z_logvar_post.size() )
+        # print("z_post", z_post.size() )
+        # print()
 
+        z_mean_prior, z_logvar_prior, z_prior = self.sample_z_prior_train(z_post, random_sampling=self.training)
+        # print("Prior; z_mean, z_logvar, z_sample", z_mean_prior.size(), z_logvar_prior.size(), z_prior.size())
+        # print()
 
         z_flatten = z_post.view(-1, z_post.shape[2])
+        # print("z_flatten", z_flatten.size())
 
         pred_area = self.z_motion_predictor_area(z_flatten)
+        # print("pred_area", pred_area.size())
         pred0 = self.z_motion_predictor0(z_flatten)
+        # print("pred0", pred0.size())
         pred1 = self.z_motion_predictor1(z_flatten)
+        # print("pred1", pred1.size())
         pred2 = self.z_motion_predictor2(z_flatten)
+        # print("pred2", pred2.size())
         pred3 = self.z_motion_predictor3(z_flatten)
+        # print("pred3", pred3.size())
         pred4 = self.z_motion_predictor4(z_flatten)
+        # print("pred4", pred4.size())
         pred5 = self.z_motion_predictor5(z_flatten)
+        # print("pred5", pred5.size())
         pred6 = self.z_motion_predictor6(z_flatten)
+        # print("pred6", pred6.size())
         pred7 = self.z_motion_predictor7(z_flatten)
+        # print("pred7", pred7.size())
         pred8 = self.z_motion_predictor8(z_flatten)
+        # print("pred8", pred8.size())
+        # print()
 
         pred = torch.cat([pred0, pred1, pred2, pred3, pred4, pred5,
                           pred6, pred7, pred8], 0)
+        # print("pred", pred.size())
 
         f_expand = f_post.unsqueeze(1).expand(-1, self.frames, self.f_dim)
+        # print("f_expand", f_expand.size())
         zf = torch.cat((z_post, f_expand), dim=2)
+        # print("zf", zf.size())
         recon_x = self.decoder(zf)
+        # print("recon", recon_x.size())
+
         return f_mean, f_logvar, f_post, z_mean_post, z_logvar_post, z_post, z_mean_prior, z_logvar_prior, z_prior, \
                recon_x, pred, pred_area
+
+
 
 
     def forward_single(self, x):
@@ -1320,6 +1373,7 @@ class DisentangledVAE_ICLR_V1(nn.Module):
             z_mean_t = self.z_prior_mean(h_t_ly2)
             z_logvar_t = self.z_prior_logvar(h_t_ly2)
             z_prior = self.reparameterize(z_mean_t, z_logvar_t, random_sampling)
+
             if z_out is None:
                 # If z_out is none it means z_t is z_1, hence store it in the format [batch_size, 1, z_dim]
                 z_out = z_prior.unsqueeze(1)
@@ -1331,6 +1385,7 @@ class DisentangledVAE_ICLR_V1(nn.Module):
                 z_means = torch.cat((z_means, z_mean_t.unsqueeze(1)), dim=1)
                 z_logvars = torch.cat((z_logvars, z_logvar_t.unsqueeze(1)), dim=1)
             z_t = z_post[:,i,:]
+
         return z_means, z_logvars, z_out
 
     # If random sampling is true, reparametrization occurs else z_t is just set to the mean

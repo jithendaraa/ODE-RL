@@ -15,6 +15,7 @@ import progressbar
 import numpy as np
 import torch.nn.functional as F
 import math
+import time
 # from OP import IPOT_distance, cost_matrix
 
 parser = argparse.ArgumentParser()
@@ -34,13 +35,12 @@ parser.add_argument('--channels', default=3, type=int)
 parser.add_argument('--dataset', default='Sprite', help='dataset to train with(smmnist_fixed, smmnist_triplet)')
 parser.add_argument('--frames', type=int, default=8, help='number of frames, 8 for sprite, 15 for digits')
 
-
 parser.add_argument('--rnn_size', type=int, default=256, help='dimensionality of hidden layer')
 parser.add_argument('--prior_rnn_layers', type=int, default=1, help='number of layers')
 
 parser.add_argument('--beta', type=float, default=0.0001, help='weighting on KL to prior')
 parser.add_argument('--model', default='dcgan', help='model type (dcgan | vgg)')
-parser.add_argument('--data_threads', type=int, default=5, help='number of data loading threads')
+parser.add_argument('--data_threads', type=int, default=1, help='number of data loading threads')
 parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 
@@ -112,8 +112,10 @@ def log_importance_weight_matrix(batch_size, dataset_size):
 def loss_fn_new(original_seq,recon_seq,f_mean,f_logvar,z_post_mean,z_post_logvar, z_post,
                 z_prior_mean, z_prior_logvar, z_prior, opt):
     """
-    Loss function consists of 3 parts, the reconstruction term that is the MSE loss between the generated and the original images
-    the KL divergence of f, and the sum over the KL divergence of each z_t, with the sum divided by batch_size
+    Loss function consists of 3 parts, 
+    the reconstruction term that is the MSE loss between the generated and the original images
+    the KL divergence of f, 
+    and the sum over the KL divergence of each z_t, with the sum divided by batch_size
 
     Loss = {mse + KL of f + sum(KL of z_t)} / batch_size
     Prior of f is a spherical zero mean unit variance Gaussian and the prior of each z_t is a Gaussian whose mean and variance
@@ -131,9 +133,20 @@ def loss_fn_new(original_seq,recon_seq,f_mean,f_logvar,z_post_mean,z_post_logvar
     kld_z = 0.5 * torch.sum(z_prior_logvar - z_post_logvar + ((z_post_var + torch.pow(z_post_mean - z_prior_mean, 2)) / z_prior_var) - 1)
     ot_loss = 0
 
+    # if opt.weight_OT != 0:
+    #     sinkhorn = SinkhornDistance(eps=0.1, max_iter=100, x=z_post, y=z_prior).cuda()
+    #     ot_loss, P, C = sinkhorn(z_post, z_prior)
+    #     ot_loss = ot_loss.sum()
+        # n = z_post.shape[1]
+        # m = z_prior.shape[1]
+        # for i in range(batch_size):
+        #     cost = cost_matrix(z_post[i], z_prior[i])
+        #     ot_loss += IPOT_  distance(cost, n, m)
+
     ot_loss = torch.zeros((1)).cuda()
     return {'mse': mse/batch_size, 'kld_f': kld_f/batch_size, 'kld_z': kld_z/batch_size,
             'ot': ot_loss/batch_size}
+
 
 triplet_loss = nn.TripletMarginLoss(margin=1.0, p=2).cuda()
 CE_loss = nn.CrossEntropyLoss().cuda()
@@ -144,9 +157,10 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
     model.zero_grad()
     if classifier:
         classifier.zero_grad()
-    f_mean, f_logvar, f, z_post_mean, z_post_logvar, z_post, z_prior_mean, z_prior_logvar, z_prior,\
-                                                                     recon_x , pred_dir, pred_area = model(x) #pred
 
+    f_mean, f_logvar, f, z_post_mean, z_post_logvar,\
+    z_post, z_prior_mean, z_prior_logvar, z_prior,\
+    recon_x , pred_dir, pred_area = model(x) #pred
 
     if isinstance(x, list):
         x = x[0]
@@ -170,24 +184,46 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
 
     motion_dir_loss = torch.zeros((1)).cuda()
     motion_area_loss = torch.zeros((1)).cuda()
+
+    # print("Motion weights", opt.weight_motion_dir, opt.weight_motion_area)
+    # print("MI", opt.weight_MI)
+    
     if opt.weight_motion_dir or opt.weight_motion_area:
         # predict the motion direction of each area
+        # print("Label", label.size())
         label_dir = label.permute(2, 0, 1).flatten()
+        # print("label_dir", label_dir.size(), label.size())
+
+        # print("mask", mask.size())
         mask_dir = mask.permute(2, 0, 1).flatten()
+        # print("mask_dir", mask_dir.size())
+        
         pred_dir = pred_dir[mask_dir]
         label_dir = label_dir[mask_dir]
+        # print(pred_dir.size(), label_dir.size())
+
         motion_dir_loss = F.cross_entropy(pred_dir, label_dir.long())
+        # print("motion_dir_loss", motion_dir_loss.size(), label_dir[0], pred_dir[0])
+
         # predict which area are moving, remove the first frame(dummy)
         mask_area = mask[:,1:,:].contiguous().view(-1, mask.shape[2])
+        print("mask_area", mask_area.size())
+
         pred_area = pred_area.view(mask.shape)[:,1:,:].contiguous().view(-1, mask.shape[2])
+        # print("pred_area", pred_area.size())
+
+        # 3x3 grid
         motion_area_loss = F.binary_cross_entropy(torch.sigmoid(pred_area), mask_area.float())
+        print("motion_area_loss", motion_area_loss.size(), mask_area[0])
 
     # calculate the mutual infomation of f and z
     batch_size, n_frame, z_dim = z_post_mean.size()
     mi_fz = torch.zeros((1)).cuda()
+
     if opt.weight_MI:
         # compute log q(z) ~= log 1/(NM) sum_m=1^M q(z|x_m) = - log(MN) + logsumexp_m(q(z|x_m))
         # batch_size x batch_size x f_dim
+
         _logq_f_tmp = log_density(f.unsqueeze(0).repeat(n_frame, 1, 1).view(n_frame, batch_size, 1, opt.f_dim),
                                   f_mean.unsqueeze(0).repeat(n_frame, 1, 1).view(n_frame, 1, batch_size, opt.f_dim),
                                   f_logvar.unsqueeze(0).repeat(n_frame, 1, 1).view(n_frame, 1, batch_size, opt.f_dim))
@@ -198,26 +234,24 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
                                   z_post_logvar.transpose(0, 1).view(n_frame, 1, batch_size, z_dim))
         _logq_fz_tmp = torch.cat((_logq_f_tmp, _logq_z_tmp), dim=3)
 
+        # print("log_f, log_z, log_zf", _logq_f_tmp.size(), _logq_z_tmp.size(), _logq_fz_tmp.size())
+
         mws = True
-        if mws:
-            logq_f = (logsumexp(_logq_f_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size))
-            logq_z = (logsumexp(_logq_z_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size))
-            logq_fz = (logsumexp(_logq_fz_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size))
-        else:
-            logiw_matrix = log_importance_weight_matrix(batch_size, opt.dataset_size).unsqueeze(0).\
-                            repeat(n_frame, 1, 1).type_as(_logq_f_tmp.data)
-            logq_fz = logsumexp(logiw_matrix + _logq_fz_tmp.sum(3), dim=2, keepdim=False)
-            logq_z = logsumexp(logiw_matrix + _logq_z_tmp.sum(3), dim=2, keepdim=False)
-            logq_f = logsumexp(logiw_matrix + _logq_f_tmp.sum(3), dim=2, keepdim=False)
+        logq_f = (logsumexp(_logq_f_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size))
+        logq_z = (logsumexp(_logq_z_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size))
+        logq_fz = (logsumexp(_logq_fz_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size))
+        # print("HA", logq_f.size(), logq_z.size(), logq_fz.size())
 
         # n_frame x batch_size
         # some sample are wired negative
         mi_fz = F.relu(logq_fz - logq_f - logq_z).mean()
+        # print("MI", mi_fz.size())
 
 
     # multple label classification loss
     # if there is supervision with ID and attributes
     if classifier and optimizer_cls:
+        # print("classifier", classifier)
         pred_action, pred_a1, pred_a2, pred_a3, pred_a4 =  classifier(z_post, f)
         cls_ｄ_loss = CE_loss(pred_action, label_D.cuda())
         cls_a1_loss = CE_loss(pred_a1, label_A[:,0].cuda())
@@ -228,6 +262,8 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
     else:
         cls_loss = torch.zeros(1).cuda()
 
+    # print("weights f z", opt.weight_f, opt.weight_z, opt.weight_motion_area, opt.weight_motion_dir, opt.weight_MI, opt.weight_GT_cls)
+    # print("unweighted losses", mse, kld_f, kld_z, trp_loss / opt.weight_triple, motion_area_loss, motion_dir_loss, mi_fz, cls_loss)
     kld_f = kld_f * opt.weight_f
     kld_z = kld_z * opt.weight_z
     motion_area_loss = motion_area_loss * opt.weight_motion_area
@@ -235,16 +271,17 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
     mi_fz = mi_fz * opt.weight_MI
     cls_loss = cls_loss * opt.weight_GT_cls
 
-
-
-    #loss = l_recon + kld_f + kld_z + trp_loss + motion_area_loss + motion_dir_loss + mmd_f + mi_fz + cls_loss
-
     loss = mse + kld_f + kld_z + trp_loss + motion_area_loss + motion_dir_loss + mi_fz + cls_loss
     loss.backward()
     optimizer.step()
     if optimizer_cls:
         optimizer_cls.step()
     ot_data = np.array(ot) if isinstance(ot, float) else ot.data.cpu().numpy()
+
+    
+    print("MSE:", mse.data.cpu(), "| Static KL:", kld_f.data.cpu().numpy(), "| Dynamic KL:", kld_z.data.cpu().numpy(), "| OT:", ot_data, "SCC Loss:", trp_loss.data.cpu().numpy(), "| Motion area loss:", motion_area_loss.data.cpu().numpy(), "| Motion dir loss:", motion_dir_loss.data.cpu().numpy(), "MI Loss:", mi_fz.data.cpu().numpy(), "| CLS Loss:", cls_loss.data.cpu().numpy())
+    print("Total loss:", loss)
+    print()
 
     return mse.data.cpu().numpy(), kld_f.data.cpu().numpy(), kld_z.data.cpu().numpy(), ot_data,\
            trp_loss.data.cpu().numpy(), motion_area_loss.data.cpu().numpy(), motion_dir_loss.data.cpu().numpy(), mi_fz.data.cpu().numpy(), \
@@ -269,6 +306,7 @@ def main(opt):
                opt.weight_motion_dir, opt.weight_MI, opt.weight_GT_cls, opt.name)
 
         opt.log_dir = '%s/%s/%s' % (opt.log_dir, opt.dataset, name)
+        print("name:", name)
 
     log = os.path.join(opt.log_dir, 'log.txt')
     os.makedirs('%s/gen/' % opt.log_dir, exist_ok=True)
@@ -304,6 +342,7 @@ def main(opt):
         classifier = Supervised_Classifier_Sprite(opt.z_dim, opt.z_dim*2, 9, # action
                                                   opt.f_dim, opt.f_dim*2, 6, opt.frames) # attributes
         classifier.apply(utils.init_weights)
+        
         optimizer_cls = opt.optimizer(classifier.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
     else:
@@ -315,17 +354,14 @@ def main(opt):
     if opt.model_dir != '':
         ds_vae =  saved_model['ds_vae']
 
-
     optimizer = opt.optimizer(ds_vae.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
     # --------- transfer to gpu ------------------------------------
-    # if torch.cuda.device_count() > 1:
-    #     print_log("Let's use {} GPUs!".format(torch.cuda.device_count()), log)
-    #     ds_vae = nn.DataParallel(ds_vae)
-
+    if torch.cuda.device_count() > 1:
+        print_log("Let's use {} GPUs!".format(torch.cuda.device_count()), log)
+        ds_vae = nn.DataParallel(ds_vae)
     ds_vae = ds_vae.cuda()
     print_log(ds_vae, log)
-
     if classifier:
         classifier = classifier.cuda()
         print_log(classifier, log)
@@ -346,8 +382,6 @@ def main(opt):
                              drop_last=True,
                              pin_memory=True)
 
-
-
     testing_batch_generator = get_batch_fixed(test_loader, dtype)
 
 
@@ -365,101 +399,87 @@ def main(opt):
         epoch_cls_loss = 0
         epoch_size = len(train_loader)
         progress = progressbar.ProgressBar(max_value=epoch_size).start()
-        # for i, batch in enumerate(train_loader):
-        for i in range(10):
+        start = time.time()
+        
+        for i, batch in enumerate(train_loader):
             progress.update(i+1)
             if opt.weight_triple:
-                print("Weight triple")
-    #             data1 = batch[0].float()
-    #             data2 = batch[5].float()
-    #             data3 = batch[6].float()
-    #             x     = utils.normalize_data(opt, dtype, data1)
-    #             x_pos = utils.normalize_data(opt, dtype, data2)
-    #             x_neg = utils.normalize_data(opt, dtype, data3)
-    #             label_A = batch[1]
-    #             label_D = batch[2]
-    #             label = batch[3].cuda()
-    #             mask = batch[4].cuda()
-    #             x = torch.stack(x, dim=1).cuda()
-    #             x_pos = torch.stack(x_pos, dim=1).cuda()
-    #             x_neg = torch.stack(x_neg, dim=1).cuda()
-    #             x = [x, x_pos, x_neg]  # list
+                data1 = batch[0].float()
+                data2 = batch[5].float()
+                data3 = batch[6].float()
+                x     = utils.normalize_data(opt, dtype, data1)
+                x_pos = utils.normalize_data(opt, dtype, data2)
+                x_neg = utils.normalize_data(opt, dtype, data3)
+                label_A = batch[1]
+                label_D = batch[2]
+                label = batch[3].cuda()
+                mask = batch[4].cuda()
+                # print("Label and masks", label_A.shape, label_D.shape, label.shape, mask.shape)
+                x = torch.stack(x, dim=1).cuda()
+                x_pos = torch.stack(x_pos, dim=1).cuda()
+                x_neg = torch.stack(x_neg, dim=1).cuda()
+                # print("Pos and neg", x.size(), x_pos.size(), x_neg.size())
+                x = [x, x_pos, x_neg]  # list
             else:
-                print('non')
-                # data = batch[0].float()
-                # x = utils.normalize_data(opt, dtype, data)
-                # label_A = batch[1]
-                # label_D = batch[2]
-                # label = batch[3].cuda()
-                # mask = batch[4].cuda()
-                # x = torch.stack(x, dim=1).cuda()
+                data = batch[0].float()
+                x = utils.normalize_data(opt, dtype, data)
+                label_A = batch[1]
+                label_D = batch[2]
+                label = batch[3].cuda()
+                mask = batch[4].cuda()
+                x = torch.stack(x, dim=1).cuda()
 
-    #         # if opt.weight_GT_cls:
-    #         mse, kld_f, kld_z, ot_z, triple_loss, m_area_loss, m_dir_loss, mi_loss, cls_loss = train(x, label_A, label_D, label, mask, ds_vae, classifier, optimizer, optimizer_cls, opt)
-    #         # else:
-    #         #     mse, kld_f, kld_z, ot_z, triple_loss, m_area_loss, m_dir_loss, cls_loss= train(x, None, None, label, mask,
-    #         #                                                                           ds_vae, None, optimizer, None, opt)
-    #         # mse, kld_f, kld_z, ot_z, triple_loss, m_area_loss, m_dir_loss =
-    #         # output[0], output[1], output[2], output[3], output[4], output[5]
-    #         # ce_loss = output[3] if len(output)>=3 else torch.Tensor([0])
+            mse, kld_f, kld_z, ot_z, triple_loss, m_area_loss, m_dir_loss, mi_loss, cls_loss = train(x, label_A, label_D, label, mask, ds_vae, classifier, optimizer, optimizer_cls, opt)
+            epoch_mse += mse
+            epoch_kld_f += kld_f
+            epoch_kld_z += kld_z
+            epoch_ot_z += ot_z
+            epoch_m_area_loss += m_area_loss
+            epoch_m_dir_loss += m_dir_loss
+            epoch_triple_loss += triple_loss
+            epoch_MI_loss += mi_loss
+            epoch_cls_loss += cls_loss
 
-    #         epoch_mse += mse
-    #         epoch_kld_f += kld_f
-    #         epoch_kld_z += kld_z
-    #         epoch_ot_z += ot_z
-    #         epoch_m_area_loss += m_area_loss
-    #         epoch_m_dir_loss += m_dir_loss
-    #         epoch_triple_loss += triple_loss
-    #         epoch_MI_loss += mi_loss
-    #         epoch_cls_loss += cls_loss
-    #         if i%100 == 0 and i:
-    #             print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f' % (
-    #             epoch, mse.item(), kld_f.item(), kld_z.item(), ot_z.item(), m_area_loss.item(), m_dir_loss.item(), triple_loss.item(), mi_loss.item(),
-    #             cls_loss.item()), log)
-    #     progress.finish()
-    #     utils.clear_progressbar()
-    #     print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f (%d)' %
-    #                                                                             (epoch, epoch_mse/epoch_size,
-    #                                                                             epoch_kld_f/epoch_size,
-    #                                                                             epoch_kld_z/epoch_size,
-    #                                                                             epoch_ot_z/epoch_size,
-    #                                                                             epoch_m_area_loss / epoch_size,
-    #                                                                             epoch_m_dir_loss / epoch_size,
-    #                                                                             epoch_triple_loss / epoch_size,
-    #                                                                             epoch_MI_loss / epoch_size,
-    #                                                                             epoch_cls_loss / epoch_size,
-    #                                                                             epoch*epoch_size*opt.batch_size), log)
+            if i%100 == 0 and i:
+                print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f' % (
+                epoch, mse.item(), kld_f.item(), kld_z.item(), ot_z.item(), m_area_loss.item(), m_dir_loss.item(), triple_loss.item(), mi_loss.item(),
+                cls_loss.item()), log)
+        
+        print("Time for epoch", epoch, ":", time.time() - start, "s")
+        progress.finish()
+        utils.clear_progressbar()
+        print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f (%d)' %
+                                                                                (epoch, epoch_mse/epoch_size,
+                                                                                epoch_kld_f/epoch_size,
+                                                                                epoch_kld_z/epoch_size,
+                                                                                epoch_ot_z/epoch_size,
+                                                                                epoch_m_area_loss / epoch_size,
+                                                                                epoch_m_dir_loss / epoch_size,
+                                                                                epoch_triple_loss / epoch_size,
+                                                                                epoch_MI_loss / epoch_size,
+                                                                                epoch_cls_loss / epoch_size,
+                                                                                epoch*epoch_size*opt.batch_size), log)
+        # plot some stuff
+        ds_vae.eval()
+        # save the model
+        net2save = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
+        torch.save({
+            'ds_vae': net2save},
+            '%s/model.pth' % opt.log_dir)
 
-    #     # plot some stuff
-    #     ds_vae.eval()
-    #     # save the model
-    #     net2save = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
-    #     torch.save({
-    #         'ds_vae': net2save},
-    #         '%s/model.pth' % opt.log_dir)
+        x, label, mask, index = next(testing_batch_generator)
+        x = torch.stack(x[:15], dim=1).cuda()
 
+        net2test = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
+        plot_rec_new(x, epoch, opt, net2test)
+        plot_rec_exchange(x, epoch, opt, net2test)
 
-    #     x, label, mask, index = next(testing_batch_generator)
-    #     x = torch.stack(x[:15], dim=1).cuda()
-    #     # plot(x, epoch)
+        plot_rec_fixed_motion(x, epoch, opt, net2test)
+        plot_rec_fixed_content(x, epoch, opt, net2test)
+        plot_rec_generating(x, epoch, opt, net2test)
 
-    #     net2test = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
-    #     plot_rec_new(x, epoch, opt, net2test)
-    #     plot_rec_exchange(x, epoch, opt, net2test)
-    #     # if epoch == 7:#0 #7 #18
-    #     #plot_rec_exchange_paper(x, epoch, opt, net2test, 4)
-
-    #     plot_rec_fixed_motion(x, epoch, opt, net2test)
-    #     plot_rec_fixed_content(x, epoch, opt, net2test)
-    #     # if epoch == 30:
-    #     plot_rec_generating(x, epoch, opt, net2test)
-    #         # plot_rec_generating_paper(x, epoch, opt, net2test)
-
-    #     # if epoch == 4:
-    #     #     plot_rec_generating2_paper(x, epoch, opt, net2test)
-
-    #     if epoch % 10 == 0:
-    #         print('log dir: %s' % opt.log_dir)
+        print('log dir: %s' % opt.log_dir)
+        print()
 
 def print_log(print_string, log=None):
   print("{}".format(print_string))

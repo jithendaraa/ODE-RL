@@ -1,0 +1,6 @@
+*.pkl
+*.npy
+saved_model/
+logs/
+data/
+*__pycache__

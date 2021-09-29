@@ -54,24 +54,6 @@ def load_dataset(opt):
         test_data  = MovingMNIST_Fixed_Cls(data=opt.test_data,  GT_label = opt.test_digit)
 
 
-
-  # elif opt.dataset == 'smmnist_triplet':
-  #     from data.moving_mnist import MovingMNIST_Triplet
-  #     train_data = MovingMNIST_Triplet(
-  #             train=True,
-  #             data_root=opt.data_root,
-  #             seq_len=opt.n_past+opt.n_future,
-  #             image_size=opt.image_width,
-  #             deterministic=False,
-  #             num_digits=opt.num_digits)
-  #     test_data = MovingMNIST_Triplet(
-  #             train=False,
-  #             data_root=opt.data_root,
-  #             seq_len=opt.n_eval,
-  #             image_size=opt.image_width,
-  #             deterministic=False,
-  #             num_digits=opt.num_digits)
-
     elif opt.dataset == 'Sprite':
         from data.sprite import Sprite
         from load_sprites import sprites_act
@@ -88,10 +70,11 @@ def load_dataset(opt):
         D_train = np.argmax(D_train, axis=1)
         D_test = np.argmax(D_test, axis=1)
 
-
         import pickle
         # pickle.dump({'train': X_train, 'test': X_test}, open('sprite_data.pkl', 'wb'))
         OF_label = pickle.load(open('dataset/dsprite_train_OF_Label_3block.pkl', 'rb'))
+        print("OF_Label", OF_label.shape)
+
         dummy = np.ones((OF_label.shape[0], 1, OF_label.shape[2])) * (-1)
         opt.train_OF_label = np.concatenate((dummy, OF_label), axis=1)
         opt.train_OF_mask = opt.train_OF_label != -1
@@ -126,31 +109,7 @@ def load_dataset(opt):
 
         test_data  = MUG(train=True, data = X_train, GT_label = X_content, # content groundtruth
                             OF_label = opt.train_OF_label, mask = opt.train_OF_mask, triple = opt.weight_triple)
-    # elif opt.dataset == 'bair':
-    #     from data.bair import RobotPush
-    #     train_data = RobotPush(
-    #             data_root=opt.data_root,
-    #             train=True,
-    #             seq_len=opt.n_past+opt.n_future,
-    #             image_size=opt.image_width)
-    #     test_data = RobotPush(
-    #             data_root=opt.data_root,
-    #             train=False,
-    #             seq_len=opt.n_eval,
-    #             image_size=opt.image_width)
-    # elif opt.dataset == 'kth':
-    #     from data.kth import KTH
-    #     train_data = KTH(
-    #             train=True,
-    #             data_root=opt.data_root,
-    #             seq_len=opt.n_past+opt.n_future,
-    #             image_size=opt.image_width)
-    #     test_data = KTH(
-    #             train=False,
-    #             data_root=opt.data_root,
-    #             seq_len=opt.n_eval,
-    #             image_size=opt.image_width)
-    
+
     return train_data, test_data
 
 def sequence_input(seq, dtype):
