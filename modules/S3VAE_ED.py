@@ -295,20 +295,37 @@ class Decoder(nn.Module):
         return self.layers(inputs)
 
 class DFP(nn.Module):
-    def __init__(self, z_size=128, grids=9):
+    def __init__(self, opt, z_size=128, grids=9):
         super(DFP, self).__init__()
-        self.main_net = nn.Sequential(
-            nn.Linear(in_features=z_size, out_features=z_size),
-            nn.Linear(in_features=z_size, out_features=z_size),
-            nn.Linear(in_features=z_size, out_features=grids),
-        )
-        print("INIT DFP model")
+        self.opt = opt
 
+        if self.opt.encoder in ['default']:
+            self.main_net = nn.Sequential(
+                nn.Linear(in_features=z_size, out_features=z_size),
+                nn.Linear(in_features=z_size, out_features=z_size),
+                nn.Linear(in_features=z_size, out_features=grids),
+            )
+        elif self.opt.encoder in ['cgru_sa', 'cgru']:
+            self.conv_net = nn.Sequential(
+                nn.Conv2d(32, 64, 3, 2, 1),
+                nn.Conv2d(64, 64, 3, 2, 1),
+                nn.Conv2d(64, 64, 3, 2, 1)
+            )
+            self.lin_net = nn.Sequential(
+                nn.Linear(64, 32),
+                nn.Linear(32, 9)
+            )
 
     def forward(self, x):
-        b, t, f = x.size()
+        if len(x.size()) == 5:
+            b, t, c, h, w = x.size()
+            x = x[:, 1:, :, :, :].reshape(-1, c, h, w)
+            res = self.conv_net(x).squeeze(-1).squeeze(-1).view(b, t-1, -1)
+            res = F.sigmoid(self.lin_net(res))
+        else:
+            res = F.sigmoid(self.main_net(x[:, 1:, :]))
+        
         # motion mag labels are t-1 labels for t frames. So ignore first element of time dimension during DFP 
-        res = F.sigmoid(self.main_net(x[:, 1:, :]))
         return res
         
         

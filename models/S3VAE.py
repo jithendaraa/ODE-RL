@@ -50,7 +50,7 @@ class S3VAE(nn.Module):
         self._triplet_loss_sc = nn.TripletMarginLoss(margin=opt.m)
         
         # For DFP Loss
-        self.dfp_net = DFP(z_size=d_zt).to(device)
+        self.dfp_net = DFP(opt, z_size=d_zt).to(device)
 
         # Encoder, dynamics and Decoder networks
         self.conv_encoder = Encoder(in_ch, opt.encoder).to(device)
@@ -95,10 +95,17 @@ class S3VAE(nn.Module):
             shuffled_encoded_inputs = shuffled_encoded_inputs.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
             another_encoded_tensor = another_encoded_tensor.view(b, t, c_, h_, w_).permute(1, 0, 2, 3, 4)
             
+            if self.opt.k_stat != -1:   
+                t = self.opt.k_stat
+                in_anch, in_pos, in_neg = encoded_inputs[:self.opt.k_stat, :], shuffled_encoded_inputs[:self.opt.k_stat, :], another_encoded_tensor[:self.opt.k_stat, :]
+
+            else:
+                in_anch, in_pos, in_neg = encoded_inputs, shuffled_encoded_inputs, another_encoded_tensor
+
             # Get posterior mu and std of static latent variable zf of channels dim d_zf
-            mu_zf, std_zf = self.static_rnn(encoded_inputs, t)
-            zf_pos_mu, zf_pos_std = self.static_rnn(shuffled_encoded_inputs, t)
-            zf_neg_mu, zf_neg_std = self.static_rnn(another_encoded_tensor, t)
+            mu_zf, std_zf = self.static_rnn(in_anch, t)
+            zf_pos_mu, zf_pos_std = self.static_rnn(in_pos, t)
+            zf_neg_mu, zf_neg_std = self.static_rnn(in_neg, t)
 
             # Pass the static representations through slots and get object-centric representations
             if self.opt.slot_att is True and self.opt.encoder in ['cgru_sa']:
@@ -283,7 +290,6 @@ class S3VAE(nn.Module):
             # 4. MI Loss
             self.get_mi_loss()  
 
-        # print("[End of forward: S3VAE]")
         return x_hat
 
     def get_prediction(self, inputs, batch_dict=None):
@@ -351,9 +357,11 @@ class S3VAE(nn.Module):
         self.scc_loss = self._triplet_loss(zf_sample, zf_pos_sample, zf_neg_sample)
 
     def get_dfp_loss(self, zt):
-        pred_area = self.dfp_net(zt)
         motion_mag_label = self.in_flow_labels.float()
+        
+        pred_area = self.dfp_net(zt)
         self.dfp_loss = F.binary_cross_entropy(torch.sigmoid(pred_area), motion_mag_label)
+        
         return
 
 
