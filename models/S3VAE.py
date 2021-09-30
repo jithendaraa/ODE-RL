@@ -144,7 +144,7 @@ class S3VAE(nn.Module):
             mu_zt, logvar_zt = self.dynamic_rnn(encoded_inputs, self.out_seq)  # Get posterior mu and std of dynamic latent variables z1....zt each of channel dim d_zt
             std_zt = torch.exp(0.5 * logvar_zt) 
             mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
-            prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt.permute(1, 0, 2, 3, 4), self.out_seq)  # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
+            prior_mu_zt, prior_logvar_zt = self.prior_rnn(mu_std_zt.permute(1, 0, 2, 3, 4), self.out_seq)  # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
 
         elif self.opt.encoder in ['default']:
             bt, num_features = encoded_inputs.size()[0], encoded_inputs.size()[1]
@@ -152,8 +152,9 @@ class S3VAE(nn.Module):
             mu_zt, logvar_zt = self.dynamic_rnn(encoded_inputs.view(b, t, num_features), self.out_seq)
             std_zt = torch.exp(0.5 * logvar_zt) 
             mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
-            prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt)   # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
+            prior_mu_zt, prior_logvar_zt = self.prior_rnn(mu_std_zt)   # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
 
+        prior_std_zt = torch.exp(0.5 * prior_logvar_zt)
         return mu_zt, std_zt, prior_mu_zt, prior_std_zt
 
     def visualize_latent_dims(self, mu, std, sampled_z, type='static'):
@@ -324,8 +325,6 @@ class S3VAE(nn.Module):
             x = self.ground_truth
         
         # 1. Reconstruction loss: p(xt | zf, zt)
-        scale = torch.exp(self.log_scale)
-        log_pxz = dist.Normal(x_hat, scale).log_prob(x)
         recon_loss = F.mse_loss(x_hat, x, reduction='sum')   
 
         # 2. KL for static latent variable zf
@@ -344,6 +343,7 @@ class S3VAE(nn.Module):
         self.total_kl_loss = kl_loss.mean()
         self.zf_KL_div_loss = zf_KL_div_loss.mean()
         self.zt_KL_div_loss = zt_KL_div_loss.mean()
+        print("Static and Dynamic KL Loss:", self.zf_KL_div_loss.item(), self.zt_KL_div_loss.item())
 
     def get_scc_loss(self, zf_pos, zf_neg):
         # zf equivalent to self.q_zf_xT -- time-invariant representation from real data
