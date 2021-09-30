@@ -206,7 +206,6 @@ class S3VAE(nn.Module):
     def forward(self, inputs):
         b, t, c, h, w = inputs.size()
         assert t == self.in_seq
-
         self.set_zero_losses()
 
         # Conv Encoding
@@ -328,11 +327,19 @@ class S3VAE(nn.Module):
         recon_loss = F.mse_loss(x_hat, x, reduction='sum')   
 
         # 2. KL for static latent variable zf
-        zf_KL_div_loss = self.kl_divergence(self.p_zf, self.q_zf_xT, zf)
-        # 3. Sum KL across time dimension for dynamic latent variable zt
-        zt_KL_div_loss = self.kl_divergence(self.p_zt, self.q_zt_xt, zt).sum(dim=(1))
+        q_zf_mean, q_zf_std = self.q_zf_xT.loc, self.q_zf_xT.scale
+        q_zf_logvar = 2 * torch.log(q_zf_std)
+        zf_KL_div_loss = -0.5 * torch.sum(1 + q_zf_logvar - torch.pow(q_zf_mean,2) - torch.exp(q_zf_logvar)) / self.opt.batch_size
+
+        # 3. KL for dynamic latent variable zt
+        z_prior_mean, z_prior_std = self.p_zt.loc, self.p_zt.scale
+        z_post_mean, z_post_std = self.q_zt_xt.loc, self.q_zt_xt.scale
+        z_prior_logvar, z_post_logvar = 2 * torch.log(z_prior_std), 2 * torch.log(z_post_std)
+        z_prior_var, z_post_var = torch.exp(z_prior_logvar), torch.exp(z_post_logvar)
+        zt_KL_div_loss = 0.5 * torch.sum(z_prior_logvar - z_post_logvar + ((z_post_var + torch.pow(z_post_mean - z_prior_mean, 2)) / z_prior_var) - 1) / self.opt.batch_size
         
         if self.opt.encoder in ['cgru_sa']:
+            # TODO: check this
             zf_KL_div_loss = zf_KL_div_loss.mean(dim=1)
 
         kl_loss = zf_KL_div_loss + zt_KL_div_loss
@@ -341,9 +348,9 @@ class S3VAE(nn.Module):
         self.vae_loss = (recon_loss + kl_loss).mean()
         self.recon_loss = recon_loss
         self.total_kl_loss = kl_loss.mean()
-        self.zf_KL_div_loss = zf_KL_div_loss.mean()
-        self.zt_KL_div_loss = zt_KL_div_loss.mean()
-        print("Static and Dynamic KL Loss:", self.zf_KL_div_loss.item(), self.zt_KL_div_loss.item())
+        self.zf_KL_div_loss = zf_KL_div_loss
+        self.zt_KL_div_loss = zt_KL_div_loss
+        
 
     def get_scc_loss(self, zf_pos, zf_neg):
         # zf equivalent to self.q_zf_xT -- time-invariant representation from real data
@@ -423,7 +430,6 @@ class S3VAE(nn.Module):
             self.mi_loss = F.relu(H_ft - H_f - H_t).mean()
         
     def get_loss(self):
-        # TODO: add self.opt.l2 * self.dfp_loss after adding DFP and uncomment DFP Loss in loss_dict below
         loss = self.vae_loss + (self.opt.l1 * self.scc_loss) + (self.opt.l2 * self.dfp_loss) + (self.opt.l3 * self.mi_loss)
 
         loss_dict = {
@@ -437,7 +443,7 @@ class S3VAE(nn.Module):
             'DFP Loss': self.dfp_loss.item(),
             'MI Loss': self.mi_loss.item()
         }
-        print("VAE Loss:", loss_dict['VAE Loss'], "|", 'Reconstruction Loss:', loss_dict['Reconstruction Loss'], "| SCC Loss:", loss_dict['SCC Loss'], "| MI Loss:", loss_dict['MI Loss'])
+        print("VAE Loss:", loss_dict['VAE Loss'], "|", 'Reconstruction Loss:', loss_dict['Reconstruction Loss'], "| Static KL", loss_dict['Static Latent KL Loss'], "|Dynamic KL", loss_dict['Dynamic Latent KL Loss'], "| SCC Loss:", loss_dict['SCC Loss'], "| DFP Loss:", loss_dict['DFP Loss'] ,"| MI Loss:", loss_dict['MI Loss'])
         return loss, loss_dict
 
 def unstack_and_split(x, batch_size, num_channels=3):

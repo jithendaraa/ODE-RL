@@ -46,7 +46,7 @@ defaults:
   rundir: 'runs'
   user_dir: "/home/jithen"            
   storage_dir: "scratch"
-  data_dir: "datasets/MovingMNIST_video/train"    # user_dir/storage_dir/data_dir
+  data_dir: "datasets/MovingMNIST_video"    # user_dir/storage_dir/data_dir
   model_params_logdir: "model_params"             # has the form logs/<model_name>/model_params/<id>_00000xxxxx.pickle
   
   # Save & logs frequencies
@@ -229,7 +229,7 @@ train_mmnist_recon_s3vae_def:
   # python main.py --config defaults train_mmnist_recon_s3vae_def experimental
   id: 'recon_s3vae_def_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vae_def'
-  lr: 5e-4
+  lr: 1e-3
   model: 'S3VAE' 
   reconstruct: True
   train_seq: 40
@@ -239,9 +239,10 @@ train_mmnist_recon_s3vae_def:
   d_zt: 32
   encoder: 'default'
   rundir: 'runs/S3VAE'
-  epochs: 25
+  epochs: 1
   clip: -1
-  k_stat: 5
+  k_stat: -1
+  data_points: 10000
 
 test_mmnist_recon_s3vae_def:
   id: 'recon_s3vae_def_mmnist_test'
