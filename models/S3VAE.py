@@ -322,7 +322,7 @@ class S3VAE(nn.Module):
         # 1. Reconstruction loss: p(xt | zf, zt)
         scale = torch.exp(self.log_scale)
         log_pxz = dist.Normal(x_hat, scale).log_prob(x)
-        recon_loss = log_pxz.sum(dim=(1,2,3,4))   # sum over t = 1..T log p(xt| zf, zt)  {dim 1 sum over time, dims 2,3,4 sum over c,h,w}
+        recon_loss = F.mse_loss(x_hat, x, reduction='sum')   
 
         # 2. KL for static latent variable zf
         zf_KL_div_loss = self.kl_divergence(self.p_zf, self.q_zf_xT, zf)
@@ -335,8 +335,8 @@ class S3VAE(nn.Module):
         kl_loss = zf_KL_div_loss + zt_KL_div_loss
 
         # ELBO Loss
-        self.vae_loss = (- recon_loss + kl_loss).mean()
-        self.recon_loss = - recon_loss.mean()
+        self.vae_loss = (recon_loss + kl_loss).mean()
+        self.recon_loss = recon_loss
         self.total_kl_loss = kl_loss.mean()
         self.zf_KL_div_loss = zf_KL_div_loss.mean()
         self.zt_KL_div_loss = zt_KL_div_loss.mean()
