@@ -1,3 +1,6 @@
+import sys
+from train_DS_VAE_sprite import train
+sys.path.append('..')
 import math
 import torch
 import socket
@@ -15,6 +18,8 @@ from skimage.measure import compare_ssim as ssim_metric
 from scipy import signal
 from scipy import ndimage
 from PIL import Image, ImageDraw
+
+from dataloader import *
 
 
 from torchvision import datasets, transforms
@@ -53,6 +58,12 @@ def load_dataset(opt):
         train_data = MovingMNIST_Fixed_Cls(data=opt.train_data, GT_label = opt.train_digit)
         test_data  = MovingMNIST_Fixed_Cls(data=opt.test_data,  GT_label = opt.test_digit)
 
+    elif opt.dataset == 'mmnist':
+        print("LOading MMNIST data")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        loader_objs = parse_datasets(opt, device)
+        train_data, test_data = loader_objs['train_dataloader'], loader_objs['test_dataloader']
+        return loader_objs
 
     elif opt.dataset == 'Sprite':
         from data.sprite import Sprite
@@ -111,6 +122,35 @@ def load_dataset(opt):
                             OF_label = opt.train_OF_label, mask = opt.train_OF_mask, triple = opt.weight_triple)
 
     return train_data, test_data
+
+def get_data(batch, opt):
+    if opt.dataset in ['mmnist']:
+        x = batch['observed_data']
+        b, t, c, h, w = x.size()
+        shuffle_idx = torch.randperm(t)
+        x_pos = x[:, shuffle_idx, :, :, :]
+        x_neg = x[torch.randperm(b)]
+        mask = batch['in_flow_labels']
+        return x, x_pos, x_neg, None, None, None, mask
+
+    else:
+        data1 = batch[0].float()
+        label_A = batch[1]
+        label_D = batch[2]
+        label = batch[3].cuda()
+        mask = batch[4].cuda()
+        data2 = batch[5].float()
+        data3 = batch[6].float()
+
+        x     = normalize_data(opt, torch.cuda.FloatTensor, data1)
+        x_pos = normalize_data(opt, torch.cuda.FloatTensor, data2)
+        x_neg = normalize_data(opt, torch.cuda.FloatTensor, data3)
+        x = torch.stack(x, dim=1).cuda()
+        x_pos = torch.stack(x_pos, dim=1).cuda()
+        x_neg = torch.stack(x_neg, dim=1).cuda()
+
+        return x, x_pos, x_neg, label_A, label_D, label, mask
+
 
 def sequence_input(seq, dtype):
     return [Variable(x.type(dtype)) for x in seq]

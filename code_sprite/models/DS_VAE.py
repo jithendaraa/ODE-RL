@@ -610,13 +610,6 @@ class DisentangledVAE_ICLR(nn.Module):
         self.z_mean = nn.Linear(self.hidden_dim, self.f_dim + self.z_dim )
         self.z_logvar = nn.Linear(self.hidden_dim, self.f_dim + self.z_dim)
 
-        # nine block, label range (0,7)
-        # self.z_motion_predictor = [nn.Sequential(OrderedDict([
-        #     ('fc1', nn.Linear(self.z_dim, self.z_dim * 2)),
-        #     ('relu', nn.LeakyReLU(0.2)),
-        #     ('fc2', nn.Linear(self.z_dim * 2, 8)),
-        # ])).cuda() for i in range(9)]
-
         self.z_motion_predictor0 = nn.Sequential(OrderedDict([
             ('fc1', nn.Linear(self.z_dim, self.z_dim * 2)),
             ('relu', nn.LeakyReLU(0.2)),
@@ -990,6 +983,7 @@ class DisentangledVAE_ICLR_V1(nn.Module):
         self.hidden_dim = opt.rnn_size
         self.f_rnn_layers = opt.f_rnn_layers
         self.frames = opt.frames
+        self.opt = opt
 
         # Frame encoder and decoder
         self.encoder = endecoder_model.encoder(self.g_dim, self.channels)
@@ -1020,20 +1014,22 @@ class DisentangledVAE_ICLR_V1(nn.Module):
             ('relu', nn.LeakyReLU(0.2)),
             ('fc2', nn.Linear(self.z_dim * 2, 9)),
         ]))
+
         # 8 direction bins
-        self.z_motion_predictor0 = nn.Sequential(OrderedDict([
-            ('fc1', nn.Linear(self.z_dim, self.z_dim * 2)),
-            ('relu', nn.LeakyReLU(0.2)),
-            ('fc2', nn.Linear(self.z_dim * 2, 8)),
-            ]))
-        self.z_motion_predictor1 = copy.deepcopy(self.z_motion_predictor0)
-        self.z_motion_predictor2 = copy.deepcopy(self.z_motion_predictor0)
-        self.z_motion_predictor3 = copy.deepcopy(self.z_motion_predictor0)
-        self.z_motion_predictor4 = copy.deepcopy(self.z_motion_predictor0)
-        self.z_motion_predictor5 = copy.deepcopy(self.z_motion_predictor0)
-        self.z_motion_predictor6 = copy.deepcopy(self.z_motion_predictor0)
-        self.z_motion_predictor7 = copy.deepcopy(self.z_motion_predictor0)
-        self.z_motion_predictor8 = copy.deepcopy(self.z_motion_predictor0)
+        if self.opt.dataset not in ['mmnist']:
+            self.z_motion_predictor0 = nn.Sequential(OrderedDict([
+                ('fc1', nn.Linear(self.z_dim, self.z_dim * 2)),
+                ('relu', nn.LeakyReLU(0.2)),
+                ('fc2', nn.Linear(self.z_dim * 2, 8)),
+                ]))
+            self.z_motion_predictor1 = copy.deepcopy(self.z_motion_predictor0)
+            self.z_motion_predictor2 = copy.deepcopy(self.z_motion_predictor0)
+            self.z_motion_predictor3 = copy.deepcopy(self.z_motion_predictor0)
+            self.z_motion_predictor4 = copy.deepcopy(self.z_motion_predictor0)
+            self.z_motion_predictor5 = copy.deepcopy(self.z_motion_predictor0)
+            self.z_motion_predictor6 = copy.deepcopy(self.z_motion_predictor0)
+            self.z_motion_predictor7 = copy.deepcopy(self.z_motion_predictor0)
+            self.z_motion_predictor8 = copy.deepcopy(self.z_motion_predictor0)
 
     def encode_and_sample_post(self, x):
         if isinstance(x, list):
@@ -1044,6 +1040,7 @@ class DisentangledVAE_ICLR_V1(nn.Module):
         # pass the bidirectional lstm
         lstm_out, _ = self.z_lstm(conv_x)
 
+        # print("DONE")
         # for i in range(len(x)):
         #     val = x[i]
         #     print("x"+str(i), val.size())
@@ -1061,10 +1058,12 @@ class DisentangledVAE_ICLR_V1(nn.Module):
 
         f_mean = self.f_mean(lstm_out_f)
         # print("f_mean", f_mean.size())
+
         f_logvar = self.f_logvar(lstm_out_f)
         # print("f_logvar", f_logvar.size())
+
         f_post = self.reparameterize(f_mean, f_logvar, random_sampling=True)
-        # print("f_post", f_post.size())
+        # print("Static zf", f_post.size())
 
         # pass to one direction rnn
         features, _ = self.z_rnn(lstm_out)
@@ -1073,8 +1072,9 @@ class DisentangledVAE_ICLR_V1(nn.Module):
         # print("z_mean", z_mean.size())
         z_logvar = self.z_logvar(features)
         # print("z_logvar", z_logvar.size())
+
         z_post = self.reparameterize(z_mean, z_logvar, random_sampling=True)
-        # print("z_post" ,z_post.size())
+        # print("Dynamic zt" ,z_post.size())
         # print()
 
         if isinstance(x, list):
@@ -1088,12 +1088,13 @@ class DisentangledVAE_ICLR_V1(nn.Module):
                 lstm_out_f = torch.cat((frontal, backward), dim=1)
                 f_mean = self.f_mean(lstm_out_f)
                 f_mean_list.append(f_mean)
-            f_mean = f_mean_list
+            f_mean = f_mean_list    
 
         # f_mean is list if triple else not
         return f_mean, f_logvar, f_post, z_mean, z_logvar, z_post
 
     def forward(self, x):
+        pred = None
         f_mean, f_logvar, f_post, z_mean_post, z_logvar_post, z_post = self.encode_and_sample_post(x)
         
         # for i in range(len(f_mean)):
@@ -1115,29 +1116,31 @@ class DisentangledVAE_ICLR_V1(nn.Module):
 
         pred_area = self.z_motion_predictor_area(z_flatten)
         # print("pred_area", pred_area.size())
-        pred0 = self.z_motion_predictor0(z_flatten)
-        # print("pred0", pred0.size())
-        pred1 = self.z_motion_predictor1(z_flatten)
-        # print("pred1", pred1.size())
-        pred2 = self.z_motion_predictor2(z_flatten)
-        # print("pred2", pred2.size())
-        pred3 = self.z_motion_predictor3(z_flatten)
-        # print("pred3", pred3.size())
-        pred4 = self.z_motion_predictor4(z_flatten)
-        # print("pred4", pred4.size())
-        pred5 = self.z_motion_predictor5(z_flatten)
-        # print("pred5", pred5.size())
-        pred6 = self.z_motion_predictor6(z_flatten)
-        # print("pred6", pred6.size())
-        pred7 = self.z_motion_predictor7(z_flatten)
-        # print("pred7", pred7.size())
-        pred8 = self.z_motion_predictor8(z_flatten)
-        # print("pred8", pred8.size())
-        # print()
 
-        pred = torch.cat([pred0, pred1, pred2, pred3, pred4, pred5,
+        if self.opt.dataset not in ['mmnist']:
+            pred0 = self.z_motion_predictor0(z_flatten)
+            # print("pred0", pred0.size())
+            pred1 = self.z_motion_predictor1(z_flatten)
+            # print("pred1", pred1.size())
+            pred2 = self.z_motion_predictor2(z_flatten)
+            # print("pred2", pred2.size())
+            pred3 = self.z_motion_predictor3(z_flatten)
+            # print("pred3", pred3.size())
+            pred4 = self.z_motion_predictor4(z_flatten)
+            # print("pred4", pred4.size())
+            pred5 = self.z_motion_predictor5(z_flatten)
+            # print("pred5", pred5.size())
+            pred6 = self.z_motion_predictor6(z_flatten)
+            # print("pred6", pred6.size())
+            pred7 = self.z_motion_predictor7(z_flatten)
+            # print("pred7", pred7.size())
+            pred8 = self.z_motion_predictor8(z_flatten)
+            # print("pred8", pred8.size())
+            # print()
+
+            pred = torch.cat([pred0, pred1, pred2, pred3, pred4, pred5,
                           pred6, pred7, pred8], 0)
-        # print("pred", pred.size())
+            
 
         f_expand = f_post.unsqueeze(1).expand(-1, self.frames, self.f_dim)
         # print("f_expand", f_expand.size())

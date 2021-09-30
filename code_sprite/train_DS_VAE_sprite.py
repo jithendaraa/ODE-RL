@@ -1,3 +1,7 @@
+import sys
+sys.path.append('..')
+
+from helpers.utils import get_data_dict, get_next_batch
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -7,8 +11,8 @@ import json
 import random
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-from utils_plot import plot_rec_new, plot_rec_exchange, plot_rec_fixed_motion, plot_rec_fixed_content, \
-    plot_rec_generating, plot_rec_generating2, plot_rec_exchange_paper, plot_rec_generating_paper, plot_rec_generating2_paper
+# from utils_plot import plot_rec_new, plot_rec_exchange, plot_rec_fixed_motion, plot_rec_fixed_content, \
+#     plot_rec_generating, plot_rec_generating2, plot_rec_exchange_paper, plot_rec_generating_paper, plot_rec_generating2_paper
 import utils
 import itertools
 import progressbar
@@ -16,12 +20,15 @@ import numpy as np
 import torch.nn.functional as F
 import math
 import time
-# from OP import IPOT_distance, cost_matrix
+from models.DS_VAE import DisentangledVAE_ICLR_V1
+import models.dcgan_64 as model
+
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--dataset', default='Sprite', help='dataset to train with(smmnist_fixed, smmnist_triplet, mmnist)')
 parser.add_argument('--lr', default=0.002, type=float, help='learning rate')
 parser.add_argument('--beta1', default=0.9, type=float, help='momentum term for adam')
-parser.add_argument('--batch_size', default=128, type=int, help='batch size')
+parser.add_argument('--batch_size', default=4, type=int, help='batch size')
 parser.add_argument('--log_dir', default='logs/lp', help='base directory to save logs')
 parser.add_argument('--model_dir', default='', help='base directory to save logs')
 parser.add_argument('--name', default='', help='identifier for directory')
@@ -31,8 +38,26 @@ parser.add_argument('--niter', type=int, default=300, help='number of epochs to 
 parser.add_argument('--seed', default=1, type=int, help='manual seed')
 parser.add_argument('--image_width', type=int, default=64, help='the height / width of the input image to network')
 
+# mmnist args
+parser.add_argument('--total_frames', default=2000000, type=int)
+parser.add_argument('--train_test_split', default=0.8, type=float)
+parser.add_argument('--test_seq', default=200, type=int)
+parser.add_argument('--user_dir', default="/home/jithen" , type=str)
+parser.add_argument('--storage_dir', default="scratch", type=str)
+parser.add_argument('--data_dir', default="/home/jithen/scratch/datasets/MovingMNIST_video", type=str)
+parser.add_argument('--train_in_seq', default=20, type=int)
+parser.add_argument('--train_out_seq', default=20, type=int)
+parser.add_argument('--test_in_seq', default=20, type=int)
+parser.add_argument('--test_out_seq', default=180, type=int)
+parser.add_argument('--frozen', default=True, type=bool)
+parser.add_argument('--in_channels', default=1, type=int)
+
+
+
+
+
+
 parser.add_argument('--channels', default=3, type=int)
-parser.add_argument('--dataset', default='Sprite', help='dataset to train with(smmnist_fixed, smmnist_triplet)')
 parser.add_argument('--frames', type=int, default=8, help='number of frames, 8 for sprite, 15 for digits')
 
 parser.add_argument('--rnn_size', type=int, default=256, help='dimensionality of hidden layer')
@@ -74,7 +99,6 @@ def get_batch_fixed(train_loader, dtype):
             batch = utils.normalize_data(opt, dtype, data)
             yield batch, sequence[1], sequence[2], sequence[-1]
 
-
 def logsumexp(value, dim=None, keepdim=False):
     """Numerically stable implementation of the operation
     value.exp().sum(dim, keepdim).log()
@@ -108,6 +132,13 @@ def log_importance_weight_matrix(batch_size, dataset_size):
     W[M-1, 0] = strat_weight
     return W.log()
 
+def print_log(print_string, log=None):
+  print("{}".format(print_string))
+  if log is not None:
+    log = open(log, 'a')
+    log.write('{}\n'.format(print_string))
+    log.close()
+
 #from sinkhorn_OT import SinkhornDistance
 def loss_fn_new(original_seq,recon_seq,f_mean,f_logvar,z_post_mean,z_post_logvar, z_post,
                 z_prior_mean, z_prior_logvar, z_prior, opt):
@@ -122,7 +153,7 @@ def loss_fn_new(original_seq,recon_seq,f_mean,f_logvar,z_post_mean,z_post_logvar
     are given by the LSTM
     """
     batch_size = original_seq.size(0)
-    mse = F.mse_loss(recon_seq,original_seq,reduction='sum')
+    mse = F.mse_loss(recon_seq, original_seq, reduction='sum')
 
     f_mean = f_mean.view((-1, f_mean.shape[-1]))
     f_logvar = f_logvar.view((-1, f_logvar.shape[-1]))
@@ -132,16 +163,6 @@ def loss_fn_new(original_seq,recon_seq,f_mean,f_logvar,z_post_mean,z_post_logvar
     z_prior_var = torch.exp(z_prior_logvar)
     kld_z = 0.5 * torch.sum(z_prior_logvar - z_post_logvar + ((z_post_var + torch.pow(z_post_mean - z_prior_mean, 2)) / z_prior_var) - 1)
     ot_loss = 0
-
-    # if opt.weight_OT != 0:
-    #     sinkhorn = SinkhornDistance(eps=0.1, max_iter=100, x=z_post, y=z_prior).cuda()
-    #     ot_loss, P, C = sinkhorn(z_post, z_prior)
-    #     ot_loss = ot_loss.sum()
-        # n = z_post.shape[1]
-        # m = z_prior.shape[1]
-        # for i in range(batch_size):
-        #     cost = cost_matrix(z_post[i], z_prior[i])
-        #     ot_loss += IPOT_  distance(cost, n, m)
 
     ot_loss = torch.zeros((1)).cuda()
     return {'mse': mse/batch_size, 'kld_f': kld_f/batch_size, 'kld_z': kld_z/batch_size,
@@ -153,10 +174,8 @@ CE_loss = nn.CrossEntropyLoss().cuda()
 
 # --------- training funtions ------------------------------------
 def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimizer_cls, opt):
-
     model.zero_grad()
-    if classifier:
-        classifier.zero_grad()
+    if classifier:  classifier.zero_grad()
 
     f_mean, f_logvar, f, z_post_mean, z_post_logvar,\
     z_post, z_prior_mean, z_prior_logvar, z_prior,\
@@ -178,43 +197,45 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
     ot = loss_dict['ot']
 
     if opt.weight_triple:
-        trp_loss = triplet_loss(f_mean, f_mean_pos, f_mean_neg) * opt.weight_triple
+        trp_loss = triplet_loss(f_mean, f_mean_pos, f_mean_neg) 
     else:
         trp_loss = torch.zeros((1)).cuda() * opt.weight_triple
-
+    
     motion_dir_loss = torch.zeros((1)).cuda()
     motion_area_loss = torch.zeros((1)).cuda()
 
-    # print("Motion weights", opt.weight_motion_dir, opt.weight_motion_area)
-    # print("MI", opt.weight_MI)
+    print("Motion weights", opt.weight_motion_dir, opt.weight_motion_area)
+    print("MI", opt.weight_MI)
     
     if opt.weight_motion_dir or opt.weight_motion_area:
-        # predict the motion direction of each area
-        # print("Label", label.size())
-        label_dir = label.permute(2, 0, 1).flatten()
-        # print("label_dir", label_dir.size(), label.size())
+        if opt.dataset not in ['mmnist']:
+            # predict the motion direction of each area
+            print("Label", label.size())
+            label_dir = label.permute(2, 0, 1).flatten()
+            print("label_dir", label_dir.size(), label.size())
 
-        # print("mask", mask.size())
-        mask_dir = mask.permute(2, 0, 1).flatten()
-        # print("mask_dir", mask_dir.size())
-        
-        pred_dir = pred_dir[mask_dir]
-        label_dir = label_dir[mask_dir]
-        # print(pred_dir.size(), label_dir.size())
+            print("mask", mask.size())
+            mask_dir = mask.permute(2, 0, 1).flatten()
+            print("mask_dir", mask_dir.size())
+            
+            pred_dir = pred_dir[mask_dir]
+            label_dir = label_dir[mask_dir]
+            print(pred_dir.size(), label_dir.size())
 
-        motion_dir_loss = F.cross_entropy(pred_dir, label_dir.long())
-        # print("motion_dir_loss", motion_dir_loss.size(), label_dir[0], pred_dir[0])
+            motion_dir_loss = F.cross_entropy(pred_dir, label_dir.long())
+            print("motion_dir_loss", motion_dir_loss.size(), label_dir[0], pred_dir[0])
 
         # predict which area are moving, remove the first frame(dummy)
-        mask_area = mask[:,1:,:].contiguous().view(-1, mask.shape[2])
-        print("mask_area", mask_area.size())
 
-        pred_area = pred_area.view(mask.shape)[:,1:,:].contiguous().view(-1, mask.shape[2])
-        # print("pred_area", pred_area.size())
-
+        if opt.dataset in ['mmnist']:
+            mask_area = mask.contiguous().view(-1, mask.shape[2]).cuda()
+        else:
+            mask_area = mask[:,1:,:].contiguous().view(-1, mask.shape[2]).cuda()
+        
+        pred_area = pred_area.view(opt.batch_size, -1, 9)[:,1:,:].contiguous().view(-1, mask.shape[2])
+        
         # 3x3 grid
         motion_area_loss = F.binary_cross_entropy(torch.sigmoid(pred_area), mask_area.float())
-        print("motion_area_loss", motion_area_loss.size(), mask_area[0])
 
     # calculate the mutual infomation of f and z
     batch_size, n_frame, z_dim = z_post_mean.size()
@@ -264,8 +285,12 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
 
     # print("weights f z", opt.weight_f, opt.weight_z, opt.weight_motion_area, opt.weight_motion_dir, opt.weight_MI, opt.weight_GT_cls)
     # print("unweighted losses", mse, kld_f, kld_z, trp_loss / opt.weight_triple, motion_area_loss, motion_dir_loss, mi_fz, cls_loss)
+    print("Unweighted losses")
+    print("MSE:", mse.data.cpu(), "| Static KL:", kld_f.data.cpu().numpy(), "| Dynamic KL:", kld_z.data.cpu().numpy(), "| SCC Loss:", trp_loss.data.cpu().numpy(), "| Motion area loss:", motion_area_loss.data.cpu().numpy(), "| Motion dir loss:", motion_dir_loss.data.cpu().numpy(), "MI Loss:", mi_fz.data.cpu().numpy(), "| CLS Loss:", cls_loss.data.cpu().numpy())
+    
     kld_f = kld_f * opt.weight_f
     kld_z = kld_z * opt.weight_z
+    trp_loss = trp_loss * opt.weight_triple
     motion_area_loss = motion_area_loss * opt.weight_motion_area
     motion_dir_loss  = motion_dir_loss * opt.weight_motion_dir
     mi_fz = mi_fz * opt.weight_MI
@@ -278,8 +303,9 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
         optimizer_cls.step()
     ot_data = np.array(ot) if isinstance(ot, float) else ot.data.cpu().numpy()
 
-    
-    print("MSE:", mse.data.cpu(), "| Static KL:", kld_f.data.cpu().numpy(), "| Dynamic KL:", kld_z.data.cpu().numpy(), "| OT:", ot_data, "SCC Loss:", trp_loss.data.cpu().numpy(), "| Motion area loss:", motion_area_loss.data.cpu().numpy(), "| Motion dir loss:", motion_dir_loss.data.cpu().numpy(), "MI Loss:", mi_fz.data.cpu().numpy(), "| CLS Loss:", cls_loss.data.cpu().numpy())
+    print()
+    print("Weighted losses")
+    print("MSE:", mse.data.cpu(), "| Static KL:", kld_f.data.cpu().numpy(), "| Dynamic KL:", kld_z.data.cpu().numpy(), "| OT:", ot_data, "SCC Loss:", trp_loss.data.cpu().numpy(), "| Motion area loss:", motion_area_loss.data.cpu().numpy(), "| Motion dir loss:", motion_dir_loss.data.cpu().numpy(), "MI Loss:", mi_fz.data.cpu().numpy())
     print("Total loss:", loss)
     print()
 
@@ -288,25 +314,47 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
            cls_loss.data.cpu().numpy()
 
 
-def main(opt):
-    if opt.model_dir != '':
-        # load model and continue training from checkpoint
-        saved_model = torch.load('%s/model.pth' % opt.model_dir)
-        optimizer = opt.optimizer
-        model_dir = opt.model_dir
-        # opt = saved_model['opt']
-        opt.optimizer = optimizer
-        opt.model_dir = model_dir
-        opt.log_dir = '%s/continued' % opt.log_dir
+def get_dataloader(train_data, test_data, opt):
+    if opt.dataset in ['mmnist']:
+        return train_data, test_data
     else:
-        name = 'ICLR_V1_%s_model=%s%dx%d-rnn_size=%d-lr=%.4f-g_dim=%d-z_dim=%d' \
+        train_loader = DataLoader(train_data,
+                              num_workers=opt.data_threads,
+                              batch_size=opt.batch_size,
+                              shuffle=True,
+                              drop_last=True,
+                              pin_memory=True)
+    
+        test_loader = DataLoader(test_data,
+                             num_workers=opt.data_threads,
+                             batch_size=opt.batch_size,#8
+                             shuffle=False,
+                             drop_last=True,
+                             pin_memory=True)
+        
+    return train_loader, test_loader
+
+
+def main(opt):
+
+    if opt.dataset in ['mmnist']:
+        opt.channels = 1
+        opt.frames = opt.train_in_seq
+        opt.weight_motion_dir = 0
+        opt.weight_triple = 1000
+        opt.weight_motion_area = 100
+        opt.weight_MI = 1
+    
+    classifier = None
+    optimizer_cls = None
+    name = 'ICLR_V1_%s_model=%s%dx%d-rnn_size=%d-lr=%.4f-g_dim=%d-z_dim=%d' \
                '-weight:kl_f=%.2f-kl_z=%.2f-OT_z=%.2f-triple=%.2f-m_area=%.2f-m_dir=%.2f-mi=%.2f-cls=%.2f-%s' % (
                'triple' if opt.weight_triple else '', opt.model, opt.image_width, opt.image_width, opt.rnn_size,
                opt.lr, opt.g_dim, opt.z_dim, opt.weight_f, opt.weight_z, opt.weight_OT, opt.weight_triple, opt.weight_motion_area,
                opt.weight_motion_dir, opt.weight_MI, opt.weight_GT_cls, opt.name)
 
-        opt.log_dir = '%s/%s/%s' % (opt.log_dir, opt.dataset, name)
-        print("name:", name)
+    opt.log_dir = '%s/%s/%s' % (opt.log_dir, opt.dataset, name)
+    print("name:", name)
 
     log = os.path.join(opt.log_dir, 'log.txt')
     os.makedirs('%s/gen/' % opt.log_dir, exist_ok=True)
@@ -322,37 +370,10 @@ def main(opt):
     print_log(json.dumps(vars(opt), indent=4, separators=(',', ':')), log)
 
     # ---------------- optimizers ----------------
-    if opt.optimizer == 'adam':
-        opt.optimizer = optim.Adam
-    elif opt.optimizer == 'rmsprop':
-        opt.optimizer = optim.RMSprop
-    elif opt.optimizer == 'sgd':
-        opt.optimizer = optim.SGD
-    else:
-        raise ValueError('Unknown optimizer: %s' % opt.optimizer)
-
-    import models.dcgan_64 as model
-
-    from models.DS_VAE import DisentangledVAE_New, DisentangledVAE_New_fixed, DisentangledVAE_New_fixed_Z_notDependonF_PlusLSTM, \
-                DisentangledVAE_ICLR, DisentangledVAE_ICLR_V1, Supervised_Classifier_Sprite
+    opt.optimizer = optim.Adam
 
     ds_vae = DisentangledVAE_ICLR_V1(model, opt)
-
-    if opt.weight_GT_cls:
-        classifier = Supervised_Classifier_Sprite(opt.z_dim, opt.z_dim*2, 9, # action
-                                                  opt.f_dim, opt.f_dim*2, 6, opt.frames) # attributes
-        classifier.apply(utils.init_weights)
-        
-        optimizer_cls = opt.optimizer(classifier.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-
-    else:
-        classifier = None
-        optimizer_cls = None
-
     ds_vae.apply(utils.init_weights)
-
-    if opt.model_dir != '':
-        ds_vae =  saved_model['ds_vae']
 
     optimizer = opt.optimizer(ds_vae.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
@@ -362,27 +383,25 @@ def main(opt):
         ds_vae = nn.DataParallel(ds_vae)
     ds_vae = ds_vae.cuda()
     print_log(ds_vae, log)
+    print("classifier", classifier)
     if classifier:
         classifier = classifier.cuda()
         print_log(classifier, log)
 
     # --------- load a dataset ------------------------------------
-    train_data, test_data = utils.load_dataset(opt)
-    train_loader = DataLoader(train_data,
-                              num_workers=opt.data_threads,
-                              batch_size=opt.batch_size,
-                              shuffle=True,
-                              drop_last=True,
-                              pin_memory=True)
-    opt.dataset_size = len(train_data)
-    test_loader = DataLoader(test_data,
-                             num_workers=opt.data_threads,
-                             batch_size=opt.batch_size,#8
-                             shuffle=False,
-                             drop_last=True,
-                             pin_memory=True)
 
-    testing_batch_generator = get_batch_fixed(test_loader, dtype)
+    if opt.dataset in ['mmnist']: 
+        opt.frames = opt.train_in_seq
+        loader_objs = utils.load_dataset(opt)
+        train_data, test_data = loader_objs['train_dataloader'], loader_objs['test_dataloader']
+        opt.dataset_size = loader_objs['n_train_batches']
+        train_loader, test_loader = get_dataloader(train_data, test_data, opt)
+    else:
+        train_data, test_data = utils.load_dataset(opt)
+        train_loader, test_loader = get_dataloader(train_data, test_data, opt)
+        opt.dataset_size = len(train_loader)
+        
+    # testing_batch_generator = get_batch_fixed(test_loader, dtype)
 
 
     # --------- training loop ------------------------------------
@@ -397,28 +416,19 @@ def main(opt):
         epoch_triple_loss = 0
         epoch_MI_loss = 0
         epoch_cls_loss = 0
-        epoch_size = len(train_loader)
+        epoch_size = opt.dataset_size
         progress = progressbar.ProgressBar(max_value=epoch_size).start()
         start = time.time()
+        print(f'epoch {epoch}')
         
         for i, batch in enumerate(train_loader):
             progress.update(i+1)
+
+            if opt.dataset in ['mmnist']:
+                print(len(batch), batch.keys())
+
             if opt.weight_triple:
-                data1 = batch[0].float()
-                data2 = batch[5].float()
-                data3 = batch[6].float()
-                x     = utils.normalize_data(opt, dtype, data1)
-                x_pos = utils.normalize_data(opt, dtype, data2)
-                x_neg = utils.normalize_data(opt, dtype, data3)
-                label_A = batch[1]
-                label_D = batch[2]
-                label = batch[3].cuda()
-                mask = batch[4].cuda()
-                # print("Label and masks", label_A.shape, label_D.shape, label.shape, mask.shape)
-                x = torch.stack(x, dim=1).cuda()
-                x_pos = torch.stack(x_pos, dim=1).cuda()
-                x_neg = torch.stack(x_neg, dim=1).cuda()
-                # print("Pos and neg", x.size(), x_pos.size(), x_neg.size())
+                x, x_pos, x_neg, label_A, label_D, label, mask = utils.get_data(batch, opt)
                 x = [x, x_pos, x_neg]  # list
             else:
                 data = batch[0].float()
@@ -430,63 +440,58 @@ def main(opt):
                 x = torch.stack(x, dim=1).cuda()
 
             mse, kld_f, kld_z, ot_z, triple_loss, m_area_loss, m_dir_loss, mi_loss, cls_loss = train(x, label_A, label_D, label, mask, ds_vae, classifier, optimizer, optimizer_cls, opt)
-            epoch_mse += mse
-            epoch_kld_f += kld_f
-            epoch_kld_z += kld_z
-            epoch_ot_z += ot_z
-            epoch_m_area_loss += m_area_loss
-            epoch_m_dir_loss += m_dir_loss
-            epoch_triple_loss += triple_loss
-            epoch_MI_loss += mi_loss
-            epoch_cls_loss += cls_loss
+    #         epoch_mse += mse
+    #         epoch_kld_f += kld_f
+    #         epoch_kld_z += kld_z
+    #         epoch_ot_z += ot_z
+    #         epoch_m_area_loss += m_area_loss
+    #         epoch_m_dir_loss += m_dir_loss
+    #         epoch_triple_loss += triple_loss
+    #         epoch_MI_loss += mi_loss
+    #         epoch_cls_loss += cls_loss
 
-            if i%100 == 0 and i:
-                print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f' % (
-                epoch, mse.item(), kld_f.item(), kld_z.item(), ot_z.item(), m_area_loss.item(), m_dir_loss.item(), triple_loss.item(), mi_loss.item(),
-                cls_loss.item()), log)
+    #         if i%100 == 0 and i:
+    #             print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f' % (
+    #             epoch, mse.item(), kld_f.item(), kld_z.item(), ot_z.item(), m_area_loss.item(), m_dir_loss.item(), triple_loss.item(), mi_loss.item(),
+    #             cls_loss.item()), log)
         
-        print("Time for epoch", epoch, ":", time.time() - start, "s")
-        progress.finish()
-        utils.clear_progressbar()
-        print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f (%d)' %
-                                                                                (epoch, epoch_mse/epoch_size,
-                                                                                epoch_kld_f/epoch_size,
-                                                                                epoch_kld_z/epoch_size,
-                                                                                epoch_ot_z/epoch_size,
-                                                                                epoch_m_area_loss / epoch_size,
-                                                                                epoch_m_dir_loss / epoch_size,
-                                                                                epoch_triple_loss / epoch_size,
-                                                                                epoch_MI_loss / epoch_size,
-                                                                                epoch_cls_loss / epoch_size,
-                                                                                epoch*epoch_size*opt.batch_size), log)
-        # plot some stuff
-        ds_vae.eval()
-        # save the model
-        net2save = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
-        torch.save({
-            'ds_vae': net2save},
-            '%s/model.pth' % opt.log_dir)
+    #     print("Time for epoch", epoch, ":", time.time() - start, "s")
+    #     progress.finish()
+    #     utils.clear_progressbar()
+    #     print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f (%d)' %
+    #                                                                             (epoch, epoch_mse/epoch_size,
+    #                                                                             epoch_kld_f/epoch_size,
+    #                                                                             epoch_kld_z/epoch_size,
+    #                                                                             epoch_ot_z/epoch_size,
+    #                                                                             epoch_m_area_loss / epoch_size,
+    #                                                                             epoch_m_dir_loss / epoch_size,
+    #                                                                             epoch_triple_loss / epoch_size,
+    #                                                                             epoch_MI_loss / epoch_size,
+    #                                                                             epoch_cls_loss / epoch_size,
+    #                                                                             epoch*epoch_size*opt.batch_size), log)
+    #     # plot some stuff
+    #     ds_vae.eval()
+    #     # save the model
+    #     net2save = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
+    #     torch.save({
+    #         'ds_vae': net2save},
+    #         '%s/model.pth' % opt.log_dir)
 
-        x, label, mask, index = next(testing_batch_generator)
-        x = torch.stack(x[:15], dim=1).cuda()
+    #     x, label, mask, index = next(testing_batch_generator)
+    #     x = torch.stack(x[:15], dim=1).cuda()
 
-        net2test = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
-        plot_rec_new(x, epoch, opt, net2test)
-        plot_rec_exchange(x, epoch, opt, net2test)
+    #     net2test = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
+    #     plot_rec_new(x, epoch, opt, net2test)
+    #     plot_rec_exchange(x, epoch, opt, net2test)
 
-        plot_rec_fixed_motion(x, epoch, opt, net2test)
-        plot_rec_fixed_content(x, epoch, opt, net2test)
-        plot_rec_generating(x, epoch, opt, net2test)
+    #     plot_rec_fixed_motion(x, epoch, opt, net2test)
+    #     plot_rec_fixed_content(x, epoch, opt, net2test)
+    #     plot_rec_generating(x, epoch, opt, net2test)
 
-        print('log dir: %s' % opt.log_dir)
-        print()
+    #     print('log dir: %s' % opt.log_dir)
+    #     print()
 
-def print_log(print_string, log=None):
-  print("{}".format(print_string))
-  if log is not None:
-    log = open(log, 'a')
-    log.write('{}\n'.format(print_string))
-    log.close()
+
 
 if __name__ == '__main__':
     main(opt)
