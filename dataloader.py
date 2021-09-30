@@ -117,7 +117,6 @@ class MovingMNIST(Dataset):
         video_filename = os.path.join(root, video_filename)
         vidcap = cv2.VideoCapture(video_filename)
         success, image = vidcap.read()
-
         while success is False: 
             print("retrying", count)
             vidcap = cv2.VideoCapture(video_filename)
