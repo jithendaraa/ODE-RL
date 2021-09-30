@@ -324,7 +324,7 @@ class S3VAE(nn.Module):
             x = self.ground_truth
         
         # 1. Reconstruction loss: p(xt | zf, zt)
-        recon_loss = F.mse_loss(x_hat, x, reduction='sum')   
+        recon_loss = F.mse_loss(x_hat, x, reduction='sum') / self.opt.batch_size
 
         # 2. KL for static latent variable zf
         q_zf_mean, q_zf_std = self.q_zf_xT.loc, self.q_zf_xT.scale
@@ -427,7 +427,7 @@ class S3VAE(nn.Module):
             H_ft = (log_q_f + log_q_t - math.log(N * M)).logsumexp(1).mean(1) # t
             # self.mi_loss = -(H_f.mean() + H_t.mean() - H_ft.mean())
         else:
-            self.mi_loss = F.relu(H_ft - H_f - H_t).mean()
+            self.mi_loss = F.relu(- H_ft + H_f + H_t).mean()
         
     def get_loss(self):
         loss = self.vae_loss + (self.opt.l1 * self.scc_loss) + (self.opt.l2 * self.dfp_loss) + (self.opt.l3 * self.mi_loss)
