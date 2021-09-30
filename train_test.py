@@ -20,6 +20,8 @@ def train(opt, model, loader_objs, device, exp_config_dict, writer):
     step = 0
     start_time = time.time()
     
+    optimizer = optim.Adam(model.parameters(), lr=opt.lr)
+    
     # Data loaders
     train_dataloader = loader_objs['train_dataloader']
     n_train_batches = loader_objs['n_train_batches']
@@ -38,7 +40,6 @@ def train(opt, model, loader_objs, device, exp_config_dict, writer):
         wandb.watch(model)
 
     print(f"Logging to {opt.logdir} {n_train_batches}")
-    optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     
     for epoch in range(opt.epochs):
         epoch_loss = 0
@@ -48,7 +49,6 @@ def train(opt, model, loader_objs, device, exp_config_dict, writer):
             pred_gt = torch.cat((pred.detach().cpu(), gt.cpu()), 0).numpy()
             epoch_loss += step_loss
             step += 1
-
             # tboard_log_dict = {}
             # tboard_log_dict = visualize_latent_dims(opt, model, tboard_log_dict)
 

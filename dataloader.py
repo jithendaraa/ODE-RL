@@ -107,12 +107,17 @@ class MovingMNIST(Dataset):
         frames = np.empty((200, 64, 64, self.channels), np.dtype('uint8'))
         count = 0
         video_filename = 'video_' + str(idx+1+self.offset) + '.mp4'
+        if idx+1+self.offset < 8000:
+            root = os.path.join(self.root, 'train')
+        else:
+            root = os.path.join(self.root, 'test')
+
         npy_filename = video_filename[:-4] + '.npy'
 
-        video_filename = os.path.join(self.root, video_filename)
-
+        video_filename = os.path.join(root, video_filename)
         vidcap = cv2.VideoCapture(video_filename)
         success, image = vidcap.read()
+
         while success is False: 
             print("retrying", count)
             vidcap = cv2.VideoCapture(video_filename)
@@ -227,7 +232,6 @@ class MovingMNIST(Dataset):
 
 def parse_datasets(opt, device):
     if opt.dataset == 'mmnist':
-
         total_frames = opt.total_frames # 2M as in clockwork paper
         total_instances = 1e4
         train_instances = int(opt.train_test_split * total_instances)       # 8000

@@ -313,7 +313,7 @@ class DFP(nn.Module):
             )
             self.lin_net = nn.Sequential(
                 nn.Linear(64, 32),
-                nn.Linear(32, 9)
+                nn.Linear(32, grids)
             )
 
     def forward(self, x):
@@ -323,7 +323,7 @@ class DFP(nn.Module):
             res = self.conv_net(x).squeeze(-1).squeeze(-1).view(b, t-1, -1)
             res = F.sigmoid(self.lin_net(res))
         else:
-            res = F.sigmoid(self.main_net(x[:, 1:, :]))
+            res = F.sigmoid(self.main_net(x[:, 1:, :])) 
         
         # motion mag labels are t-1 labels for t frames. So ignore first element of time dimension during DFP 
         return res

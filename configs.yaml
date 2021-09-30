@@ -265,8 +265,8 @@ train_mmnist_recon_s3vaecgru:
   # python main.py --config defaults train_mmnist_recon_s3vaecgru experimental
   id: 'recon_s3vaecgru_mmnist_train'
   ckpt_id: 'train_mmnist_recon_s3vaecgru'
-  lr: 5e-4
-  clip: 2e4
+  lr: 1e-4
+  clip: 3e4
   model: 'S3VAE'
   reconstruct: True
   train_seq: 40
@@ -276,7 +276,8 @@ train_mmnist_recon_s3vaecgru:
   d_zt: 32
   encoder: 'cgru'
   unmasked: True
-  epochs: 35
+  epochs: 25
+  k_stat: -1
 
 test_mmnist_recon_s3vaecgru:
   # python main.py --config defaults flownet_args test_mmnist_recon_s3vaecgru experimental
@@ -351,6 +352,8 @@ train_mmnist_recon_s3vaecgru_sa:
   slot_size: 32
   encoder: 'cgru_sa'
   slot_att: True
+  l2: 1000
+  k_stat: -1
 
 test_mmnist_recon_s3vaecgru_sa:
   # python main.py --config defaults flownet_args test_mmnist_recon_s3vaecgru_sa experimental
@@ -427,6 +430,12 @@ train_mmnist_recon_rimconvs4vae_def_sa:
   encoder: 'cgru_sa' 
   slot_att: True
   rim: True
+
+
+
+
+
+
 
 
 
