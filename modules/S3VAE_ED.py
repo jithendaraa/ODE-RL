@@ -166,7 +166,7 @@ class LSTMEncoder(nn.Module):
             self.lstm_net = nn.LSTM(input_size, hidden_size, num_layers=1, batch_first=True)
         
         self.mean_net = nn.Linear(hidden_size * (1 + int(static)), z_size)
-        self.std_net = nn.Linear(hidden_size * (1 + int(static)), z_size)
+        self.logvar_net = nn.Linear(hidden_size * (1 + int(static)), z_size)
         self.static = static
     
     def forward(self, inputs, seq_len):
@@ -183,12 +183,12 @@ class LSTMEncoder(nn.Module):
         if self.static:
             hidden = torch.cat(hidden, 2).squeeze(0)
             mean = self.mean_net(hidden)
-            std = F.softplus(self.std_net(hidden))
+            logvar = self.logvar_net(hidden)
         else:
             mean = self.mean_net(outs)
-            std = F.softplus(self.std_net(outs))
+            logvar = self.logvar_net(outs)
 
-        return mean, std 
+        return mean, logvar 
 
 class ConvGRUEncoder(nn.Module):
     def __init__(self, in_ch, out_ch, opt, device, resize, type='static'):
@@ -217,7 +217,7 @@ class ConvGRUEncoder(nn.Module):
             nn.Conv2d(out_ch, 128, 3, 1, 1), nn.ReLU(),
             nn.Conv2d(128, out_ch, 3, 1, 1))
 
-        self.std_net = nn.Sequential(
+        self.logvar_net = nn.Sequential(
             nn.Conv2d(out_ch, out_ch, 3, 1, 1), nn.ReLU(),
             nn.Conv2d(out_ch, 128, 3, 1, 1), nn.ReLU(),
             nn.Conv2d(128, out_ch, 3, 1, 1))
@@ -236,7 +236,7 @@ class ConvGRUEncoder(nn.Module):
         
         if self.type == 'static':
             mean = self.mean_net(hidden)
-            std = F.softplus(self.std_net(hidden))
+            logvar = self.logvar_net(hidden)
 
         elif self.type == 'dynamic':
             hiddens, _ = self.dynamic_convgru_cell(None, hidden, seq_len)
@@ -244,12 +244,12 @@ class ConvGRUEncoder(nn.Module):
         if self.type in ['dynamic', 'prior']:
             t, b, c, h, w = hiddens.size()
             mean = self.mean_net(hiddens.view(-1, c, h, w))
-            std = F.softplus(self.std_net(hiddens.view(-1, c, h, w)))
+            logvar = self.logvar_net(hiddens.view(-1, c, h, w))
             _, c, h, w = mean.size()
             mean = mean.view(t, b, c, h, w).permute(1, 0, 2, 3, 4)
-            std = std.view(t, b, c, h, w).permute(1, 0, 2, 3, 4)
+            logvar = logvar.view(t, b, c, h, w).permute(1, 0, 2, 3, 4)
         
-        return mean, std
+        return mean, logvar
 
 class Decoder(nn.Module):
     def __init__(self, in_ch, final_dim, opt):

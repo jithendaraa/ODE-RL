@@ -71,7 +71,7 @@ class S3VAE(nn.Module):
 
         if opt.slot_att is True:
             self.mu_slot_att = SlotAttentionAutoEncoder(opt, resolution=(self.h // resize, self.w // (resize)), num_slots=opt.num_slots, num_iterations=opt.num_iterations, device=device, resize=resize, broadcast=broadcast).to(device)
-            self.std_slot_att = SlotAttentionAutoEncoder(opt, resolution=(self.h // resize, self.w // (resize)), num_slots=opt.num_slots, num_iterations=opt.num_iterations, device=device, resize=resize, std=True, broadcast=broadcast).to(device)
+            self.logvar_slot_att = SlotAttentionAutoEncoder(opt, resolution=(self.h // resize, self.w // (resize)), num_slots=opt.num_slots, num_iterations=opt.num_iterations, device=device, resize=resize, broadcast=broadcast).to(device)
             
             if opt.unmasked is False: ch_ = in_ch + 1
             else: ch_ = in_ch
@@ -103,16 +103,16 @@ class S3VAE(nn.Module):
             else:
                 in_anch, in_pos, in_neg = encoded_inputs, shuffled_encoded_inputs, another_encoded_tensor
 
-            # Get posterior mu and std of static latent variable zf of channels dim d_zf
-            mu_zf, std_zf = self.static_rnn(in_anch, t)
-            zf_pos_mu, zf_pos_std = self.static_rnn(in_pos, t)
-            zf_neg_mu, zf_neg_std = self.static_rnn(in_neg, t)
+            # Get posterior mu and logvar of static latent variable zf of channels dim d_zf
+            mu_zf, logvar_zf = self.static_rnn(in_anch, t)
+            zf_pos_mu, zf_pos_logvar = self.static_rnn(in_pos, t)
+            zf_neg_mu, zf_neg_logvar = self.static_rnn(in_neg, t)
 
             # Pass the static representations through slots and get object-centric representations
             if self.opt.slot_att is True and self.opt.encoder in ['cgru_sa']:
-                mu_zf, std_zf = self.mu_slot_att(mu_zf), self.std_slot_att(std_zf)
-                zf_pos_mu, zf_pos_std = self.mu_slot_att(zf_pos_mu), self.std_slot_att(zf_pos_std)
-                zf_neg_mu, zf_neg_std = self.mu_slot_att(zf_neg_mu), self.std_slot_att(zf_neg_std)
+                mu_zf, logvar_zf = self.mu_slot_att(mu_zf), self.logvar_slot_att(logvar_zf)
+                zf_pos_mu, zf_pos_logvar = self.mu_slot_att(zf_pos_mu), self.logvar_slot_att(zf_pos_logvar)
+                zf_neg_mu, zf_neg_logvar = self.mu_slot_att(zf_neg_mu), self.logvar_slot_att(zf_neg_logvar)
             
         elif self.opt.encoder in ['default']:
             num_features = encoded_inputs.size()[1]
@@ -121,16 +121,18 @@ class S3VAE(nn.Module):
             else:
                 in_anch, in_pos, in_neg = encoded_inputs.view(b, t, num_features)[:, :self.opt.k_stat, :], shuffled_encoded_inputs.view(b, t, num_features)[:, :self.opt.k_stat, :], another_encoded_tensor.view(b, t, num_features)[:, :self.opt.k_stat, :]
             
-            mu_zf, std_zf = self.static_rnn(in_anch)
-            zf_pos_mu, zf_pos_std = self.static_rnn(in_pos)
-            zf_neg_mu, zf_neg_std = self.static_rnn(in_neg)
+            mu_zf, logvar_zf = self.static_rnn(in_anch)
+            zf_pos_mu, zf_pos_logvar = self.static_rnn(in_pos)
+            zf_neg_mu, zf_neg_logvar = self.static_rnn(in_neg)
             
             if self.opt.slot_att is True:
                 # Pass the static representations through slots and hopefully get object-centric representations
-                mu_zf, std_zf = self.mu_slot_att(mu_zf).reshape(b, -1), self.std_slot_att(std_zf).reshape(b, -1)
-                zf_pos_mu, zf_pos_std = self.mu_slot_att(zf_pos_mu), self.std_slot_att(zf_pos_std)
-                zf_neg_mu, zf_neg_std = self.mu_slot_att(zf_neg_mu), self.std_slot_att(zf_neg_std)
-            
+                mu_zf, logvar_zf = self.mu_slot_att(mu_zf).reshape(b, -1), self.logvar_slot_att(logvar_zf).reshape(b, -1)
+                zf_pos_mu, zf_pos_logvar = self.mu_slot_att(zf_pos_mu), self.logvar_slot_att(zf_pos_logvar)
+                zf_neg_mu, zf_neg_logvar = self.mu_slot_att(zf_neg_mu), self.logvar_slot_att(zf_neg_logvar)
+        
+        std_zf, zf_pos_std, zf_neg_std = torch.exp(0.5 * logvar_zf), torch.exp(0.5 * zf_pos_logvar), torch.exp(0.5 * zf_neg_logvar)
+        
         return mu_zf, std_zf, zf_pos_mu, zf_pos_std, zf_neg_mu, zf_neg_std
 
     def get_dynamic_rep(self, encoded_inputs):
@@ -139,14 +141,16 @@ class S3VAE(nn.Module):
         if self.opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:
             bt, c, h, w = encoded_inputs.size()
             encoded_inputs = encoded_inputs.view(b, self.in_seq, c, h, w).permute(1, 0, 2, 3, 4)
-            mu_zt, std_zt = self.dynamic_rnn(encoded_inputs, self.out_seq)  # Get posterior mu and std of dynamic latent variables z1....zt each of channel dim d_zt
+            mu_zt, logvar_zt = self.dynamic_rnn(encoded_inputs, self.out_seq)  # Get posterior mu and std of dynamic latent variables z1....zt each of channel dim d_zt
+            std_zt = torch.exp(0.5 * logvar_zt) 
             mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
             prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt.permute(1, 0, 2, 3, 4), self.out_seq)  # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
 
         elif self.opt.encoder in ['default']:
             bt, num_features = encoded_inputs.size()[0], encoded_inputs.size()[1]
             t = bt // b
-            mu_zt, std_zt = self.dynamic_rnn(encoded_inputs.view(b, t, num_features), self.out_seq)
+            mu_zt, logvar_zt = self.dynamic_rnn(encoded_inputs.view(b, t, num_features), self.out_seq)
+            std_zt = torch.exp(0.5 * logvar_zt) 
             mu_std_zt = torch.cat((mu_zt, std_zt), dim=2)
             prior_mu_zt, prior_std_zt = self.prior_rnn(mu_std_zt)   # Get prior mu and std of dynamic latent variables z1....zt each of dim d_zt
 

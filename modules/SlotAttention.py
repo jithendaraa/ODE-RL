@@ -144,14 +144,13 @@ class SlotAttention(nn.Module):
         return slots
 
 class SlotAttentionAutoEncoder(nn.Module):
-    def __init__(self, opt, resolution=(64,64), num_slots=3, num_iterations=3, device=None, std=False, resize=4, broadcast=False):
+    def __init__(self, opt, resolution=(64,64), num_slots=3, num_iterations=3, device=None, resize=4, broadcast=False):
         super(SlotAttentionAutoEncoder, self).__init__()
         self.opt = opt
         self.device = device
         self.resolution = resolution
         self.encoder_pos = None
         self.cgru = False
-        self.std = std
         self.decoder_initial_size = (8, 8)
         self.broadcast = broadcast
         
@@ -187,9 +186,6 @@ class SlotAttentionAutoEncoder(nn.Module):
         if self.broadcast is True:
             slots = spatial_broadcast(slots, self.decoder_initial_size).permute(0, 3, 1, 2)
 
-        if self.std is True:    
-            slots = F.softplus(slots)
-            
         return slots
 
 
