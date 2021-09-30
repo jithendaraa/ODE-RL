@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch import distributions as dist
 import numpy as np
 import wandb
+import math
 
 from modules.S3VAE_ED import Encoder, GRUEncoder, ConvGRUEncoder, Decoder, DFP
 
@@ -358,14 +359,17 @@ class S3VAE(nn.Module):
 
     def get_dfp_loss(self, zt):
         motion_mag_label = self.in_flow_labels.float()
-        
         pred_area = self.dfp_net(zt)
         self.dfp_loss = F.binary_cross_entropy(torch.sigmoid(pred_area), motion_mag_label)
-        
         return
 
 
     def get_mi_loss(self):
+        M = self.opt.batch_size
+        if self.opt.phase == 'train':
+            N = self.opt.train_test_split * self.opt.data_points    # dataset size
+        else:
+            N = (1 - self.opt.train_test_split) * self.opt.data_points
         # sum t from 1..T H(zf) + H(zt) - H(zf, zt)
         # zf_dist is self.q_zf_xT and zt_dist = self.q_zt_xt
         # H(.) -> -log q(.)
@@ -380,43 +384,39 @@ class S3VAE(nn.Module):
 
         z_t1 = dist_op(self.q_zt_xt, lambda x: x.unsqueeze(1), t=True) # t, 1, b, d_zt / t, 1, b, c, h, w
         z_t2 = dist_op(self.q_zt_xt, lambda x: x.unsqueeze(2), t=True) # t, b, 1, d_zt / t, b, 1, c, h, w
+        z_t2_sample = z_t2.rsample()
+        t, b, _, _ = z_t2_sample.size()
         
         if self.opt.encoder == 'default':
-            log_q_t = z_t1.log_prob(z_t2.rsample()).sum(-1)                             # t, b, b
+            log_q_t = z_t1.log_prob(z_t2_sample)                           # t, b, b, d_zt
         else:
             dims = len(z_t1.loc.size())
-            log_q_t = z_t1.log_prob(z_t2.rsample()).sum(dim=(dims-3, dims-2, dims-1))   # t, b, b
-        
-        H_t = log_q_t.logsumexp(2).mean(1) - np.log(log_q_t.shape[2]) # t
+            log_q_t = z_t1.log_prob(z_t2_sample).sum(dim=(dims-3, dims-2, dims-1))   
         
         z_f1 = dist_op(self.q_zf_xT, lambda x: x.unsqueeze(0)) # 1, b, d_zf / 1, b, c, h, w
         z_f2 = dist_op(self.q_zf_xT, lambda x: x.unsqueeze(1)) # b, 1, d_zf / b, 1, c, h, w
         
         if self.opt.encoder == 'default':
-            log_q_f = z_f1.log_prob(z_f2.rsample()).sum(-1)                             # b, b 
+            log_q_f = z_f1.log_prob(z_f2.rsample()).unsqueeze(0).repeat(t, 1, 1, 1)              # t, b, b, d_zf
         
         elif self.opt.encoder in ['cgru_sa']:
-            dims = len(z_f1.loc.size())
-            log_q_f = z_f1.log_prob(z_f2.rsample()).mean(dim=(2,3,4,5))
+            log_q_f = z_f1.log_prob(z_f2.rsample()).mean(dim=(2,3,4,5)).unsqueeze(0).repeat(t, 1, 1, 1)    
         
         else:
             dims = len(z_f1.loc.size())
-            log_q_f = z_f1.log_prob(z_f2.rsample()).sum(dim=(dims-3, dims-2, dims-1))   # b, b
-        
-        H_f = log_q_f.logsumexp(1).mean(0) - np.log(log_q_t.shape[2])  
-        
-        # print("ZF", z_f1.log_prob(z_f2.rsample()).size())
-        # print("ZT", z_t1.log_prob(z_t2.rsample()).size())
-        # print("Log t and Log q", log_q_t.size(), log_q_f.size())
-        # print("hf, ht", H_f.size(), H_t.size())
-        # print(log_q_f, H_f)
+            log_q_f = z_f1.log_prob(z_f2.rsample()).sum(dim=(dims-3, dims-2, dims-1)).unsqueeze(0).repeat(t, 1, 1)       
 
+        log_q_ft = torch.cat((log_q_t, log_q_f), dim=-1)
+
+        H_t = (log_q_t.sum(-1) - math.log(N * M)).logsumexp(-1)  
+        H_f = (log_q_f.sum(-1) - math.log(N * M)).logsumexp(-1)  
+        H_ft = (log_q_ft.sum(-1) - math.log(N * M)).logsumexp(-1)
+        
         if self.opt.encoder in ['cgru_sa']:
-            H_ft = (log_q_f + log_q_t).logsumexp(1).mean(1) # t
-            self.mi_loss = -(H_f.mean() + H_t.mean() - H_ft.mean())
+            H_ft = (log_q_f + log_q_t - math.log(N * M)).logsumexp(1).mean(1) # t
+            # self.mi_loss = -(H_f.mean() + H_t.mean() - H_ft.mean())
         else:
-            H_ft = (log_q_f.unsqueeze(0) + log_q_t).logsumexp(1).mean(1) # t
-            self.mi_loss = -(H_f + H_t.mean() - H_ft.mean())
+            self.mi_loss = F.relu(H_ft - H_f - H_t).mean()
         
     def get_loss(self):
         # TODO: add self.opt.l2 * self.dfp_loss after adding DFP and uncomment DFP Loss in loss_dict below
