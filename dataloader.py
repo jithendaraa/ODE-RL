@@ -107,7 +107,7 @@ class MovingMNIST(Dataset):
         frames = np.empty((200, 64, 64, self.channels), np.dtype('uint8'))
         count = 0
         video_filename = 'video_' + str(idx+1+self.offset) + '.mp4'
-        if idx+1+self.offset < 8000:
+        if idx+1+self.offset <= 8000:
             root = os.path.join(self.root, 'train')
         else:
             root = os.path.join(self.root, 'test')
