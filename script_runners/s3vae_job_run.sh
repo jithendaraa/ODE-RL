@@ -85,10 +85,10 @@ fi
 echo "sbatch --job-name ${config} --output ${output_file} --time ${time} scripts/run_s3vae.sh ${config}"      
 echo ""
 
-# RES=$(sbatch --job-name ${config} --output ${output_file} --time ${time} scripts/run_job.sh ${config})
-# job_id=${RES##* }
-# echo "Job ID"" ""${job_id}"" -> ""${config}" >> out/job_logs.txt
-# echo "Job ID"" ""${job_id}"" -> ""${config}" 
+RES=$(sbatch --job-name ${config} --output ${output_file} --time ${time} scripts/run_job.sh ${config})
+job_id=${RES##* }
+echo "Job ID"" ""${job_id}"" -> ""${config}" >> out/job_logs.txt
+echo "Job ID"" ""${job_id}"" -> ""${config}" 
 echo ""
 
 end=`date +%s`
