@@ -1,8 +1,9 @@
 #!/bin/bash
 exp_id=$1   # 0 for OG S3VAE, 1 for S3VAE, 2 for Conv. S3VAE
 dataset=$2  # ['mmnist']
-train=${3-'train'}
-time=$4'23:00:00'
+train=${3:-'train'}
+def_time='23:00:00'
+time=${4:-$def_time}
 
 if [ ${exp_id} == 0 ]    
 then
