@@ -13,10 +13,5 @@
 #SBATCH --mail-type=ALL
 
 id=$1
-start=`date +%s`
-echo "Starting run at: `date`"
-python main.py --config flownet_args defaults ${id}
-echo "Ending run at: `date`"
-end=`date +%s`
-runtime=$((end-start))
-echo "Program time: $runtime"
+python main.py --config defaults ${id}
+
