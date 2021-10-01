@@ -235,7 +235,7 @@ class S3VAE(nn.Module):
             self.p_zf = dist.Normal(loc=torch.zeros_like(mu_zf), scale=torch.ones_like(std_zf))
             self.q_zf_xT = dist.Normal(loc=mu_zf, scale=std_zf)
 
-        # zt prior p(z_t | z<t) prior and zt posterior q(z_t | x <= T) posterior
+        # zt prior p(z_t | z<t) and zt posterior q(z_t | x <= T)
         self.p_zt = dist.Normal(loc=prior_mu_zt, scale=prior_std_zt)
         self.q_zt_xt = dist.Normal(loc=mu_zt, scale=std_zt)
         zf_sample = self.q_zf_xT.rsample()
@@ -320,8 +320,7 @@ class S3VAE(nn.Module):
 
     def get_vae_loss(self, x_hat, x, zf, zt):
 
-        if self.opt.extrapolate is True:    
-            x = self.ground_truth
+        if self.opt.extrapolate is True:    x = self.ground_truth
         
         # 1. Reconstruction loss: p(xt | zf, zt)
         recon_loss = F.mse_loss(x_hat, x, reduction='sum') / self.opt.batch_size
@@ -337,7 +336,7 @@ class S3VAE(nn.Module):
         z_prior_logvar, z_post_logvar = 2 * torch.log(z_prior_std), 2 * torch.log(z_post_std)
         z_prior_var, z_post_var = torch.exp(z_prior_logvar), torch.exp(z_post_logvar)
         zt_KL_div_loss = 0.5 * torch.sum(z_prior_logvar - z_post_logvar + ((z_post_var + torch.pow(z_post_mean - z_prior_mean, 2)) / z_prior_var) - 1) / self.opt.batch_size
-        
+
         if self.opt.encoder in ['cgru_sa']:
             # TODO: check this
             zf_KL_div_loss = zf_KL_div_loss.mean(dim=1)
@@ -374,7 +373,6 @@ class S3VAE(nn.Module):
         self.dfp_loss = F.binary_cross_entropy(torch.sigmoid(pred_area), motion_mag_label)
         return
 
-
     def get_mi_loss(self):
         M = self.opt.batch_size
         if self.opt.phase == 'train':
@@ -384,6 +382,7 @@ class S3VAE(nn.Module):
         # sum t from 1..T H(zf) + H(zt) - H(zf, zt)
         # zf_dist is self.q_zf_xT and zt_dist = self.q_zt_xt
         # H(.) -> -log q(.)
+
         def dist_op(dist1, op, t=False):
             if t is True:
                 if self.opt.encoder == 'default':
@@ -396,14 +395,10 @@ class S3VAE(nn.Module):
         z_t1 = dist_op(self.q_zt_xt, lambda x: x.unsqueeze(1), t=True) # t, 1, b, d_zt / t, 1, b, c, h, w
         z_t2 = dist_op(self.q_zt_xt, lambda x: x.unsqueeze(2), t=True) # t, b, 1, d_zt / t, b, 1, c, h, w
         z_t2_sample = z_t2.rsample()
-        t, b, _, _ = z_t2_sample.size()
+        t = z_t2_sample.size()[0]
         
-        if self.opt.encoder == 'default':
-            log_q_t = z_t1.log_prob(z_t2_sample)                           # t, b, b, d_zt
-        else:
-            dims = len(z_t1.loc.size())
-            log_q_t = z_t1.log_prob(z_t2_sample).sum(dim=(dims-3, dims-2, dims-1))   
-        
+        log_q_t = z_t1.log_prob(z_t2_sample)            # t, b, b, d_zt, (h, w) if cgru encoder
+
         z_f1 = dist_op(self.q_zf_xT, lambda x: x.unsqueeze(0)) # 1, b, d_zf / 1, b, c, h, w
         z_f2 = dist_op(self.q_zf_xT, lambda x: x.unsqueeze(1)) # b, 1, d_zf / b, 1, c, h, w
         
@@ -414,21 +409,28 @@ class S3VAE(nn.Module):
             log_q_f = z_f1.log_prob(z_f2.rsample()).mean(dim=(2,3,4,5)).unsqueeze(0).repeat(t, 1, 1, 1)    
         
         else:
-            dims = len(z_f1.loc.size())
-            log_q_f = z_f1.log_prob(z_f2.rsample()).sum(dim=(dims-3, dims-2, dims-1)).unsqueeze(0).repeat(t, 1, 1)       
+            log_q_f = z_f1.log_prob(z_f2.rsample()).unsqueeze(0).repeat(t, 1, 1, 1, 1, 1) 
 
-        log_q_ft = torch.cat((log_q_t, log_q_f), dim=-1)
 
-        H_t = (log_q_t.sum(-1) - math.log(N * M)).logsumexp(-1)  
-        H_f = (log_q_f.sum(-1) - math.log(N * M)).logsumexp(-1)  
-        H_ft = (log_q_ft.sum(-1) - math.log(N * M)).logsumexp(-1)
+        if self.opt.encoder in ['default']:
+            log_q_ft = torch.cat((log_q_t, log_q_f), dim=3)
+
+            H_t = - (log_q_t.sum(3) - math.log(N * M)).logsumexp(2)  
+            H_f = - (log_q_f.sum(3) - math.log(N * M)).logsumexp(2)  
+            H_ft = - (log_q_ft.sum(3) - math.log(N * M)).logsumexp(2)
         
-        if self.opt.encoder in ['cgru_sa']:
-            H_ft = (log_q_f + log_q_t - math.log(N * M)).logsumexp(1).mean(1) # t
-            # self.mi_loss = -(H_f.mean() + H_t.mean() - H_ft.mean())
-        else:
-            self.mi_loss = F.relu(- H_ft + H_f + H_t).mean()
+        elif self.opt.encoder in ['cgru']:
+            log_q_ft = torch.cat((log_q_t, log_q_f), dim=-3)
+            
+            dims = len(z_t1.loc.size())
+            H_t = - (log_q_t.sum(dim=(dims-3, dims-2, dims-1)) - math.log(N * M)).logsumexp(2)  
+            H_f = - (log_q_f.sum(dim=(dims-3, dims-2, dims-1)) - math.log(N * M)).logsumexp(2)
+            H_ft = - (log_q_ft.sum(dim=(dims-3, dims-2, dims-1)) - math.log(N * M)).logsumexp(2)
+
+
+        self.mi_loss = F.relu(- H_ft + H_f + H_t).mean()
         
+
     def get_loss(self):
         loss = self.vae_loss + (self.opt.l1 * self.scc_loss) + (self.opt.l2 * self.dfp_loss) + (self.opt.l3 * self.mi_loss)
 
@@ -444,6 +446,7 @@ class S3VAE(nn.Module):
             'MI Loss': self.mi_loss.item()
         }
         print("VAE Loss:", loss_dict['VAE Loss'], "|", 'Reconstruction Loss:', loss_dict['Reconstruction Loss'], "| Static KL", loss_dict['Static Latent KL Loss'], "|Dynamic KL", loss_dict['Dynamic Latent KL Loss'], "| SCC Loss:", loss_dict['SCC Loss'], "| DFP Loss:", loss_dict['DFP Loss'] ,"| MI Loss:", loss_dict['MI Loss'])
+        print()
         return loss, loss_dict
 
 def unstack_and_split(x, batch_size, num_channels=3):
