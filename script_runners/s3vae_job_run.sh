@@ -82,10 +82,11 @@ else
     echo "Wrong command!"
 fi
 
-echo "sbatch --job-name ${config} --output ${output_file} --time ${time} scripts/run_s3vae.sh ${config}"      
+command="sbatch --job-name ${config} --output ${output_file} --time ${time} scripts/run_s3vae.sh ${config}"      
+echo ${command}
 echo ""
 
-RES=$(sbatch --job-name ${config} --output ${output_file} --time ${time} scripts/run_job.sh ${config})
+RES=$(${command})
 job_id=${RES##* }
 echo "Job ID"" ""${job_id}"" -> ""${config}" >> out/job_logs.txt
 echo "Job ID"" ""${job_id}"" -> ""${config}" 

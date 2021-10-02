@@ -13,5 +13,10 @@
 #SBATCH --mail-type=ALL
 
 id=$1
+start=`date +%s`
+
 python main.py --config defaults ${id}
 
+end=`date +%s`
+runtime=$((end-start))
+echo "Program time: $runtime"

@@ -14,6 +14,7 @@
 
 dataset=$1
 train=$2
+start=`date +%s`
 cd code_sprite
 
 if [ $2 == 'train' ]
@@ -25,4 +26,8 @@ then
 else
     echo "Wrong command"
 fi
+
+end=`date +%s`
+runtime=$((end-start))
+echo "Program time: $runtime"
 

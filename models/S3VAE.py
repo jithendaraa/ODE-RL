@@ -33,7 +33,7 @@ class S3VAE(nn.Module):
         in_ch = opt.in_channels
         self.in_ch = in_ch
         d_zf, d_zt = opt.d_zf, opt.d_zt
-        n_hid = 256
+        n_hid = 512
         self.latent_dims = {}
 
         if self.opt.rim is True: 
@@ -59,8 +59,8 @@ class S3VAE(nn.Module):
         self.res_after_encoder = opt.resolution // resize
         
         if opt.encoder == 'default':
-            self.static_rnn = GRUEncoder(128, n_hid, d_zf, ode=False, device=device, type='static', batch_first=True, opt=opt).to(device)
-            self.dynamic_rnn = GRUEncoder(128, n_hid, d_zt, ode=opt.ode, device=device, type='dynamic', batch_first=True, opt=opt).to(device)
+            self.static_rnn = GRUEncoder(256, n_hid, d_zf, ode=False, device=device, type='static', batch_first=True, opt=opt).to(device)
+            self.dynamic_rnn = GRUEncoder(256, n_hid, d_zt, ode=opt.ode, device=device, type='dynamic', batch_first=True, opt=opt).to(device)
             self.prior_rnn = GRUEncoder(d_zt * 2 * self.num_rims, n_hid, d_zt * self.num_rims, ode=False, device=device, type='prior', batch_first=True, opt=opt).to(device)
         
         elif opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:

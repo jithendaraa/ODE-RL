@@ -24,7 +24,7 @@ class Encoder(nn.Module):
                 nn.Conv2d(64, 128, 4, 2, 1), nn.BatchNorm2d(128), nn.LeakyReLU(0.2),
                 nn.Conv2d(128, 256, 4, 2, 1), nn.BatchNorm2d(256), nn.LeakyReLU(0.2),
                 nn.Conv2d(256, 512, 4, 2, 1), nn.BatchNorm2d(512), nn.LeakyReLU(0.2),
-                nn.Conv2d(512, 128, 4, 1, 0), nn.BatchNorm2d(128), nn.Tanh())
+                nn.Conv2d(512, 256, 4, 1, 0), nn.BatchNorm2d(256), nn.Tanh())
 
         elif encoder_type in ['odecgru', 'cgru']:
             self.resize = 16
@@ -32,7 +32,7 @@ class Encoder(nn.Module):
                 nn.Conv2d(in_ch, 16, 4, 2, 1), nn.BatchNorm2d(16), nn.LeakyReLU(0.2),
                 nn.Conv2d(16, 32, 4, 2, 1), nn.BatchNorm2d(32), nn.LeakyReLU(0.2),
                 nn.Conv2d(32, 64, 4, 2, 1), nn.BatchNorm2d(64), nn.LeakyReLU(0.2),
-                nn.Conv2d(64, 128, 4, 2, 1), nn.BatchNorm2d(128), nn.Tanh())
+                nn.Conv2d(64, 256, 4, 2, 1), nn.BatchNorm2d(256), nn.Tanh())
         
         elif encoder_type in ['cgru_sa']:
             self.resize = 8
@@ -40,7 +40,7 @@ class Encoder(nn.Module):
                 nn.Conv2d(in_ch, 16, 3, 2, 1), nn.BatchNorm2d(16), nn.LeakyReLU(0.2),
                 nn.Conv2d(16, 32, 3, 2, 1), nn.BatchNorm2d(32), nn.LeakyReLU(0.2),
                 nn.Conv2d(32, 64, 3, 1, 1), nn.BatchNorm2d(64), nn.LeakyReLU(0.2),
-                nn.Conv2d(64, 128, 3, 2, 1), nn.BatchNorm2d(128), nn.Tanh())
+                nn.Conv2d(64, 256, 3, 2, 1), nn.BatchNorm2d(256), nn.Tanh())
 
 
     def forward(self, inputs):
