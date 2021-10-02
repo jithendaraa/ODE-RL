@@ -14,6 +14,9 @@ defaults:
   z_sample: False
   clip: -1
 
+  # Architecture dims
+  encoder_out_dims: 128
+
   # losses
   static_contrastive: False
 
@@ -22,11 +25,11 @@ defaults:
 
   # Slot attention
   slot_att: False
+  rim: False
   num_slots: 3
   num_iterations: 3
-  slot_size: 64
+  slot_size: 128
   unmasked: True
-  rim: False
 
   # RIM params
   emsize: 300
@@ -39,7 +42,9 @@ defaults:
   unit_per_rim: 100
 
   # S3VAE variations
-  k_stat: 5 # set -1 to see all frames to infer zf; else first k frames are seen
+  k_stat: -1 # set -1 to see all frames to infer zf; else first k frames are seen
+  d_zf: 256
+  d_zt: 32
 
   # Directories
   logdir: "logs"
@@ -61,11 +66,12 @@ defaults:
   test_seq: 200
   train_in_seq: 50
   train_out_seq: 50
-  test_in_seq: 50
-  test_out_seq: 150
+  test_in_seq: 20
+  test_out_seq: 180
   in_channels: 1
   num_digits: 3
   n_layers: 3
+  data_points: 10000
 
   lr: 8e-4
   n_downs: 2
@@ -105,6 +111,342 @@ experimental:
 smol:
   epochs: 1
 
+# Experiment 1: S3VAE on MMNIST 50K steps (Train by reconstructing or extrapolation)
+train_mmnist_recon_s3vae:
+  # python main.py --config defaults train_mmnist_recon_s3vae experimental
+  id: 'recon_s3vae_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_s3vae'
+  lr: 1e-3
+  model: 'S3VAE' 
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20 
+  train_out_seq: 20
+  encoder: 'default'
+  rundir: 'runs/S3VAE'
+  epochs: 1
+  clip: -1
+  k_stat: -1
+
+test_mmnist_recon_s3vae:
+  id: 'recon_s3vae_mmnist_test'
+  ckpt_id: 'train_mmnist_recon_s3vae'
+  model: 'S3VAE'
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  test_seq: 200
+  test_in_seq: 20
+  test_out_seq: 180
+  encoder: 'default'
+  clip: -1
+  k_stat: -1
+
+train_mmnist_extrap_s3vae:
+  # python main.py --config defaults train_mmnist_extrap_s3vae experimental
+  id: 'extrap_s3vae_mmnist_train'
+  ckpt_id: 'train_mmnist_extrap_s3vae'
+  lr: 1e-3
+  model: 'S3VAE' 
+  extrapolate: True
+  train_seq: 80
+  train_in_seq: 40 
+  train_out_seq: 40
+  encoder: 'default'
+  rundir: 'runs/S3VAE'
+  epochs: 1
+  clip: -1
+  k_stat: -1
+
+test_mmnist_extrap_s3vae:
+  id: 'extrap_s3vae_mmnist_test'
+  ckpt_id: 'train_mmnist_extrap_s3vae'
+  model: 'S3VAE'
+  phase: 'test'
+  extrapolate: True
+  load_model: True
+  test_seq: 200
+  test_in_seq: 20
+  test_out_seq: 180
+  encoder: 'default'
+  clip: -1
+  k_stat: -1
+
+
+
+
+
+# Experiment 2: S3VAE with ConvGRU MMNIST, 50K steps (Train by reconstructing or extrapolation)
+train_mmnist_recon_cs3vae:
+  # python main.py --config defaults train_mmnist_recon_cs3vae experimental
+  id: 'recon_cs3vae_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_cs3vae'
+  lr: 1e-3
+  clip: 3e4
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 60
+  train_in_seq: 30
+  train_out_seq: 30
+  d_zf: 64
+  d_zt: 32
+  encoder: 'cgru'
+  epochs: 1
+  k_stat: -1
+
+train_mmnist_extrap_cs3vae:
+  # python main.py --config defaults train_mmnist_extrap_cs3vae experimental
+  id: 'extrap_cs3vae_mmnist_train'
+  ckpt_id: 'train_mmnist_extrap_cs3vae'
+  lr: 1e-3
+  clip: 3e4
+  model: 'S3VAE'
+  extrapolate: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 64
+  d_zt: 32
+  encoder: 'cgru'
+  epochs: 25
+  k_stat: -1
+
+test_mmnist_recon_cs3vae:
+  # python main.py --config defaults flownet_args test_mmnist_recon_cs3vae experimental
+  id: 'recon_cs3vae_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_recon_cs3vae'
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  test_seq: 200
+  test_in_seq: 20
+  test_out_seq: 180
+  d_zf: 64
+  d_zt: 32
+  encoder: 'cgru'
+
+test_mmnist_extrap_cs3vae:
+  # python main.py --config defaults flownet_args test_mmnist_extrap_cs3vae experimental
+  id: 'extrap_cs3vae_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_extrap_cs3vae'
+  phase: 'test'
+  extrapolate: True
+  load_model: True
+  test_seq: 200
+  test_in_seq: 20
+  test_out_seq: 180
+  d_zf: 64
+  d_zt: 32
+  encoder: 'cgru'
+
+
+# Experiment 3: Slotted S3VAE MMNIST, 50K steps
+train_mmnist_recon_s4vae:
+  # python main.py --config defaults train_mmnist_recon_s4vae experimental
+  id: 'recon_s4vae_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_s4vae'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 256
+  d_zt: 64
+  encoder: 'default'
+  slot_att: True
+  clip: -1
+
+test_mmnist_recon_s4vae:
+  # python main.py --config defaults flownet_args test_mmnist_recon_s4vae experimental
+  id: 'recon_s4vae_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_recon_s4vae'
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  d_zf: 256
+  d_zt: 64
+  encoder: 'default'
+  slot_att: True
+
+train_mmnist_extrap_s4vae:
+  # python main.py --config defaults train_mmnist_extrap_s4vae experimental
+  id: 'extrap_s4vae_mmnist_train'
+  ckpt_id: 'train_mmnist_extrap_s4vae'
+  lr: 1e-3
+  model: 'S3VAE'
+  extrapolate: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 256
+  d_zt: 64
+  encoder: 'default'
+  slot_att: True
+  clip: -1
+
+test_mmnist_extrap_s4vae:
+  # python main.py --config defaults flownet_args test_mmnist_extrap_s4vae experimental
+  id: 'extrap_s4vae_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_extrap_s4vae'
+  phase: 'test'
+  extrapolate: True
+  load_model: True
+  d_zf: 256
+  d_zt: 64
+  encoder: 'default'
+  slot_att: True
+
+
+
+# Experiment 4: Slotted S3VAE with ConvGRU MMNIST, 50K steps
+train_mmnist_recon_cs4vae:
+  # python main.py --config defaults train_mmnist_recon_cs4vae experimental
+  id: 'recon_cs4vae_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_cs4vae'
+  lr: 7e-4
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  encoder: 'cgru_sa'
+  slot_att: True
+
+test_mmnist_recon_cs4vae:
+  # python main.py --config defaults flownet_args test_mmnist_recon_cs4vae experimental
+  id: 'recon_cs4vae_mmnist_test'
+  ckpt_id: 'train_mmnist_recon_cs4vae'
+  model: 'S3VAE'
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  encoder: 'cgru_sa'
+  slot_att: True
+
+train_mmnist_extrap_cs4vae:
+  # python main.py --config defaults train_mmnist_extrap_cs4vae experimental
+  id: 'extrap_cs4vae_mmnist_train'
+  ckpt_id: 'train_mmnist_extrap_cs4vae'
+  lr: 7e-4
+  model: 'S3VAE'
+  extrapolate: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  encoder: 'cgru_sa'
+  slot_att: True
+  k_stat: -1
+
+test_mmnist_extrap_cs4vae:
+  # python main.py --config defaults flownet_args test_mmnist_extrap_cs4vae experimental
+  id: 'extrap_cs4vae_mmnist_test'
+  ckpt_id: 'train_mmnist_extrap_cs4vae'
+  model: 'S3VAE'
+  phase: 'test'
+  extrapolate: True
+  load_model: True
+  encoder: 'cgru_sa'
+  slot_att: True
+
+
+# Experiment 8: RIM + Slotted S3VAE
+train_mmnist_recon_rims4vae:
+  # python main.py --config defaults train_mmnist_recon_rims4vae experimental
+  id: 'recon_rims4vae_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_rims4vae'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 128
+  d_zt: 32
+  slot_size: 32
+  encoder: 'default'
+  slot_att: True
+  rim: True
+
+test_mmnist_recon_rims4vae:
+  # python main.py --config defaults flownet_args test_mmnist_recon_rims4vae experimental
+  id: 'recon_rims4vae_mmnist_test'
+  model: 'S3VAE'
+  ckpt_id: 'train_mmnist_recon_rims4vae'
+  phase: 'test'
+  reconstruct: True
+  load_model: True
+  test_seq: 200
+  test_in_seq: 20
+  test_out_seq: 180
+  d_zf: 128
+  d_zt: 32
+  slot_size: 32
+  encoder: 'default'
+  slot_att: True
+  rim: True
+
+  
+# Experiment 9: RIM + Conv. Slotted S3VAE
+train_mmnist_recon_rimconvs4vae:
+  # python main.py --config defaults train_mmnist_recon_rimconvs4vae experimental
+  id: 'recon_rimconvs4vae_mmnist_train'
+  ckpt_id: 'train_mmnist_recon_rimconvs4vae'
+  lr: 1e-3
+  model: 'S3VAE'
+  reconstruct: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  d_zf: 64
+  d_zt: 32
+  slot_size: 32
+  encoder: 'cgru_sa' 
+  slot_att: True
+  rim: True
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Experiment 1: Train and test ConvGRU on Moving MNIST with 2M frames, 50000 steps, batch size 4
 train_mmnist_cgru_len20:
   # python main.py --config defaults flownet_args train_mmnist_cgru_len20 experimental
@@ -133,7 +475,6 @@ test_mmnist_cgru_len20:
   convgru_out_ch: 64
   depth: 1                          # num_pairs <ConvEncode, ConvGRUCell>                  
   in_channels: 1
-
 
 
 # Experiment 2: Train and test ODEConvGRU on Moving MNIST with 50000 steps
@@ -221,247 +562,6 @@ test_mmnist_odecgrumem_len20_1ch:
   n_ode_layers: 2                       # n_layers for the convnet in ode_encoder_func and ode_decoder_func
   z_sample: False
   in_channels: 1
-
-
-
-# Experiment 4: S3VAE on MMNIST 50K steps (Train by reconstructing or extrapolation)
-train_mmnist_recon_s3vae_def:
-  # python main.py --config defaults train_mmnist_recon_s3vae_def experimental
-  id: 'recon_s3vae_def_mmnist_train'
-  ckpt_id: 'train_mmnist_recon_s3vae_def'
-  lr: 1e-3
-  model: 'S3VAE' 
-  reconstruct: True
-  train_seq: 40
-  train_in_seq: 20 
-  train_out_seq: 20
-  d_zf: 256
-  d_zt: 32
-  encoder: 'default'
-  rundir: 'runs/S3VAE'
-  epochs: 1
-  clip: -1
-  k_stat: -1
-  data_points: 10000
-
-test_mmnist_recon_s3vae_def:
-  id: 'recon_s3vae_def_mmnist_test'
-  ckpt_id: 'train_mmnist_recon_s3vae_def'
-  data_dir: "datasets/MovingMNIST_video/test"
-  model: 'S3VAE'
-  phase: 'test'
-  reconstruct: True
-  load_model: True
-  test_seq: 200
-  test_in_seq: 20
-  test_out_seq: 180
-  d_zf: 64
-  d_zt: 64
-  encoder: 'default'
-
-
-
-# Experiment 5: S3VAE with ConvGRU MMNIST, 50K steps (Train by reconstructing or extrapolation)
-train_mmnist_recon_s3vaecgru:
-  # python main.py --config defaults train_mmnist_recon_s3vaecgru experimental
-  id: 'recon_s3vaecgru_mmnist_train'
-  ckpt_id: 'train_mmnist_recon_s3vaecgru'
-  lr: 1e-4
-  clip: 3e4
-  model: 'S3VAE'
-  reconstruct: True
-  train_seq: 40
-  train_in_seq: 20
-  train_out_seq: 20
-  d_zf: 64
-  d_zt: 32
-  encoder: 'cgru'
-  unmasked: True
-  epochs: 25
-  k_stat: -1
-
-test_mmnist_recon_s3vaecgru:
-  # python main.py --config defaults flownet_args test_mmnist_recon_s3vaecgru experimental
-  id: 'recon_s3vaecgru_mmnist_test'
-  model: 'S3VAE'
-  ckpt_id: 'train_mmnist_recon_s3vaecgru'
-  data_dir: "datasets/MovingMNIST_video/test"
-  phase: 'test'
-  reconstruct: True
-  load_model: True
-  test_seq: 200
-  test_in_seq: 20
-  test_out_seq: 180
-  d_zf: 64
-  d_zt: 32
-  encoder: 'cgru'
-
-
-
-# Experiment 6: Slotted S3VAE MMNIST, 50K steps
-train_mmnist_recon_s3vae_def_sa:
-  # python main.py --config defaults train_mmnist_recon_s3vae_def_sa experimental
-  id: 'recon_s3vae_def_sa_mmnist_train'
-  ckpt_id: 'train_mmnist_recon_s3vae_def_sa'
-  lr: 5e-4
-  clip: 2e4
-  model: 'S3VAE'
-  reconstruct: True
-  train_seq: 40
-  train_in_seq: 20
-  train_out_seq: 20
-  d_zf: 256
-  d_zt: 64
-  slot_size: 128
-  encoder: 'default'
-  slot_att: True
-  l1: 1000
-
-test_mmnist_recon_s3vae_def_sa:
-  # python main.py --config defaults flownet_args test_mmnist_recon_s3vae_def_sa experimental
-  id: 'recon_s3vae_def_sa_mmnist_test'
-  model: 'S3VAE'
-  ckpt_id: 'train_mmnist_recon_s3vae_def_sa'
-  data_dir: "datasets/MovingMNIST_video/test"
-  phase: 'test'
-  reconstruct: True
-  load_model: True
-  test_seq: 200
-  test_in_seq: 20
-  test_out_seq: 180
-  d_zf: 128
-  d_zt: 32
-  slot_size: 32
-  encoder: 'default'
-  slot_att: True
-
-
-
-# Experiment 7: Slotted S3VAE with ConvGRU MMNIST, 50K steps
-train_mmnist_recon_s3vaecgru_sa:
-  # python main.py --config defaults train_mmnist_recon_s3vaecgru_sa experimental
-  id: 'recon_s3vaecgru_sa_mmnist_train'
-  ckpt_id: 'train_mmnist_recon_s3vaecgru_sa'
-  lr: 7e-4
-  model: 'S3VAE'
-  reconstruct: True
-  train_seq: 40
-  train_in_seq: 20
-  train_out_seq: 20
-  d_zf: 64
-  d_zt: 32
-  slot_size: 32
-  encoder: 'cgru_sa'
-  slot_att: True
-  l2: 1000
-  k_stat: -1
-
-test_mmnist_recon_s3vaecgru_sa:
-  # python main.py --config defaults flownet_args test_mmnist_recon_s3vaecgru_sa experimental
-  id: 'recon_s3vaecgru_sa_mmnist_test'
-  ckpt_id: 'train_mmnist_recon_s3vaecgru_sa'
-  model: 'S3VAE'
-  phase: 'test'
-  data_dir: "datasets/MovingMNIST_video/test"
-  reconstruct: True
-  load_model: True
-  test_seq: 200
-  test_in_seq: 20
-  test_out_seq: 180
-  d_zf: 64
-  d_zt: 32
-  slot_size: 32
-  encoder: 'cgru_sa'
-  slot_att: True
-
-
-
-# Experiment 8: RIM + Slotted S3VAE
-train_mmnist_recon_rims3vae_def_sa:
-  # python main.py --config defaults train_mmnist_recon_rims3vae_def_sa experimental
-  id: 'recon_rims3vae_def_sa_mmnist_train'
-  ckpt_id: 'train_mmnist_recon_rims3vae_def_sa'
-  lr: 1e-3
-  model: 'S3VAE'
-  reconstruct: True
-  train_seq: 40
-  train_in_seq: 20
-  train_out_seq: 20
-  d_zf: 128
-  d_zt: 32
-  slot_size: 32
-  encoder: 'default'
-  slot_att: True
-  rim: True
-
-test_mmnist_recon_rims3vae_def_sa:
-  # python main.py --config defaults flownet_args test_mmnist_recon_rims3vae_def_sa experimental
-  id: 'recon_rims3vae_def_sa_mmnist_test'
-  model: 'S3VAE'
-  ckpt_id: 'train_mmnist_recon_rims3vae_def_sa'
-  data_dir: "datasets/MovingMNIST_video/test"
-  phase: 'test'
-  reconstruct: True
-  load_model: True
-  test_seq: 200
-  test_in_seq: 20
-  test_out_seq: 180
-  d_zf: 128
-  d_zt: 32
-  slot_size: 32
-  encoder: 'default'
-  slot_att: True
-  rim: True
-
-  
-# Experiment 9: RIM + Conv. Slotted S3VAE
-train_mmnist_recon_rimconvs4vae_def_sa:
-  # python main.py --config defaults train_mmnist_recon_rimconvs4vae_def_sa experimental
-  id: 'recon_rimconvs4vae_def_sa_mmnist_train'
-  ckpt_id: 'train_mmnist_recon_rimconvs4vae_def_sa'
-  lr: 1e-3
-  model: 'S3VAE'
-  reconstruct: True
-  train_seq: 40
-  train_in_seq: 20
-  train_out_seq: 20
-  d_zf: 64
-  d_zt: 32
-  slot_size: 32
-  encoder: 'cgru_sa' 
-  slot_att: True
-  rim: True
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 train_mmnist_s3vaeode:
