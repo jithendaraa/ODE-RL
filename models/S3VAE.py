@@ -35,6 +35,7 @@ class S3VAE(nn.Module):
         d_zf, d_zt = opt.d_zf, opt.d_zt
         n_hid = 512
         self.latent_dims = {}
+        encoder_out = self.opt.encoder_out_dims
 
         if self.opt.rim is True: 
             n_hid=opt.n_hid[0]
@@ -54,19 +55,18 @@ class S3VAE(nn.Module):
         self.dfp_net = DFP(opt, z_size=d_zt).to(device)
 
         # Encoder, dynamics and Decoder networks
-        self.conv_encoder = Encoder(in_ch, opt.encoder).to(device)
+        self.conv_encoder = Encoder(in_ch, opt.encoder, opt.encoder_out_dims).to(device)
         resize = self.conv_encoder.resize
         self.res_after_encoder = opt.resolution // resize
         
         if opt.encoder == 'default':
-            self.static_rnn = GRUEncoder(256, n_hid, d_zf, ode=False, device=device, type='static', batch_first=True, opt=opt).to(device)
-            self.dynamic_rnn = GRUEncoder(256, n_hid, d_zt, ode=opt.ode, device=device, type='dynamic', batch_first=True, opt=opt).to(device)
+            self.static_rnn = GRUEncoder(encoder_out, n_hid, d_zf, ode=False, device=device, type='static', batch_first=True, opt=opt).to(device)
+            self.dynamic_rnn = GRUEncoder(encoder_out, n_hid, d_zt, ode=opt.ode, device=device, type='dynamic', batch_first=True, opt=opt).to(device)
             self.prior_rnn = GRUEncoder(d_zt * 2 * self.num_rims, n_hid, d_zt * self.num_rims, ode=False, device=device, type='prior', batch_first=True, opt=opt).to(device)
         
         elif opt.encoder in ['odecgru', 'cgru', 'cgru_sa']:
-            conv_encoder_out_ch = self.conv_encoder.layers[-3].out_channels
-            self.static_rnn = ConvGRUEncoder(conv_encoder_out_ch, d_zf, opt, device, self.conv_encoder.resize, type='static').to(device)
-            self.dynamic_rnn = ConvGRUEncoder(conv_encoder_out_ch, d_zt, opt, device, self.conv_encoder.resize, type='dynamic').to(device)
+            self.static_rnn = ConvGRUEncoder(encoder_out, d_zf, opt, device, self.conv_encoder.resize, type='static').to(device)
+            self.dynamic_rnn = ConvGRUEncoder(encoder_out, d_zt, opt, device, self.conv_encoder.resize, type='dynamic').to(device)
             self.prior_rnn = ConvGRUEncoder(d_zt*2, d_zt, opt, device, self.conv_encoder.resize,type='prior').to(device)
 
         if opt.slot_att is True:
@@ -80,7 +80,6 @@ class S3VAE(nn.Module):
         else:
             self.conv_decoder = Decoder(d_zf + d_zt, in_ch, opt).to(device)
             
-
     def set_zero_losses(self):
         self.vae_loss = 0
         self.scc_loss = 0
@@ -280,6 +279,7 @@ class S3VAE(nn.Module):
 
             # 2. SCC Loss
             if self.opt.encoder in ['cgru_sa']:
+                # TODO: check
                 zf_pos_mu   = zf_pos_mu.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder) 
                 zf_pos_std  = zf_pos_std.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder) 
                 zf_neg_mu   = zf_neg_mu.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder) 
@@ -289,7 +289,7 @@ class S3VAE(nn.Module):
             zf_neg = dist.Normal(loc=zf_neg_mu, scale=zf_neg_std)
             self.get_scc_loss(zf_pos, zf_neg)
 
-            # 3. TODO: DFP Loss
+            # 3. DFP Loss
             self.get_dfp_loss(zt_sample)  
 
             # 4. MI Loss

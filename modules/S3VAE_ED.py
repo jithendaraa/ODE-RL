@@ -14,7 +14,7 @@ from modules.RIM_CGRU import RIM_CGRU
 from helpers.utils import *
 
 class Encoder(nn.Module):
-    def __init__(self, in_ch, encoder_type='default'):
+    def __init__(self, in_ch, encoder_type='default', encoder_out_dims=None):
         super(Encoder, self).__init__()
 
         if encoder_type == 'default':
@@ -24,7 +24,7 @@ class Encoder(nn.Module):
                 nn.Conv2d(64, 128, 4, 2, 1), nn.BatchNorm2d(128), nn.LeakyReLU(0.2),
                 nn.Conv2d(128, 256, 4, 2, 1), nn.BatchNorm2d(256), nn.LeakyReLU(0.2),
                 nn.Conv2d(256, 512, 4, 2, 1), nn.BatchNorm2d(512), nn.LeakyReLU(0.2),
-                nn.Conv2d(512, 256, 4, 1, 0), nn.BatchNorm2d(256), nn.Tanh())
+                nn.Conv2d(512, encoder_out_dims, 4, 1, 0), nn.BatchNorm2d(encoder_out_dims), nn.Tanh())
 
         elif encoder_type in ['odecgru', 'cgru']:
             self.resize = 16
@@ -32,7 +32,7 @@ class Encoder(nn.Module):
                 nn.Conv2d(in_ch, 16, 4, 2, 1), nn.BatchNorm2d(16), nn.LeakyReLU(0.2),
                 nn.Conv2d(16, 32, 4, 2, 1), nn.BatchNorm2d(32), nn.LeakyReLU(0.2),
                 nn.Conv2d(32, 64, 4, 2, 1), nn.BatchNorm2d(64), nn.LeakyReLU(0.2),
-                nn.Conv2d(64, 256, 4, 2, 1), nn.BatchNorm2d(256), nn.Tanh())
+                nn.Conv2d(64, encoder_out_dims, 4, 2, 1), nn.BatchNorm2d(encoder_out_dims), nn.Tanh())
         
         elif encoder_type in ['cgru_sa']:
             self.resize = 8
@@ -40,7 +40,7 @@ class Encoder(nn.Module):
                 nn.Conv2d(in_ch, 16, 3, 2, 1), nn.BatchNorm2d(16), nn.LeakyReLU(0.2),
                 nn.Conv2d(16, 32, 3, 2, 1), nn.BatchNorm2d(32), nn.LeakyReLU(0.2),
                 nn.Conv2d(32, 64, 3, 1, 1), nn.BatchNorm2d(64), nn.LeakyReLU(0.2),
-                nn.Conv2d(64, 256, 3, 2, 1), nn.BatchNorm2d(256), nn.Tanh())
+                nn.Conv2d(64, encoder_out_dims, 3, 2, 1), nn.BatchNorm2d(encoder_out_dims), nn.Tanh())
 
 
     def forward(self, inputs):
@@ -59,22 +59,12 @@ class GRUEncoder(nn.Module):
         self.num_rims = self.opt.n_hid[0] // self.opt.unit_per_rim
 
         if ode is True:
-            z0_outs = hidden_size // 2
-            self.z0_net = nn.GRU(input_size, z0_outs, num_layers=1, batch_first=True)
-            self.ode_func_net = nn.Sequential(
-                nn.Linear(2*z0_outs, hidden_size),
-                nn.ReLU(),
-                nn.Linear(hidden_size, hidden_size),
-                nn.ReLU(),
-                nn.Linear(hidden_size, 2*z0_outs),
-            )
-            self.ode_func = ODEFunc(net=self.ode_func_net, device=device)
-            self.ode_solver = DiffEqSolver(self.ode_func, method, device=device).to(device)
+            NotImplementedError('ODE version not implemented!')
         
         else:
             self.gru_net = nn.GRU(input_size, hidden_size, num_layers=1, batch_first=batch_first)
+            
             if self.type == 'dynamic':
-                
                 if self.rim is True:
                     if opt.encoder in ['default']:
                         self.dynamic_net = RIM_GRU(opt.emsize, [hidden_size], opt)
@@ -98,6 +88,7 @@ class GRUEncoder(nn.Module):
         timesteps_to_predict = torch.from_numpy(np.arange(seq_len, dtype=np.int64)) / seq_len
 
         if self.ode is True:
+            NotImplementedError('ODE version not implemented!')
             outs, hidden = self.z0_net(inputs)
             hidden = hidden.squeeze(0)
             outs = self.ode_solver(hidden, timesteps_to_predict)
