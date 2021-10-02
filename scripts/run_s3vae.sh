@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --time=27:00:00
 #SBATCH --account=def-ebrahimi
-#SBATCH --mem=32G
+#SBATCH --mem=48G
 #SBATCH --gres=gpu:v100:1
 #SBATCH --job-name=MovingMNIST
 #SBATCH --cpus-per-task=6
@@ -14,9 +14,11 @@
 
 id=$1
 start=`date +%s`
+echo $start
 
 python main.py --config defaults ${id}
 
+echo $end
 end=`date +%s`
 runtime=$((end-start))
 echo "Program time: $runtime"
