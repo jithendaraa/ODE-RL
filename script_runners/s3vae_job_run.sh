@@ -5,6 +5,7 @@ dataset=$1
 train=$2
 model=$3
 time=$4
+mode=${5:-'recon'}
 
 start=`date +%s`
 
@@ -15,25 +16,25 @@ then
         if [ ${model} == 's3vae' ]
         then
             # Train S3VAE on MMNIST
-            config='train_mmnist_recon_s3vae_def'
+            config='train_mmnist_'${mode}'_s3vae'
             output_file="out/S3VAE/""$config""-%j.out"
             echo "Train S3VAE MMNIST: ${config}"
         elif [ ${model} == 'cs3vae' ]
         then
             # Train Conv. S3VAE on MMNIST
-            config='train_mmnist_recon_s3vaecgru'
+            config='train_mmnist_'${mode}'_cs3vae'
             output_file="out/ConvS3VAE/""$config""-%j.out"
             echo "Train Conv S3VAE MMNIST: ${config}"
         elif [ ${model} == 's4vae' ]
         then
             # Train S4VAE on MMNIST
-            config='train_mmnist_recon_s3vae_def_sa'
+            config='train_mmnist_'${mode}'_s4vae'
             output_file="out/S4VAE/""$config""-%j.out"
             echo "Train S4VAE MMNIST: ${config}"
         elif [ ${model} == 'cs4vae' ]
         then
             # Train Conv S4VAE on MMNIST
-            config='train_mmnist_recon_s3vaecgru_sa'
+            config='train_mmnist_'${mode}'_cs4vae'
             output_file="out/ConvS4VAE/""$config""-%j.out"
             echo "Train Conv S4VAE MMNIST: ${config}"
         else    
@@ -50,25 +51,25 @@ then
         if [ ${model} == 's3vae' ]
         then
             # Test S3VAE on MMNIST
-            config='test_mmnist_recon_s3vae_def'
+            config='test_mmnist_'${mode}'_s3vae'
             output_file="out/S3VAE/""$config""-%j.out"
             echo "Test S3VAE MMNIST: ${config}"
         elif [ ${model} == 'cs3vae' ]
         then
             # Test Conv. S3VAE on MMNIST
-            config='test_mmnist_recon_s3vaecgru'
+            config='test_mmnist_'${mode}'_cs3vae'
             output_file="out/ConvS3VAE/""$config""-%j.out"
             echo "Test Conv S3VAE MMNIST: ${config}"
         elif [ ${model} == 's4vae' ]
         then
             # Test S4VAE on MMNIST
-            config='test_mmnist_recon_s3vae_def_sa'
+            config='test_mmnist_'${mode}'_s4vae'
             output_file="out/S4VAE/""$config""-%j.out"
             echo "Test S4VAE MMNIST: ${config}"
         elif [ ${model} == 'cs4vae' ]
         then
             # Test Conv S4VAE on MMNIST
-            config='test_mmnist_recon_s3vaecgru_sa'
+            config='test_mmnist_'${mode}'_cs4vae'
             output_file="out/ConvS4VAE/""$config""-%j.out"
             echo "Test Conv S4VAE MMNIST: ${config}"
         else    
