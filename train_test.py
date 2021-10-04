@@ -169,12 +169,12 @@ def train_batch(model, train_dataloader, optimizer, opt, device, writer):
     data_dict = utils.get_data_dict(train_dataloader)
     batch_dict = utils.get_next_batch(data_dict, opt)
     input_frames = batch_dict['observed_data'].to(device)   # [-0.5, 0.5]
-    ground_truth = batch_dict['data_to_predict'].to(device) # [-0.5, 0.5]
+    output_frames = batch_dict['data_to_predict'].to(device) # [-0.5, 0.5]
     loss_dict = {}
     optimizer.zero_grad()
     
-    # change input_frames and ground_truth from [-0.5, 0.5] to [0, 1]
-    input_frames, ground_truth = (input_frames + 0.5).to(device), (ground_truth + 0.5).to(device) 
+    # change input_frames and output_frames from [-0.5, 0.5] to [0, 1]
+    input_frames, output_frames = (input_frames + 0.5).to(device), (output_frames + 0.5).to(device) 
     predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
     total_norm = 0
 
@@ -192,14 +192,17 @@ def train_batch(model, train_dataloader, optimizer, opt, device, writer):
         total_norm = total_norm ** 0.5
         loss_dict['Gradient Norm'] = total_norm
 
+        if opt.extrapolate is True:
+            return predicted_frames * 255.0, output_frames * 255.0, train_loss.item(), loss_dict
+
         return predicted_frames * 255.0, input_frames * 255.0, train_loss.item(), loss_dict
 
     else: 
-        train_loss = model.get_loss(predicted_frames, ground_truth)
+        train_loss = model.get_loss(predicted_frames, output_frames)
         train_loss.backward()
         optimizer.step()
         loss_dict = {'Per Step Loss': train_loss.item()}
-        return predicted_frames * 255.0, ground_truth * 255.0, train_loss.item(), loss_dict
+        return predicted_frames * 255.0, output_frames * 255.0, train_loss.item(), loss_dict
 
 
 def visualize_latent_dims(opt, model, log_dict={}):
