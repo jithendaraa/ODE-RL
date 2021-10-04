@@ -204,8 +204,8 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
     motion_dir_loss = torch.zeros((1)).cuda()
     motion_area_loss = torch.zeros((1)).cuda()
 
-    print("Motion weights", opt.weight_motion_dir, opt.weight_motion_area)
-    print("MI", opt.weight_MI)
+    # print("Motion weights", opt.weight_motion_dir, opt.weight_motion_area)
+    # print("MI", opt.weight_MI)
     
     if opt.weight_motion_dir or opt.weight_motion_area:
         if opt.dataset not in ['mmnist']:
@@ -244,11 +244,14 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
     if opt.weight_MI:
         # compute log q(z) ~= log 1/(NM) sum_m=1^M q(z|x_m) = - log(MN) + logsumexp_m(q(z|x_m))
         # batch_size x batch_size x f_dim
+        # print(f.size(), f_mean.size(), f_logvar.size())
 
         _logq_f_tmp = log_density(f.unsqueeze(0).repeat(n_frame, 1, 1).view(n_frame, batch_size, 1, opt.f_dim),
                                   f_mean.unsqueeze(0).repeat(n_frame, 1, 1).view(n_frame, 1, batch_size, opt.f_dim),
                                   f_logvar.unsqueeze(0).repeat(n_frame, 1, 1).view(n_frame, 1, batch_size, opt.f_dim))
 
+        # print("_logq_f_tmp", _logq_f_tmp.size())
+        # print(z_post.size(), z_post_mean.size(), z_post_logvar.size())
         # n_frame x batch_size x batch_size x f_dim
         _logq_z_tmp = log_density(z_post.transpose(0, 1).view(n_frame, batch_size, 1, z_dim),
                                   z_post_mean.transpose(0, 1).view(n_frame, 1, batch_size, z_dim),
@@ -257,7 +260,6 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
 
         # print("log_f, log_z, log_zf", _logq_f_tmp.size(), _logq_z_tmp.size(), _logq_fz_tmp.size())
 
-        mws = True
         logq_f = (logsumexp(_logq_f_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size))
         logq_z = (logsumexp(_logq_z_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size))
         logq_fz = (logsumexp(_logq_fz_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size))
@@ -266,7 +268,6 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
         # n_frame x batch_size
         # some sample are wired negative
         mi_fz = F.relu(logq_fz - logq_f - logq_z).mean()
-        # print("MI", mi_fz.size())
 
 
     # multple label classification loss
@@ -286,8 +287,9 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
     # print("weights f z", opt.weight_f, opt.weight_z, opt.weight_motion_area, opt.weight_motion_dir, opt.weight_MI, opt.weight_GT_cls)
     # print("unweighted losses", mse, kld_f, kld_z, trp_loss / opt.weight_triple, motion_area_loss, motion_dir_loss, mi_fz, cls_loss)
     print("Unweighted losses")
-    print("MSE:", mse.data.cpu(), "| Static KL:", kld_f.data.cpu().numpy(), "| Dynamic KL:", kld_z.data.cpu().numpy(), "| SCC Loss:", trp_loss.data.cpu().numpy(), "| Motion area loss:", motion_area_loss.data.cpu().numpy(), "| Motion dir loss:", motion_dir_loss.data.cpu().numpy(), "MI Loss:", mi_fz.data.cpu().numpy(), "| CLS Loss:", cls_loss.data.cpu().numpy())
-    
+    print("MSE:", mse.data.cpu().item(), "| Static KL:", kld_f.data.cpu().numpy(), "| Dynamic KL:", kld_z.data.cpu().numpy(), "| SCC Loss:", trp_loss.data.cpu().numpy(), "| Motion area loss:", motion_area_loss.data.cpu().numpy(), "| Motion dir loss:", motion_dir_loss.data.cpu().numpy(), "MI Loss:", mi_fz.data.cpu().numpy(), "| CLS Loss:", cls_loss.data.cpu().numpy())
+    print()
+
     kld_f = kld_f * opt.weight_f
     kld_z = kld_z * opt.weight_z
     trp_loss = trp_loss * opt.weight_triple
@@ -303,11 +305,11 @@ def train(x, label_A, label_D, label, mask, model, classifier, optimizer, optimi
         optimizer_cls.step()
     ot_data = np.array(ot) if isinstance(ot, float) else ot.data.cpu().numpy()
 
-    print()
-    print("Weighted losses")
-    print("MSE:", mse.data.cpu(), "| Static KL:", kld_f.data.cpu().numpy(), "| Dynamic KL:", kld_z.data.cpu().numpy(), "| OT:", ot_data, "SCC Loss:", trp_loss.data.cpu().numpy(), "| Motion area loss:", motion_area_loss.data.cpu().numpy(), "| Motion dir loss:", motion_dir_loss.data.cpu().numpy(), "MI Loss:", mi_fz.data.cpu().numpy())
-    print("Total loss:", loss)
-    print()
+    # print()
+    # print("Weighted losses")
+    # print("MSE:", mse.data.cpu(), "| Static KL:", kld_f.data.cpu().numpy(), "| Dynamic KL:", kld_z.data.cpu().numpy(), "| OT:", ot_data, "SCC Loss:", trp_loss.data.cpu().numpy(), "| Motion area loss:", motion_area_loss.data.cpu().numpy(), "| Motion dir loss:", motion_dir_loss.data.cpu().numpy(), "MI Loss:", mi_fz.data.cpu().numpy())
+    # print("Total loss:", loss.item())
+    # print()
 
     return mse.data.cpu().numpy(), kld_f.data.cpu().numpy(), kld_z.data.cpu().numpy(), ot_data,\
            trp_loss.data.cpu().numpy(), motion_area_loss.data.cpu().numpy(), motion_dir_loss.data.cpu().numpy(), mi_fz.data.cpu().numpy(), \
@@ -341,9 +343,9 @@ def main(opt):
         opt.channels = 1
         opt.frames = opt.train_in_seq
         opt.weight_motion_dir = 0
-        opt.weight_triple = 1000
-        opt.weight_motion_area = 100
-        opt.weight_MI = 1
+        # opt.weight_triple = 1000
+        # opt.weight_motion_area = 100
+        # opt.weight_MI = 1
     
     classifier = None
     optimizer_cls = None
@@ -424,9 +426,6 @@ def main(opt):
         for i, batch in enumerate(train_loader):
             progress.update(i+1)
 
-            if opt.dataset in ['mmnist']:
-                print(len(batch), batch.keys())
-
             if opt.weight_triple:
                 x, x_pos, x_neg, label_A, label_D, label, mask = utils.get_data(batch, opt)
                 x = [x, x_pos, x_neg]  # list
@@ -440,56 +439,56 @@ def main(opt):
                 x = torch.stack(x, dim=1).cuda()
 
             mse, kld_f, kld_z, ot_z, triple_loss, m_area_loss, m_dir_loss, mi_loss, cls_loss = train(x, label_A, label_D, label, mask, ds_vae, classifier, optimizer, optimizer_cls, opt)
-    #         epoch_mse += mse
-    #         epoch_kld_f += kld_f
-    #         epoch_kld_z += kld_z
-    #         epoch_ot_z += ot_z
-    #         epoch_m_area_loss += m_area_loss
-    #         epoch_m_dir_loss += m_dir_loss
-    #         epoch_triple_loss += triple_loss
-    #         epoch_MI_loss += mi_loss
-    #         epoch_cls_loss += cls_loss
+            epoch_mse += mse
+            epoch_kld_f += kld_f
+            epoch_kld_z += kld_z
+            epoch_ot_z += ot_z
+            epoch_m_area_loss += m_area_loss
+            epoch_m_dir_loss += m_dir_loss
+            epoch_triple_loss += triple_loss
+            epoch_MI_loss += mi_loss
+            epoch_cls_loss += cls_loss
 
-    #         if i%100 == 0 and i:
-    #             print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f' % (
-    #             epoch, mse.item(), kld_f.item(), kld_z.item(), ot_z.item(), m_area_loss.item(), m_dir_loss.item(), triple_loss.item(), mi_loss.item(),
-    #             cls_loss.item()), log)
+            if i%100 == 0 and i:
+                print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f' % (
+                epoch, mse.item(), kld_f.item(), kld_z.item(), ot_z.item(), m_area_loss.item(), m_dir_loss.item(), triple_loss.item(), mi_loss.item(),
+                cls_loss.item()), log)
         
-    #     print("Time for epoch", epoch, ":", time.time() - start, "s")
-    #     progress.finish()
-    #     utils.clear_progressbar()
-    #     print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f (%d)' %
-    #                                                                             (epoch, epoch_mse/epoch_size,
-    #                                                                             epoch_kld_f/epoch_size,
-    #                                                                             epoch_kld_z/epoch_size,
-    #                                                                             epoch_ot_z/epoch_size,
-    #                                                                             epoch_m_area_loss / epoch_size,
-    #                                                                             epoch_m_dir_loss / epoch_size,
-    #                                                                             epoch_triple_loss / epoch_size,
-    #                                                                             epoch_MI_loss / epoch_size,
-    #                                                                             epoch_cls_loss / epoch_size,
-    #                                                                             epoch*epoch_size*opt.batch_size), log)
-    #     # plot some stuff
-    #     ds_vae.eval()
-    #     # save the model
-    #     net2save = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
-    #     torch.save({
-    #         'ds_vae': net2save},
-    #         '%s/model.pth' % opt.log_dir)
+        print("Time for epoch", epoch, ":", time.time() - start, "s")
+        progress.finish()
+        utils.clear_progressbar()
+        print_log('[%02d] mse: %.5f | kld_f: %.5f | kld_z: %.5f | ot_z: %.5f | m_area: %.5f | m_dir: %.5f | trp: %.5f | mi: %.5f | cls: %.5f (%d)' %
+                                                                                (epoch, epoch_mse/epoch_size,
+                                                                                epoch_kld_f/epoch_size,
+                                                                                epoch_kld_z/epoch_size,
+                                                                                epoch_ot_z/epoch_size,
+                                                                                epoch_m_area_loss / epoch_size,
+                                                                                epoch_m_dir_loss / epoch_size,
+                                                                                epoch_triple_loss / epoch_size,
+                                                                                epoch_MI_loss / epoch_size,
+                                                                                epoch_cls_loss / epoch_size,
+                                                                                epoch*epoch_size*opt.batch_size), log)
+        # plot some stuff
+        ds_vae.eval()
+        # save the model
+        net2save = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
+        torch.save({
+            'ds_vae': net2save},
+            '%s/model.pth' % opt.log_dir)
 
-    #     x, label, mask, index = next(testing_batch_generator)
-    #     x = torch.stack(x[:15], dim=1).cuda()
+        # x, label, mask, index = next(testing_batch_generator)
+        # x = torch.stack(x[:15], dim=1).cuda()
 
-    #     net2test = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
-    #     plot_rec_new(x, epoch, opt, net2test)
-    #     plot_rec_exchange(x, epoch, opt, net2test)
+        # net2test = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
+        # plot_rec_new(x, epoch, opt, net2test)
+        # plot_rec_exchange(x, epoch, opt, net2test)
 
-    #     plot_rec_fixed_motion(x, epoch, opt, net2test)
-    #     plot_rec_fixed_content(x, epoch, opt, net2test)
-    #     plot_rec_generating(x, epoch, opt, net2test)
+        # plot_rec_fixed_motion(x, epoch, opt, net2test)
+        # plot_rec_fixed_content(x, epoch, opt, net2test)
+        # plot_rec_generating(x, epoch, opt, net2test)
 
-    #     print('log dir: %s' % opt.log_dir)
-    #     print()
+        print('log dir: %s' % opt.log_dir)
+        print()
 
 
 

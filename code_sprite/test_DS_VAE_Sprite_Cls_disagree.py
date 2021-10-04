@@ -28,6 +28,7 @@ parser.add_argument('--optimizer', default='adam', help='optimizer to train with
 parser.add_argument('--niter', type=int, default=300, help='number of epochs to train for')
 parser.add_argument('--seed', default=1, type=int, help='manual seed')
 parser.add_argument('--image_width', type=int, default=64, help='the height / width of the input image to network')
+parser.add_argument('--type_gt',  type=str, default='action', help='action, skin, top, pant, hair')
 
 parser.add_argument('--channels', default=3, type=int)
 parser.add_argument('--dataset', default='Sprite', help='dataset to train with(smmnist_fixed, smmnist_triplet)')
@@ -56,14 +57,12 @@ parser.add_argument('--weight_triple', type=float, default=100, help='100, weigh
 parser.add_argument('--weight_motion_area', type=float, default=0.1, help='weighting on motion area loss of motion vector')
 parser.add_argument('--weight_motion_dir', type=float, default=0.1, help='weighting on motion direction loss of motion vector')
 parser.add_argument('--weight_GT_cls', type=float, default=0, help='weighting on digit recogniation classification loss')
-parser.add_argument('--type_gt',  type=str, default='action', help='action, skin, top, pant, hair')
 
 opt = parser.parse_args()
 
 opt.model_dir = "saved_model/Sprite/"
-
-
 os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpu
+
 def get_batch_fixed(train_loader, dtype):
     while True:
         for sequence in train_loader:
@@ -85,6 +84,7 @@ def main(opt):
         opt.optimizer = optimizer
         opt.model_dir = model_dir
         opt.log_dir = '%s/continued' % opt.log_dir
+        print("Loaded model!")
     else:
         name = 'ICLR_V1_%s_model=%s%dx%d-rnn_size=%d-lr=%.4f-g_dim=%d-z_dim=%d' \
                '-weight:kl_f=%.2f-kl_z=%.2f-OT_z=%.2f-triple=%.2f-m_area=%.2f-m_dir=%.2f-cls=%.2f-%s' % (
@@ -98,12 +98,7 @@ def main(opt):
     os.makedirs('%s/gen/' % opt.log_dir, exist_ok=True)
     os.makedirs('%s/plots/' % opt.log_dir, exist_ok=True)
 
-    # print_log("Random Seed: {}".format(opt.seed), log)
-    # random.seed(opt.seed)
-    # torch.manual_seed(opt.seed)
-    # torch.cuda.manual_seed_all(opt.seed)
     dtype = torch.cuda.FloatTensor
-
     print_log('Running parameters:')
     print_log(json.dumps(vars(opt), indent=4, separators=(',', ':')), log)
 
@@ -117,34 +112,15 @@ def main(opt):
     else:
         raise ValueError('Unknown optimizer: %s' % opt.optimizer)
 
-    # import models.dcgan_64 as model
-    #
-    #
-    # from models.DS_VAE import DisentangledVAE_New, DisentangledVAE_New_fixed,\
-    #             DisentangledVAE_New_fixed_Z_notDependonF_PlusLSTM, DisentangledVAE_ICLR, DisentangledVAE_ICLR_V1
-    #
-    # ds_vae = DisentangledVAE_ICLR_V1(model, opt)
-    # ds_vae.apply(utils.init_weights)
-
     if opt.model_dir != '':
         ds_vae =  saved_model['ds_vae']
+        print("load")
 
 
-    # --------- transfer to gpu ------------------------------------
-    if torch.cuda.device_count() > 1:
-        print_log("Let's use {} GPUs!".format(torch.cuda.device_count()), log)
-        ds_vae = nn.DataParallel(ds_vae)
-    ds_vae = ds_vae.cuda()
-    #print_log(ds_vae, log)
+    # ds_vae = ds_vae.cuda()
 
     # --------- load a dataset ------------------------------------
     train_data, test_data = utils.load_dataset(opt)
-    # train_loader = DataLoader(train_data,
-    #                           num_workers=opt.data_threads,
-    #                           batch_size=opt.batch_size,
-    #                           shuffle=True,
-    #                           drop_last=True,
-    #                           pin_memory=True)
     test_loader = DataLoader(test_data,
                              num_workers=opt.data_threads,
                              batch_size=opt.batch_size,
@@ -152,33 +128,10 @@ def main(opt):
                              drop_last=True,
                              pin_memory=True)
 
-
-    # testing_batch_generator = get_batch_fixed(test_loader, dtype)
-    # for epoch in range(opt.niter):
-    #     for sequence in test_loader:
-    #         data1 = sequence[0].float()
-    #         batch1 = utils.normalize_data(opt, dtype, data1)
-    #         x = torch.stack(batch1[:15], dim=1).cuda()
-    #
-    #         # plot(x, epoch)
-    #
-    #         net2test = ds_vae.module if torch.cuda.device_count() > 1 else ds_vae
-    #         plot_rec_new(x, epoch, opt, net2test)
-    #         plot_rec_exchange(x, epoch, opt, net2test)
-    #         plot_rec_fixed_motion(x, epoch, opt, net2test)
-    #         plot_rec_fixed_content(x, epoch, opt, net2test)
-    #         plot_rec_generating(x, epoch, opt, net2test)
-    #         plot_rec_generating2(x, epoch, opt, net2test)
-    #         a = 1
-
-    print("here1")
+    # print("here1")
 
     from video_classifier_Sprite_all import classifier_Sprite_all
-    print("here2")
-    # if opt.type_gt == 'action':
-    #     opt.nlabel = 9
-    # else:
-    #     opt.nlabel = 6
+
     opt.g_dim = 128
     opt.rnn_size = 256
     classifier = classifier_Sprite_all(opt)
@@ -187,17 +140,14 @@ def main(opt):
     classifier.load_state_dict(loaded_dict['state_dict'])
     classifier = classifier.cuda().eval()
     
-   
-    
     # --------- training loop ------------------------------------
     for epoch in range(opt.niter):
-
+        print("IN")
         ds_vae.eval()
         label1_all, label2_all, label3_all = list(), list(), list()
         pred1_all, pred2_all, pred3_all = list(), list(), list()
         label_gt = list()
         for sequence in test_loader:
-            #print(sequence.keys())
             data1 = sequence[0].float()
             label_A = sequence[1]
             label_D = sequence[2]
@@ -206,10 +156,7 @@ def main(opt):
             x = torch.stack(batch1, dim=1).cuda()
 
             """ #1 change"""
-            if opt.type_gt == "action":
-                recon_x_sample, recon_x = ds_vae.forward_fixed_action_for_classification(x)
-            else:
-                recon_x_sample, recon_x = ds_vae.forward_fixed_content_for_classification(x)
+            recon_x_sample, recon_x = ds_vae.forward_fixed_action_for_classification(x)
             
             with torch.no_grad():
                 """ #2 change"""
@@ -234,13 +181,16 @@ def main(opt):
             label1 = np.argmax(pred1.detach().cpu().numpy(), axis=1)
             label2 = np.argmax(pred2.detach().cpu().numpy(), axis=1)
             label3 = np.argmax(pred3.detach().cpu().numpy(), axis=1)
+            print("Got labels")
 
             pred1_all.append(pred1.detach().cpu().numpy())
             pred2_all.append(pred2.detach().cpu().numpy())
             pred3_all.append(pred3.detach().cpu().numpy())
+            print("got preds")
 
             """ #3 change"""
             if opt.type_gt == "action":
+                print("ACTION")
                 label_gt.append(label_D.numpy())
             elif opt.type_gt == "skin":
                 label_gt.append(label_A[:,0].numpy())
@@ -254,6 +204,7 @@ def main(opt):
             label1_all.append(label1)
             label2_all.append(label2)
             label3_all.append(label3)
+
         label1_all = np.hstack(label1_all)
         label2_all = np.hstack(label2_all)
         label3_all = np.hstack(label3_all)
