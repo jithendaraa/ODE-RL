@@ -42,3 +42,5 @@ then
     # Run Conv S4VAE (extrap)
     sh script_runners/s3vae_job_run.sh ${dataset} ${train} 'cs4vae' ${time} 'extrap'
 fi
+
+

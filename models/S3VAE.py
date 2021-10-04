@@ -110,9 +110,15 @@ class S3VAE(nn.Module):
             # Pass the static representations through slots and get object-centric representations
             if self.opt.slot_att is True and self.opt.encoder in ['cgru_sa']:
                 mu_zf, logvar_zf = self.mu_slot_att(mu_zf), self.logvar_slot_att(logvar_zf)
+                b_s, c, h, w = mu_zf.size()
                 zf_pos_mu, zf_pos_logvar = self.mu_slot_att(zf_pos_mu), self.logvar_slot_att(zf_pos_logvar)
                 zf_neg_mu, zf_neg_logvar = self.mu_slot_att(zf_neg_mu), self.logvar_slot_att(zf_neg_logvar)
-            
+                
+                mu_zf, logvar_zf = mu_zf.view(b, self.opt.num_slots, c, h, w).contiguous().view(b, -1, h, w), logvar_zf.view(b, self.opt.num_slots, c, h, w).contiguous().view(b, -1, h, w)
+                zf_pos_mu, zf_pos_logvar = zf_pos_mu.view(b, self.opt.num_slots, c, h, w).contiguous().view(b, -1, h, w), zf_pos_logvar.view(b, self.opt.num_slots, c, h, w).contiguous().view(b, -1, h, w)
+                zf_neg_mu, zf_neg_logvar = zf_neg_mu.view(b, self.opt.num_slots, c, h, w).contiguous().view(b, -1, h, w), zf_neg_logvar.view(b, self.opt.num_slots, c, h, w).contiguous().view(b, -1, h, w)
+
+
         elif self.opt.encoder in ['default']:
             num_features = encoded_inputs.size()[1]
             if self.opt.k_stat == -1:
@@ -127,8 +133,8 @@ class S3VAE(nn.Module):
             if self.opt.slot_att is True:
                 # Pass the static representations through slots and hopefully get object-centric representations
                 mu_zf, logvar_zf = self.mu_slot_att(mu_zf).reshape(b, -1), self.logvar_slot_att(logvar_zf).reshape(b, -1)
-                zf_pos_mu, zf_pos_logvar = self.mu_slot_att(zf_pos_mu), self.logvar_slot_att(zf_pos_logvar)
-                zf_neg_mu, zf_neg_logvar = self.mu_slot_att(zf_neg_mu), self.logvar_slot_att(zf_neg_logvar)
+                zf_pos_mu, zf_pos_logvar = self.mu_slot_att(zf_pos_mu).reshape(b, -1), self.logvar_slot_att(zf_pos_logvar).reshape(b, -1)
+                zf_neg_mu, zf_neg_logvar = self.mu_slot_att(zf_neg_mu).reshape(b, -1), self.logvar_slot_att(zf_neg_logvar).reshape(b, -1)
         
         std_zf, zf_pos_std, zf_neg_std = torch.exp(0.5 * logvar_zf), torch.exp(0.5 * zf_pos_logvar), torch.exp(0.5 * zf_neg_logvar)
         
@@ -221,31 +227,39 @@ class S3VAE(nn.Module):
 
         # Get mu and std of static latent variable zf, zf_pos, zf_neg each of dim d_zf
         mu_zf, std_zf, zf_pos_mu, zf_pos_std, zf_neg_mu, zf_neg_std = self.get_static_rep(encoded_inputs, shuffled_encoded_inputs, another_encoded_tensor)
+        # print("mu_zf", mu_zf.size())
         mu_zt, std_zt, prior_mu_zt, prior_std_zt = self.get_dynamic_rep(encoded_inputs)
+        # print("mu_zt", mu_zt.size())
 
         # zf prior p(z_f) ~ N(0, 1) and zf posterior q(z_f | x_1:T)
-        if self.opt.slot_att is True and self.opt.encoder in ['cgru_sa']:
-            reshaped_mu_zf = mu_zf.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder)
-            reshaped_std_zf = std_zf.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder)
-            self.p_zf = dist.Normal(loc=torch.zeros_like(reshaped_mu_zf), scale=torch.ones_like(reshaped_std_zf))
-            self.q_zf_xT = dist.Normal(loc=reshaped_mu_zf, scale=reshaped_std_zf)
+        # if self.opt.slot_att is True and self.opt.encoder in ['cgru_sa']:
+            # reshaped_mu_zf = mu_zf.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder)
+            # reshaped_std_zf = std_zf.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder)
+            # print("reshaped_mu_zf", reshaped_mu_zf.size())
+            # self.p_zf = dist.Normal(loc=torch.zeros_like(reshaped_mu_zf), scale=torch.ones_like(reshaped_std_zf))
+            # self.q_zf_xT = dist.Normal(loc=reshaped_mu_zf, scale=reshaped_std_zf)
         
-        else:
-            self.p_zf = dist.Normal(loc=torch.zeros_like(mu_zf), scale=torch.ones_like(std_zf))
-            self.q_zf_xT = dist.Normal(loc=mu_zf, scale=std_zf)
+        self.p_zf = dist.Normal(loc=torch.zeros_like(mu_zf), scale=torch.ones_like(std_zf))
+        self.q_zf_xT = dist.Normal(loc=mu_zf, scale=std_zf)
 
         # zt prior p(z_t | z<t) and zt posterior q(z_t | x <= T)
         self.p_zt = dist.Normal(loc=prior_mu_zt, scale=prior_std_zt)
         self.q_zt_xt = dist.Normal(loc=mu_zt, scale=std_zt)
         zf_sample = self.q_zf_xT.rsample()
         zt_sample = self.q_zt_xt.rsample()
+        # print("zf_sample", zf_sample.size())
+        # print("zt_sample", zt_sample.size())
 
         self.mu_zf, self.std_zf, self.sampled_zf = self.visualize_latent_dims(mu_zf, std_zf, zf_sample, 'static')
         self.mu_zt, self.std_zt, self.sampled_zt = self.visualize_latent_dims(mu_zt, std_zt, zt_sample, 'dynamic')
 
         if self.opt.encoder == 'default' and self.opt.slot_att is True:
+            # Make zf and zt, (b, t, num_slots, f)
             zf_zt = torch.cat((zf_sample.reshape(b, 1, -1).repeat(1, self.out_seq, 1), zt_sample), dim=2).view(b*self.out_seq, -1, 1, 1)
-        
+            # print("Combining", zf_sample.unsqueeze(1).repeat(1, self.out_seq, 1, 1).size(), zt_sample.unsqueeze(2).repeat(1, 1, self.opt.num_slots, 1).size())
+            # zf_zt = torch.cat((zf_sample.unsqueeze(1).repeat(1, self.out_seq, 1, 1), zt_sample.unsqueeze(2).repeat(1, 1, self.opt.num_slots, 1)), dim=-1).view(b*self.out_seq*self.opt.num_slots, -1, 1, 1)
+            # print("zf_zt", zf_zt.size(), zf_sample.size(), zt_sample.size())
+
         elif self.opt.encoder == 'default' and self.opt.slot_att is False:
             zf_zt = torch.cat((zf_sample.unsqueeze(1).repeat(1, self.out_seq, 1), zt_sample), dim=2).view(b*self.out_seq, -1, 1, 1)
 
@@ -272,14 +286,13 @@ class S3VAE(nn.Module):
 
         else:
             x_hat = F.sigmoid(x_hat)
-        
+
         if self.opt.phase == 'train':
             # 1. VAE ELBO Loss
             self.get_vae_loss(x_hat, inputs, zf_sample, zt_sample) 
 
             # 2. SCC Loss
             if self.opt.encoder in ['cgru_sa']:
-                # TODO: check
                 zf_pos_mu   = zf_pos_mu.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder) 
                 zf_pos_std  = zf_pos_std.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder) 
                 zf_neg_mu   = zf_neg_mu.view(b, self.opt.num_slots, -1, self.res_after_encoder, self.res_after_encoder) 
@@ -288,9 +301,11 @@ class S3VAE(nn.Module):
             zf_pos = dist.Normal(loc=zf_pos_mu, scale=zf_pos_std)
             zf_neg = dist.Normal(loc=zf_neg_mu, scale=zf_neg_std)
             self.get_scc_loss(zf_pos, zf_neg)
+            # print("Got SCC")
 
             # 3. DFP Loss
             self.get_dfp_loss(zt_sample)  
+            # print("Got DFP")
 
             # 4. MI Loss
             self.get_mi_loss()  
@@ -300,6 +315,7 @@ class S3VAE(nn.Module):
     def get_prediction(self, inputs, batch_dict=None):
         self.ground_truth = batch_dict['data_to_predict'].to(self.device)
         self.in_flow_labels = batch_dict['in_flow_labels'].to(self.device)
+        self.out_flow_labels = batch_dict['out_flow_labels'].to(self.device)
         self.ground_truth = (self.ground_truth + 0.5)
         pred_frames = self(inputs)
         return pred_frames
@@ -321,25 +337,23 @@ class S3VAE(nn.Module):
     def get_vae_loss(self, x_hat, x, zf, zt):
 
         if self.opt.extrapolate is True:    x = self.ground_truth
+
+        t = x.size()[1]
         
         # 1. Reconstruction loss: p(xt | zf, zt)
-        recon_loss = F.mse_loss(x_hat, x, reduction='sum') / self.opt.batch_size
+        recon_loss = F.mse_loss(x_hat, x, reduction='sum') / (self.opt.batch_size * t)
 
         # 2. KL for static latent variable zf
         q_zf_mean, q_zf_std = self.q_zf_xT.loc, self.q_zf_xT.scale
         q_zf_logvar = 2 * torch.log(q_zf_std)
-        zf_KL_div_loss = -0.5 * torch.sum(1 + q_zf_logvar - torch.pow(q_zf_mean,2) - torch.exp(q_zf_logvar)) / self.opt.batch_size
+        zf_KL_div_loss = -0.5 * torch.sum(1 + q_zf_logvar - torch.pow(q_zf_mean,2) - torch.exp(q_zf_logvar)) / (self.opt.batch_size * t)
 
         # 3. KL for dynamic latent variable zt
         z_prior_mean, z_prior_std = self.p_zt.loc, self.p_zt.scale
         z_post_mean, z_post_std = self.q_zt_xt.loc, self.q_zt_xt.scale
         z_prior_logvar, z_post_logvar = 2 * torch.log(z_prior_std), 2 * torch.log(z_post_std)
         z_prior_var, z_post_var = torch.exp(z_prior_logvar), torch.exp(z_post_logvar)
-        zt_KL_div_loss = 0.5 * torch.sum(z_prior_logvar - z_post_logvar + ((z_post_var + torch.pow(z_post_mean - z_prior_mean, 2)) / z_prior_var) - 1) / self.opt.batch_size
-
-        if self.opt.encoder in ['cgru_sa']:
-            # TODO: check this
-            zf_KL_div_loss = zf_KL_div_loss.mean(dim=1)
+        zt_KL_div_loss = 0.5 * torch.sum(z_prior_logvar - z_post_logvar + ((z_post_var + torch.pow(z_post_mean - z_prior_mean, 2)) / z_prior_var) - 1) / (self.opt.batch_size * t)
 
         kl_loss = zf_KL_div_loss + zt_KL_div_loss
 
@@ -350,31 +364,35 @@ class S3VAE(nn.Module):
         self.zf_KL_div_loss = zf_KL_div_loss
         self.zt_KL_div_loss = zt_KL_div_loss
         
-
     def get_scc_loss(self, zf_pos, zf_neg):
         # zf equivalent to self.q_zf_xT -- time-invariant representation from real data
         # zf_pos -- time-invariant representation from shuffled real video
         # zf_neg -- time-invariant representation from another video
         zf_sample = self.q_zf_xT.rsample()
+        
+        if len(zf_sample.size()) == 4:
+            b, f_s, h, w = zf_sample.size()
+            zf_sample = zf_sample.view(b, self.opt.num_slots, -1, h, w)
+
         zf_pos_sample = zf_pos.sample()
         zf_neg_sample = zf_neg.sample()
-        
-        # For slotted S3VAE
-        if len(zf_sample.size()) == 2:
-            zf_pos_sample = zf_pos_sample.view(self.opt.batch_size, -1)
-            zf_neg_sample = zf_neg_sample.view(self.opt.batch_size, -1)
         
         # max(D(zf, zf_pos) - D(zf, zf_neg) + margin, 0)
         self.scc_loss = self._triplet_loss(zf_sample, zf_pos_sample, zf_neg_sample)
 
     def get_dfp_loss(self, zt):
-        motion_mag_label = self.in_flow_labels.float()
+        if self.opt.extrapolate is True:    
+            motion_mag_label = self.out_flow_labels.float()
+        elif self.opt.reconstruct is True:
+            motion_mag_label = self.in_flow_labels.float()
+            
         pred_area = self.dfp_net(zt)
         self.dfp_loss = F.binary_cross_entropy(torch.sigmoid(pred_area), motion_mag_label)
         return
 
     def get_mi_loss(self):
         M = self.opt.batch_size
+
         if self.opt.phase == 'train':
             N = self.opt.train_test_split * self.opt.data_points    # dataset size
         else:
@@ -406,20 +424,23 @@ class S3VAE(nn.Module):
             log_q_f = z_f1.log_prob(z_f2.rsample()).unsqueeze(0).repeat(t, 1, 1, 1)              # t, b, b, d_zf
         
         elif self.opt.encoder in ['cgru_sa']:
-            log_q_f = z_f1.log_prob(z_f2.rsample()).mean(dim=(2,3,4,5)).unsqueeze(0).repeat(t, 1, 1, 1)    
+            log_q_f = z_f1.log_prob(z_f2.rsample()).unsqueeze(0).repeat(t, 1, 1, 1, 1, 1)   # t, b, b, num_slots*slot_dim, h, w 
         
         else:
             log_q_f = z_f1.log_prob(z_f2.rsample()).unsqueeze(0).repeat(t, 1, 1, 1, 1, 1) 
 
+        # print("log_q_f", log_q_f.size(), log_q_t.size())
 
+        log_q_ft = torch.cat((log_q_t, log_q_f), dim=3)
+        # print("log_q_ft", log_q_ft.size())
+        
         if self.opt.encoder in ['default']:
-            log_q_ft = torch.cat((log_q_t, log_q_f), dim=3)
 
             H_t = - (log_q_t.sum(3) - math.log(N * M)).logsumexp(2)  
             H_f = - (log_q_f.sum(3) - math.log(N * M)).logsumexp(2)  
             H_ft = - (log_q_ft.sum(3) - math.log(N * M)).logsumexp(2)
         
-        elif self.opt.encoder in ['cgru']:
+        elif self.opt.encoder in ['cgru', 'cgru_sa']:
             log_q_ft = torch.cat((log_q_t, log_q_f), dim=-3)
             
             dims = len(z_t1.loc.size())
@@ -428,11 +449,10 @@ class S3VAE(nn.Module):
             H_ft = - (log_q_ft.sum(dim=(dims-3, dims-2, dims-1)) - math.log(N * M)).logsumexp(2)
 
 
-        self.mi_loss = F.relu(- H_ft + H_f + H_t).mean()
+        self.mi_loss = (- H_ft + H_f + H_t).mean()
         
-
     def get_loss(self):
-        loss = self.vae_loss + (self.opt.l1 * self.scc_loss) + (self.opt.l2 * self.dfp_loss) + (self.opt.l3 * self.mi_loss)
+        loss = (self.opt.l0 * self.vae_loss) + (self.opt.l1 * self.scc_loss) + (self.opt.l2 * self.dfp_loss) + (self.opt.l3 * self.mi_loss)
 
         loss_dict = {
             'Loss': loss.item(),

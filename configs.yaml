@@ -56,9 +56,9 @@ defaults:
   
   # Save & logs frequencies
   ckpt_save_freq: 5000            # Save model params every x steps
-  test_log_freq: 50               # log test loss every x steps
-  video_log_freq: 500
-  loss_log_freq: 50
+  test_log_freq: 200               # log test loss every x steps
+  video_log_freq: 5000
+  loss_log_freq: 200
 
   # Image sequence details
   resolution: 64
@@ -92,6 +92,7 @@ defaults:
   neural_ode_n_units: 64                # n_units for the convnet in ode_encoder_func and ode_decoder_func
   n_ode_layers: 2
   convgru_out_ch: 256
+  l0: 10
   l1: 1000
   l2: 100
   l3: 1
@@ -124,7 +125,7 @@ train_mmnist_recon_s3vae:
   train_out_seq: 20
   encoder: 'default'
   rundir: 'runs/S3VAE'
-  epochs: 1
+  epochs: 50
   clip: -1
   k_stat: -1
 
@@ -149,12 +150,12 @@ train_mmnist_extrap_s3vae:
   lr: 1e-3
   model: 'S3VAE' 
   extrapolate: True
-  train_seq: 80
-  train_in_seq: 40 
-  train_out_seq: 40
+  train_seq: 40
+  train_in_seq: 20 
+  train_out_seq: 20
   encoder: 'default'
   rundir: 'runs/S3VAE'
-  epochs: 1
+  epochs: 50
   clip: -1
   k_stat: -1
 
@@ -185,13 +186,13 @@ train_mmnist_recon_cs3vae:
   clip: 3e4
   model: 'S3VAE'
   reconstruct: True
-  train_seq: 60
-  train_in_seq: 30
-  train_out_seq: 30
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
   d_zf: 64
   d_zt: 32
   encoder: 'cgru'
-  epochs: 1
+  epochs: 50
   k_stat: -1
 
 train_mmnist_extrap_cs3vae:
@@ -208,7 +209,7 @@ train_mmnist_extrap_cs3vae:
   d_zf: 64
   d_zt: 32
   encoder: 'cgru'
-  epochs: 25
+  epochs: 50
   k_stat: -1
 
 test_mmnist_recon_cs3vae:
@@ -254,9 +255,10 @@ train_mmnist_recon_s4vae:
   train_in_seq: 20
   train_out_seq: 20
   d_zf: 256
-  d_zt: 64
-  encoder: 'default'
+  d_zt: 32
   slot_att: True
+  encoder: 'default'
+  epochs: 50
   clip: -1
 
 test_mmnist_recon_s4vae:
@@ -286,6 +288,8 @@ train_mmnist_extrap_s4vae:
   d_zt: 64
   encoder: 'default'
   slot_att: True
+  epochs: 50
+
   clip: -1
 
 test_mmnist_extrap_s4vae:
@@ -316,6 +320,7 @@ train_mmnist_recon_cs4vae:
   train_out_seq: 20
   encoder: 'cgru_sa'
   slot_att: True
+  epochs: 50
 
 test_mmnist_recon_cs4vae:
   # python main.py --config defaults flownet_args test_mmnist_recon_cs4vae experimental
@@ -341,6 +346,7 @@ train_mmnist_extrap_cs4vae:
   encoder: 'cgru_sa'
   slot_att: True
   k_stat: -1
+  epochs: 50
 
 test_mmnist_extrap_cs4vae:
   # python main.py --config defaults flownet_args test_mmnist_extrap_cs4vae experimental
