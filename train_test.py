@@ -178,7 +178,7 @@ def train_batch(model, train_dataloader, optimizer, opt, device, writer):
     predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
     total_norm = 0
 
-    if opt.model in ['S3VAE']:  
+    if opt.model in ['S3VAE', 'DS2VAE']:  
         train_loss, loss_dict = model.get_loss()
         train_loss.backward()
 
