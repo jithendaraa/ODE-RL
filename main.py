@@ -1,4 +1,5 @@
 import argparse
+from models.DS2VAE import DS2VAE
 import numpy as np
 import torch
 import ruamel.yaml as yaml
@@ -48,9 +49,8 @@ def get_opt():
     
 def init_model(opt, device):
 
-    implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv', 'S3VAE']
+    implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv', 'S3VAE', 'DS2VAE']
     
-
     if opt.model in ['ConvGRU', 'cgrudecODE']:
       model = ConvGRU(opt, device, decODE=opt.decODE)
     
@@ -61,9 +61,11 @@ def init_model(opt, device):
     elif opt.model in ['S3VAE']:
       model = S3VAE(opt, device)
 
+    elif opt.model in ['DS2VAE']:
+      model = DS2VAE(opt, device)
+
     elif opt.model in ['VidODE']:
       raise NotImplementedError(f'Model {opt.model} is not implemented. Try one of {implemented_models}')
-      # model = VidODE(opt, device)
     
     else: 
       raise NotImplementedError(f'Model {opt.model} is not implemented. Try one of {implemented_models}')

@@ -270,7 +270,7 @@ test_mmnist_recon_s4vae:
   reconstruct: True
   load_model: True
   d_zf: 256
-  d_zt: 64
+  d_zt: 32
   encoder: 'default'
   slot_att: True
 
@@ -285,11 +285,10 @@ train_mmnist_extrap_s4vae:
   train_in_seq: 20
   train_out_seq: 20
   d_zf: 256
-  d_zt: 64
+  d_zt: 32
   encoder: 'default'
   slot_att: True
   epochs: 50
-
   clip: -1
 
 test_mmnist_extrap_s4vae:
@@ -301,13 +300,13 @@ test_mmnist_extrap_s4vae:
   extrapolate: True
   load_model: True
   d_zf: 256
-  d_zt: 64
+  d_zt: 32
   encoder: 'default'
   slot_att: True
 
 
 
-# Experiment 4: Slotted S3VAE with ConvGRU MMNIST, 50K steps
+# Experiment 4: Slotted S3VAE with ConvGRU MMNIST
 train_mmnist_recon_cs4vae:
   # python main.py --config defaults train_mmnist_recon_cs4vae experimental
   id: 'recon_cs4vae_mmnist_train'
@@ -358,6 +357,31 @@ test_mmnist_extrap_cs4vae:
   load_model: True
   encoder: 'cgru_sa'
   slot_att: True
+
+
+# Experiment 5: DS2VAE: Disentangled Slot Sequential VAE
+train_mmnist_ds2vae:
+  # python main.py --config defaults train_mmnist_ds2vae experimental
+  id: 'ds2vae_mmnist_train'
+  ckpt_id: 'train_mmnist_ds2vae'
+  extrapolate: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  slot_att: True
+
+test_mmnist_ds2vae:
+  # python main.py --config defaults test_mmnist_ds2vae experimental
+  id: 'ds2vae_mmnist_train'
+  ckpt_id: 'train_mmnist_ds2vae'
+  extrapolate: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  slot_att: True
+
+
+
 
 
 # Experiment 8: RIM + Slotted S3VAE
