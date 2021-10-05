@@ -373,7 +373,7 @@ train_mmnist_ds2vae:
 
 test_mmnist_ds2vae:
   # python main.py --config defaults test_mmnist_ds2vae experimental
-  id: 'ds2vae_mmnist_train'
+  id: 'ds2vae_mmnist_test'
   ckpt_id: 'train_mmnist_ds2vae'
   model: 'DS2VAE'
   extrapolate: True
@@ -381,6 +381,13 @@ test_mmnist_ds2vae:
   train_in_seq: 20
   train_out_seq: 20
   slot_att: True
+
+
+
+
+
+
+
 
 
 

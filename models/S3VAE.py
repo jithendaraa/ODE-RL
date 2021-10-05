@@ -335,9 +335,7 @@ class S3VAE(nn.Module):
         return kl
 
     def get_vae_loss(self, x_hat, x, zf, zt):
-
         if self.opt.extrapolate is True:    x = self.ground_truth
-
         t = x.size()[1]
         
         # 1. Reconstruction loss: p(xt | zf, zt)
@@ -370,7 +368,7 @@ class S3VAE(nn.Module):
         # zf_neg -- time-invariant representation from another video
         zf_sample = self.q_zf_xT.rsample()
         
-        if len(zf_sample.size()) == 4:
+        if self.opt.slot_att is True and self.opt.encoder in ['cgru_sa']:
             b, f_s, h, w = zf_sample.size()
             zf_sample = zf_sample.view(b, self.opt.num_slots, -1, h, w)
 
@@ -448,8 +446,7 @@ class S3VAE(nn.Module):
             H_f = - (log_q_f.sum(dim=(dims-3, dims-2, dims-1)) - math.log(N * M)).logsumexp(2)
             H_ft = - (log_q_ft.sum(dim=(dims-3, dims-2, dims-1)) - math.log(N * M)).logsumexp(2)
 
-
-        self.mi_loss = (- H_ft + H_f + H_t).mean()
+        self.mi_loss = F.relu(- H_ft + H_f + H_t).mean()
         
     def get_loss(self):
         loss = (self.opt.l0 * self.vae_loss) + (self.opt.l1 * self.scc_loss) + (self.opt.l2 * self.dfp_loss) + (self.opt.l3 * self.mi_loss)
