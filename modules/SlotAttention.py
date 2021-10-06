@@ -74,9 +74,10 @@ class SlotAttention(nn.Module):
         self.mlp_hidden_size = mlp_hidden_size
         self.epsilon = epsilon
         self.device = device
-        dim = (opt.resolution // resize) ** 2
 
-        if self.opt.encoder in ['cgru_sa']: self.norm_inputs = nn.LayerNorm([dim, features]).to(device)
+        if self.opt.encoder in ['cgru_sa'] or self.opt.transition in ['cgru']:
+            dim = (opt.resolution // resize) ** 2
+            self.norm_inputs = nn.LayerNorm([dim, features]).to(device)
         else:   self.norm_inputs = nn.LayerNorm(features).to(device)
         self.norm_slots = nn.LayerNorm([self.num_slots, self.slot_size]).to(device)
         self.norm_mlp = nn.LayerNorm([self.num_slots, self.slot_size]).to(device)
@@ -102,7 +103,7 @@ class SlotAttention(nn.Module):
     def forward(self, x):
         # `x` has shape [batch_size, num_inputs, inputs_size].
         # Make num_inputs last dim
-        if self.opt.encoder in ['cgru_sa']: x = x.permute(0, 2, 1)
+        if self.opt.encoder in ['cgru_sa'] or self.opt.transition in ['cgru']: x = x.permute(0, 2, 1)
         # Layer norm 
         x = self.norm_inputs(x)     # Shape: [batch_size, input_size, num_inputs].
         k = self.project_k(x)       # Shape: [batch_size, num_inputs, slot_size].
@@ -159,7 +160,7 @@ class SlotAttentionAutoEncoder(nn.Module):
             # self.encoder_pos = SoftPositionEmbed(opt.d_zf, self.resolution, device)
             # self.decoder_pos = SoftPositionEmbed(self.opt.in_channels, self.decoder_initial_size, device)
             # print("built position encoding", self.resolution)
-        if opt.encoder in ['cgru_sa']:
+        if opt.encoder in ['cgru_sa'] or opt.transition in ['cgru']:
             self.layer_norm = nn.LayerNorm([resolution[0] * resolution[1], opt.d_zf]).to(device)
         
         else:
@@ -172,20 +173,15 @@ class SlotAttentionAutoEncoder(nn.Module):
         self.slot_attention = SlotAttention(opt, opt.d_zf, num_iterations, num_slots, opt.slot_size, device=device, resize=resize).to(device)
             
     def forward(self, x):
-        
         # print('[Slot Att. input]', x.size())
-
-        if self.opt.encoder in ['cgru_sa']:
+        if self.opt.encoder in ['cgru_sa'] or self.opt.transition in ['cgru']:
             x = self.conv_preprocess(x)
         else:
             x = self.default_preprocess(x)
-
         # Slot Attention module.
         slots = self.slot_attention(x)  # `slots` has shape: [batch_size, num_slots, slot_size].
-
         if self.broadcast is True:
             slots = spatial_broadcast(slots, self.decoder_initial_size).permute(0, 3, 1, 2)
-
         return slots
 
 
@@ -195,11 +191,9 @@ class SlotAttentionAutoEncoder(nn.Module):
         # Make features last dim, feed to layer norm
         x = self.layer_norm(x.permute(0, 2, 1))
         # print("LayerNorm done")
-
         # Pass through MLP and make dim 1 as features again
         x = self.mlp(x).permute(0, 2, 1)  # Feedforward network on set.
         # print("MLP done")
-
         return x
 
     def default_preprocess(self, x):
