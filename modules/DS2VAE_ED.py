@@ -50,5 +50,26 @@ class C3DEncoder(nn.Module):
         return enc_x
         
 
+class CNNDecoder(nn.Module):
+    def __init__(self, in_channels, out_channels, unmasked=True):
+        super(CNNDecoder, self).__init__()
 
+        if unmasked is False: out_channels += 1 # Include mask channel
+
+        self.deconv_net = nn.Sequential(
+                nn.ConvTranspose2d(in_channels, 256, 4, 1, 0), nn.BatchNorm2d(256), nn.LeakyReLU(0.2),
+                nn.Upsample(scale_factor=2),
+                nn.Conv2d(256, 128, 3, 1, 1), nn.BatchNorm2d(128), nn.LeakyReLU(0.2),
+                nn.Upsample(scale_factor=2),
+                nn.Conv2d(128, 64, 3, 1, 1), nn.BatchNorm2d(64), nn.LeakyReLU(0.2),
+                nn.Upsample(scale_factor=2),
+                nn.Conv2d(64, 32, 3, 1, 1), nn.BatchNorm2d(32), nn.LeakyReLU(0.2),
+                nn.Upsample(scale_factor=2),
+                nn.Conv2d(32, 16, 3, 1, 1), nn.BatchNorm2d(16), nn.LeakyReLU(0.2),
+                nn.Conv2d(16, out_channels, 1, 1, 0), nn.Sigmoid()
+        )
+    
+    def forward(self, x):
+        res = self.deconv_net(x)
+        return res
 
