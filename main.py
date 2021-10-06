@@ -15,6 +15,9 @@ from models.ConvGRU import ConvGRU
 from models.ODEConvGRU import ODEConvGRU
 # from models.VidODE import VidODE
 from models.S3VAE import S3VAE
+from models.S2VAE import S2VAE
+from models.DS2VAE import DS2VAE
+
 from train_test import train, test
 from torch.utils.tensorboard import SummaryWriter
 
@@ -49,17 +52,19 @@ def get_opt():
     
 def init_model(opt, device):
 
-    implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv', 'S3VAE', 'DS2VAE']
+    implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv', 'S3VAE', 'DS2VAE', 'S2VAE']
     
     if opt.model in ['ConvGRU', 'cgrudecODE']:
       model = ConvGRU(opt, device, decODE=opt.decODE)
     
     elif opt.model in ['ODEConv']:
       model = ODEConvGRU(opt, device)
-      print("Initialised ODEConv model")
 
     elif opt.model in ['S3VAE']:
       model = S3VAE(opt, device)
+    
+    elif opt.model in ['S2VAE']:
+      model = S2VAE(opt, device)
 
     elif opt.model in ['DS2VAE']:
       model = DS2VAE(opt, device)
