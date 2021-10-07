@@ -393,7 +393,7 @@ train_mmnist_cs2vae:
   # python main.py --config defaults train_mmnist_cs2vae experimental
   id: 'cs2vae_mmnist_train'
   ckpt_id: 'train_mmnist_cs2vae'
-  lr: 8e-4
+  lr: 1e-3
   model: 'CS2VAE'
   extrapolate: True
   train_seq: 40
