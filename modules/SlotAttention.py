@@ -102,7 +102,6 @@ class SlotAttention(nn.Module):
 
     def forward(self, x):
         # `x` has shape [batch_size, num_inputs, inputs_size].
-        
         if self.opt.encoder in ['cgru_sa'] or self.opt.transition in ['cgru']: 
             # Make num_inputs last dim
             x = x.permute(0, 2, 1)
@@ -111,7 +110,6 @@ class SlotAttention(nn.Module):
         x = self.norm_inputs(x)     # Shape: [batch_size, input_size, num_inputs].
         k = self.project_k(x)       # Shape: [batch_size, num_inputs, slot_size].
         v = self.project_v(x)       # Shape: [batch_size, num_inputs, slot_size].
-        print(x.size(), k.size(), v.size())
 
         if len(k.size()) == 2: k = k.view(k.size()[0], 1, k.size()[1])
         if len(v.size()) == 2: v = v.view(v.size()[0], 1, v.size()[1])
