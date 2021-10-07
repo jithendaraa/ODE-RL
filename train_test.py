@@ -19,6 +19,7 @@ import helpers.loggers as loggers
 def train(opt, model, loader_objs, device, exp_config_dict, writer):
     step = 0
     start_time = time.time()
+    log_dict = {}
     
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     
@@ -33,7 +34,7 @@ def train(opt, model, loader_objs, device, exp_config_dict, writer):
 
     if opt.off_wandb is False:
         # 1. Start a new run
-        wandb.init(project=opt.wandb_project, entity=opt.wandb_entity, config=exp_config_dict)
+        wandb.init(project=opt.wandb_project, entity=opt.wandb_entity, config=exp_config_dict, settings=wandb.Settings(start_method="fork"))
         # 2. Save model inputs and hyperparameters
         config = wandb.config
         # 3. Log gradients and model parameters
@@ -58,7 +59,8 @@ def train(opt, model, loader_objs, device, exp_config_dict, writer):
                     wandb.log(loss_dict, step=step)
 
                 if step == 1 or step % opt.video_log_freq == 0:
-                    if opt.model in ['S3VAE']:  log_dict = model.latent_dims
+                    if opt.model in ['S3VAE']:  
+                        log_dict = model.latent_dims
                     log_dict['Pred_GT'] = wandb.Video(pred_gt) 
                     wandb.log(log_dict, step=step)
                     print("Logged video")

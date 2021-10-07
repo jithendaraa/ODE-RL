@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --time=27:00:00
 #SBATCH --partition=main
+#SBATCH --time=32:00:00
 #SBATCH --mem=48G
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:v100:1
 #SBATCH --job-name=MovingMNIST
 #SBATCH --cpus-per-task=6
 #SBATCH --mail-user=jithen.subra@gmail.com
@@ -16,7 +16,7 @@ id=$1
 start=`date +%s`
 echo $start
 
-python main.py --config defaults ${id}
+python main.py --config defaults ${id} mila
 
 echo $end
 end=`date +%s`
