@@ -57,8 +57,8 @@ defaults:
   # Save & logs frequencies
   ckpt_save_freq: 5000            # Save model params every x steps
   test_log_freq: 200               # log test loss every x steps
-  video_log_freq: 5000
-  loss_log_freq: 200
+  video_log_freq: 500
+  loss_log_freq: 50
 
   # Image sequence details
   resolution: 64
@@ -86,7 +86,7 @@ defaults:
 
   wandb_project: 'ODE-RL'
   wandb_entity: 'jithendaraa'
-  offline: True                         # Beluga does not have internet; can set to False on cedar
+  offline: True                         # Beluga does not have internet; can set to False on cedar/mila
   reconstruct: False                     # Set true if you want to train x frames and reconstruct back the same x frames
   extrapolate: False
 
@@ -100,6 +100,18 @@ defaults:
   l2: 100
   l3: 1
   m: 1      # Margin for triplet loss
+
+beluga:
+  user_dir: "/home/jithen"            
+  storage_dir: "scratch"
+  data_dir: "datasets/MovingMNIST_video"    # user_dir/storage_dir/data_dir
+
+mila:
+  user_dir: ''
+  storage_dir: '/network/scratch/j/jithendaraa.subramanian'
+  data_dir: "datasets/MovingMNIST_video"    # user_dir/storage_dir/data_dir
+  offline: False 
+
 
 flownet_args:
   rgb_max: 1.
@@ -364,7 +376,7 @@ test_mmnist_extrap_cs4vae:
 
 # Experiment 5: S2VAE: Slot Sequential VAE
 train_mmnist_s2vae:
-  # python main.py --config defaults train_mmnist_s2vae experimental
+  # python main.py --config defaults train_mmnist_s2vae mila experimental
   id: 's2vae_mmnist_train'
   ckpt_id: 'train_mmnist_s2vae'
   lr: 8e-4
@@ -375,7 +387,8 @@ train_mmnist_s2vae:
   train_out_seq: 20
   slot_att: True
   prior: 'standard'
-  decoder: 'cnn' # 'cnn' or 'c3d'
+  epochs: 50
+  gru_layers: 1
 
 test_mmnist_s2vae:
   # python main.py --config defaults test_mmnist_s2vae experimental
@@ -390,10 +403,10 @@ test_mmnist_s2vae:
 
 # Experiment 6: CS2VAE: Convolutional Slot Sequential VAE
 train_mmnist_cs2vae:
-  # python main.py --config defaults train_mmnist_cs2vae experimental
+  # python main.py --config defaults train_mmnist_cs2vae mila experimental
   id: 'cs2vae_mmnist_train'
   ckpt_id: 'train_mmnist_cs2vae'
-  lr: 1e-3
+  lr: 8e-4
   model: 'CS2VAE'
   extrapolate: True
   train_seq: 40
@@ -402,6 +415,8 @@ train_mmnist_cs2vae:
   slot_att: True
   prior: 'standard'
   transition: 'cgru'
+  epochs: 50
+
 
 test_mmnist_cs2vae:
   # python main.py --config defaults test_mmnist_cs2vae experimental
