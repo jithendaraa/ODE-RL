@@ -153,7 +153,7 @@ def test_batch(model, test_dataloader, opt, device):
     if opt.model in ['ConvGRU', 'ODEConv']:  # preds are [0, 1]
         loss = model.get_loss(predicted_frames, ground_truth)
         
-    elif opt.model in ['S3VAE']:
+    elif opt.model in ['S3VAE', 'DS2VAE', "S2VAE", 'CS2VAE']:
         loss_function = nn.MSELoss().cuda()
         b, t, c, h, w = predicted_frames.size()
         ground_truth = torch.cat((input_frames, ground_truth), 1)
@@ -176,9 +176,9 @@ def train_batch(model, train_dataloader, optimizer, opt, device, writer):
     # change input_frames and output_frames from [-0.5, 0.5] to [0, 1]
     input_frames, output_frames = (input_frames + 0.5).to(device), (output_frames + 0.5).to(device) 
     predicted_frames = model.get_prediction(input_frames, batch_dict=batch_dict)
-    total_norm = 0
+    total_norm = 0 
 
-    if opt.model in ['S2VAE', 'S3VAE', 'DS2VAE']:  
+    if opt.model in ['S2VAE', 'CS2VAE', 'S3VAE', 'DS2VAE']:  
         train_loss, loss_dict = model.get_loss()
         train_loss.backward()
 

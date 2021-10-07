@@ -22,10 +22,6 @@ class C3DEncoder(nn.Module):
         self.mode = mode
 
         self.c3d_net = self.init_conv_3d_net()
-
-        if mode in ['static', 'dynamic']:
-            self.mu_net = nn.Linear(self.out_channels, self.out_channels)
-            self.logvar_net = nn.Linear(self.out_channels, self.out_channels)
     
     def init_conv_3d_net(self):
         if self.instance_norm is True:

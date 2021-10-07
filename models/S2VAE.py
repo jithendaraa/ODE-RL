@@ -9,7 +9,8 @@ from torch import distributions as dist
 import numpy as np
 import wandb
 
-from modules.DS2VAE_ED import C3DEncoder, CNNDecoder
+from modules.DS2VAE_ED import C3DEncoder
+from modules.S2VAE_ED import CNNDecoder
 from modules.ConvGRUCell import ConvGRUCell
 from modules.SlotAttention import SlotAttentionAutoEncoder
 
@@ -31,7 +32,7 @@ class S2VAE(nn.Module):
         self.slot_z = SlotAttentionAutoEncoder(opt, resolution=self.resolution_after_c3d, num_slots=num_slots, num_iterations=opt.num_iterations, resize=resize, device=device).to(device)
         self.init_transition_net()
         if self.opt.prior == 'infer':   self.init_prior_transition_nets()
-        self.cnn_decoder = CNNDecoder(num_slots * slot_size, self.opt.in_channels, self.opt.unmasked).to(device)
+        self.cnn_decoder = CNNDecoder(num_slots * slot_size, self.opt.in_channels, self. opt.model.lower(), self.opt.unmasked).to(device)
     
     def init_c3d_encoder(self, channels):
         k, s, p = (3, 3, 3), (1, 2, 2), (1, 1, 1)
@@ -150,7 +151,6 @@ class S2VAE(nn.Module):
 
         # 3. From z_enc, get mu and logvar for [z0_1...z0_s] where s is the number of slots
         slot_z0 = self.get_slots(z_enc)
-        print("slot_z0", slot_z0.size())
         # 4. From [z0_1..z1_s] use GRU to unroll in time, till t.
         #    GRU(z0_1....z0_s) -> mean and std of [[z1_1,...z1_s],
         #                                           [z2_1....z2_s],
@@ -169,7 +169,6 @@ class S2VAE(nn.Module):
         slot_zs = torch.stack(slot_zs, dim=1)               # Make (b, num_slots, t, f)
         slot_post_mus = torch.stack(slot_post_mus, dim=1)             # Make (b, num_slots, t, f)
         slot_post_logvars = torch.stack(slot_post_logvars, dim=1)     # Make (b, num_slots, t, f)
-        print(slot_zs.size(), slot_post_mus.size(), slot_post_logvars.size())
 
         # 5. Set z slot priors to N(0, 1) or infer using self.slotwise_prior_gru depending on opt.prior is 'standard' or 'infer'
         if self.opt.prior == 'standard':
@@ -182,8 +181,8 @@ class S2VAE(nn.Module):
         slot_post_stds = 0.5 * torch.exp(slot_post_logvars)
         self.slot_z_post = dist.Normal(loc=slot_post_mus, scale=slot_post_stds)
         slot_z_posterior_sample = self.slot_z_post.rsample()
-        if self.opt.model in ['S2VAE']: slot_z_posterior_sample.unsqueeze(-1).unsqueeze(-1) # b, slot, t, c, h, w
-        print("slot_z_posterior_sample", slot_z_posterior_sample.size())
+        if self.opt.model in ['S2VAE']: 
+            slot_z_posterior_sample = slot_z_posterior_sample.unsqueeze(-1).unsqueeze(-1) # b, slot, t, c, h, w
 
         b, num_slots, t, slot_size, h_, w_ = slot_z_posterior_sample.size()
         # 7. Combine all z slots and decode z slots. One decoder across slots
