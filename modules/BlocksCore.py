@@ -12,7 +12,7 @@ class BlocksCore(nn.Module):
         self.num_blocks_out = num_blocks_out
         self.block_size_in = n_hid // num_blocks_in
         self.block_size_out = n_hid // num_blocks_out
-        self.att_out = self.block_size_out*4
+        self.att_out = self.block_size_out * 4
         self.ninp = ninp
         self.topkval = topkval
         self.step_att = step_att
@@ -31,15 +31,24 @@ class BlocksCore(nn.Module):
     def forward(self, inp, hx, step, do_print=False, do_block=True):
 
         inp_use = inp #layer_input[idx_step]
+        assert len(hx) == 1
+        hx = hx[0]
+        print("HA", self.num_blocks_out, self.block_size_out)
+        print("inp_use", inp_use.size(), self.ninp, hx.size())
         
-        #use attention here.
+        # use attention here.
         inp_use = inp_use.reshape((inp_use.shape[0], self.num_blocks_in, self.ninp))
+        print("inp_use", inp_use.size())
         inp_use = inp_use.repeat(1,self.num_modules_read_input-1,1)
+        print("inp_use", inp_use.size())
         inp_use = torch.cat([torch.zeros_like(inp_use[:,0:1,:]), inp_use], dim=1)
+        print("inp_use", inp_use.size())
 
         inp_use, iatt, _ = self.inp_att(hx.reshape((hx.shape[0], self.num_blocks_out, self.block_size_out)), inp_use, inp_use)
+        print("MHA Done")
         inp_use = inp_use.reshape((inp_use.shape[0], self.att_out*self.num_blocks_out))
-
+        print("After input MHA:", inp_use.size())
+        
         new_mask = torch.ones_like(iatt[:,:,0])
         bottomk_indices = torch.topk(iatt[:,:,0], dim=1, sorted=True, largest=True,
                                 k = self.num_blocks_out - self.topkval)[1]

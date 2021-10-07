@@ -11,7 +11,7 @@ from modules.BlocksCore import BlocksCore
 
 '''
 Core blocks module.  Takes:
-    input: (ts, mb, h)
+    input: (ts, minibatch, h)
     hx: (ts, mb, h)
     cx: (ts, mb, h)
 
@@ -20,7 +20,7 @@ Core blocks module.  Takes:
 '''
 
 class RIM_GRU(nn.Module):
-    def __init__(self, ninp, n_hid, opt, dropout=0.5, nlayers=1, 
+    def __init__(self, ninp, n_hid, opt, device=None, dropout=0.5, nlayers=1, 
                 discrete_input=False, use_inactive=False, blocked_grad=False,
                 num_modules_read_input=2):
 
@@ -33,6 +33,7 @@ class RIM_GRU(nn.Module):
         self.block_dilation = [1] * nlayers
         self.bc_list, self.dropout_list = [], []
         self.num_blocks = opt.num_blocks
+        self.device = device
 
         print()
         print('Top k Blocks: ', opt.topk)
@@ -64,7 +65,7 @@ class RIM_GRU(nn.Module):
         weight = next(self.bc_list[0].block_gru.parameters())
         hidden = []
         for i in range(self.nlayers):
-            hidden.append(( weight.new_zeros(b, self.n_hid[i]) ))
+            hidden.append(( weight.new_zeros(b, self.n_hid[i]).to(self.device) ))
         return hidden
 
     def forward(self, input, hidden, seq_len=10):
@@ -86,7 +87,7 @@ class RIM_GRU(nn.Module):
                     else:
                         hx, mask = self.bc_list[idx_layer](inp[t_step], hx, t_step, do_block=False)
                     
-                print("Got hx")
+                print("Got hx", idx_layer, self.nlayers - 1)
 
                 if idx_layer < self.nlayers - 1:
                     print("HERE")

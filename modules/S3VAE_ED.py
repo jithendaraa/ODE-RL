@@ -67,7 +67,7 @@ class GRUEncoder(nn.Module):
             if self.type == 'dynamic':
                 if self.rim is True:
                     if opt.encoder in ['default']:
-                        self.dynamic_net =  (opt.emsize, [hidden_size], opt)
+                        self.dynamic_net =  RIM_GRU(opt.emsize, [hidden_size], opt)
                     
                     else:
                         NotImplementedError('Not implemented RIMs for encoder type ' + opt.encoder)
