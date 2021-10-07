@@ -102,12 +102,16 @@ class SlotAttention(nn.Module):
 
     def forward(self, x):
         # `x` has shape [batch_size, num_inputs, inputs_size].
-        # Make num_inputs last dim
-        if self.opt.encoder in ['cgru_sa'] or self.opt.transition in ['cgru']: x = x.permute(0, 2, 1)
+        
+        if self.opt.encoder in ['cgru_sa'] or self.opt.transition in ['cgru']: 
+            # Make num_inputs last dim
+            x = x.permute(0, 2, 1)
+
         # Layer norm 
         x = self.norm_inputs(x)     # Shape: [batch_size, input_size, num_inputs].
         k = self.project_k(x)       # Shape: [batch_size, num_inputs, slot_size].
         v = self.project_v(x)       # Shape: [batch_size, num_inputs, slot_size].
+        print(x.size(), k.size(), v.size())
 
         if len(k.size()) == 2: k = k.view(k.size()[0], 1, k.size()[1])
         if len(v.size()) == 2: v = v.view(v.size()[0], 1, v.size()[1])
@@ -187,13 +191,13 @@ class SlotAttentionAutoEncoder(nn.Module):
 
     def conv_preprocess(self, x):
         x = spatial_flatten(x)
-        # print("Spatial flatten done")
+        # print("Spatial flatten done", x.size())
         # Make features last dim, feed to layer norm
         x = self.layer_norm(x.permute(0, 2, 1))
-        # print("LayerNorm done")
+        # print("LayerNorm done", x.size())
         # Pass through MLP and make dim 1 as features again
         x = self.mlp(x).permute(0, 2, 1)  # Feedforward network on set.
-        # print("MLP done")
+        # print("MLP done", x.size())
         return x
 
     def default_preprocess(self, x):

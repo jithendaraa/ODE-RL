@@ -19,6 +19,7 @@ class C3DEncoder(nn.Module):
         self.stride = stride
         self.padding = padding
         self.affine = affine
+        self.mode = mode
 
         self.c3d_net = self.init_conv_3d_net()
 
@@ -36,12 +37,21 @@ class C3DEncoder(nn.Module):
                 nn.Conv3d(512, self.out_channels, self.kernel_size, self.stride, self.padding), nn.InstanceNorm3d(self.out_channels, affine=self.affine), nn.Tanh())
                 
         else:
-            c3d_net = nn.Sequential(
-                nn.Conv3d(self.in_channels, 64, self.kernel_size, self.stride, self.padding), nn.LeakyReLU(0.2),
-                nn.Conv3d(64, 128, self.kernel_size, self.stride, self.padding), nn.LeakyReLU(0.2),
-                nn.Conv3d(128, 256, self.kernel_size, self.stride, self.padding), nn.LeakyReLU(0.2),
-                nn.Conv3d(256, 512, self.kernel_size, self.stride, self.padding), nn.LeakyReLU(0.2),
-                nn.Conv3d(512, self.out_channels, self.kernel_size, self.stride, self.padding), nn.Tanh())
+            if self.mode in ['cgru']:
+                k, s, p = (3, 3, 3), (2, 1, 1), (1, 1, 1)
+                c3d_net = nn.Sequential(
+                    nn.Conv3d(self.in_channels, 64, self.kernel_size, self.stride, self.padding), nn.LeakyReLU(0.2),
+                    nn.Conv3d(64, 128, (3, 4, 4), (2, 2, 2), (1, 1, 1)), nn.LeakyReLU(0.2),
+                    nn.Conv3d(128, 256, k, s, p), nn.LeakyReLU(0.2),
+                    nn.Conv3d(256, 512, k, s, p), nn.LeakyReLU(0.2),
+                    nn.Conv3d(512, self.out_channels, self.kernel_size, self.stride, self.padding), nn.Tanh())
+            else:
+                c3d_net = nn.Sequential(
+                    nn.Conv3d(self.in_channels, 64, self.kernel_size, self.stride, self.padding), nn.LeakyReLU(0.2),
+                    nn.Conv3d(64, 128, self.kernel_size, self.stride, self.padding), nn.LeakyReLU(0.2),
+                    nn.Conv3d(128, 256, self.kernel_size, self.stride, self.padding), nn.LeakyReLU(0.2),
+                    nn.Conv3d(256, 512, self.kernel_size, self.stride, self.padding), nn.LeakyReLU(0.2),
+                    nn.Conv3d(512, self.out_channels, self.kernel_size, self.stride, self.padding), nn.Tanh())
 
         return c3d_net
     
