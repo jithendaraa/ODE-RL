@@ -52,7 +52,7 @@ class ConvGRUCell(nn.Module):
     def init_hidden(self, batch_size):
         return (torch.zeros(batch_size, self.hidden_dim, self.height, self.width)).type(self.dtype)
     
-    def forward(self, input_tensor=None, h_cur=None, seq_len=10, mask=None):
+    def forward(self, input_tensor=None, h_cur=None, seq_len=10, mask=None, dim=0):
         """
         :param self:
         :param input_tensor: (b, input_dim, h, w) / input is actually the target_model
@@ -83,7 +83,7 @@ class ConvGRUCell(nn.Module):
             output_inner.append(h_next)
             h_cur = h_next
         
-        return torch.stack(output_inner), h_next
+        return torch.stack(output_inner, dim=dim), h_next
         
 class ConvEncoder(nn.Module):
     
