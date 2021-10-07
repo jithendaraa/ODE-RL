@@ -80,6 +80,8 @@ defaults:
   mem: False
   ode: False
   encoder: 'default'
+  transition: 'gru'
+  decoder: 'cnn' # 'cnn' or 'c3d'
 
   wandb_project: 'ODE-RL'
   wandb_entity: 'jithendaraa'
@@ -311,7 +313,7 @@ train_mmnist_recon_cs4vae:
   # python main.py --config defaults train_mmnist_recon_cs4vae experimental
   id: 'recon_cs4vae_mmnist_train'
   ckpt_id: 'train_mmnist_recon_cs4vae'
-  lr: 7e-4
+  lr: 8e-4
   model: 'S3VAE'
   reconstruct: True
   train_seq: 40
@@ -319,7 +321,7 @@ train_mmnist_recon_cs4vae:
   train_out_seq: 20
   encoder: 'cgru_sa'
   slot_att: True
-  epochs: 50
+  epochs: 45
 
 test_mmnist_recon_cs4vae:
   # python main.py --config defaults flownet_args test_mmnist_recon_cs4vae experimental
@@ -336,7 +338,7 @@ train_mmnist_extrap_cs4vae:
   # python main.py --config defaults train_mmnist_extrap_cs4vae experimental
   id: 'extrap_cs4vae_mmnist_train'
   ckpt_id: 'train_mmnist_extrap_cs4vae'
-  lr: 7e-4
+  lr: 8e-4
   model: 'S3VAE'
   extrapolate: True
   train_seq: 40
@@ -345,7 +347,7 @@ train_mmnist_extrap_cs4vae:
   encoder: 'cgru_sa'
   slot_att: True
   k_stat: -1
-  epochs: 50
+  epochs: 45
 
 test_mmnist_extrap_cs4vae:
   # python main.py --config defaults flownet_args test_mmnist_extrap_cs4vae experimental
@@ -359,7 +361,61 @@ test_mmnist_extrap_cs4vae:
   slot_att: True
 
 
-# Experiment 5: DS2VAE: Disentangled Slot Sequential VAE
+# Experiment 5: S2VAE: Slot Sequential VAE
+train_mmnist_s2vae:
+  # python main.py --config defaults train_mmnist_s2vae experimental
+  id: 's2vae_mmnist_train'
+  ckpt_id: 'train_mmnist_s2vae'
+  lr: 1e-3
+  model: 'S2VAE'
+  extrapolate: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  slot_att: True
+  prior: 'standard'
+  decoder: 'cnn' # 'cnn' or 'c3d'
+
+test_mmnist_s2vae:
+  # python main.py --config defaults test_mmnist_s2vae experimental
+  id: 's2vae_mmnist_test'
+  ckpt_id: 'train_mmnist_s2vae'
+  model: 'S2VAE'
+  phase: 'test'
+  load_model: True
+  extrapolate: True
+  slot_att: True
+
+# Experiment 6: CS2VAE: Convolutional Slot Sequential VAE
+train_mmnist_cs2vae:
+  # python main.py --config defaults train_mmnist_cs2vae experimental
+  id: 'cs2vae_mmnist_train'
+  ckpt_id: 'train_mmnist_cs2vae'
+  lr: 8e-4
+  model: 'CS2VAE'
+  extrapolate: True
+  train_seq: 40
+  train_in_seq: 20
+  train_out_seq: 20
+  slot_att: True
+  prior: 'standard'
+  transition: 'cgru'
+
+test_mmnist_cs2vae:
+  # python main.py --config defaults test_mmnist_cs2vae experimental
+  id: 'cs2vae_mmnist_test'
+  ckpt_id: 'train_mmnist_cs2vae'
+  model: 'CS2VAE'
+  phase: 'test'
+  load_model: True
+  extrapolate: True
+  slot_att: True
+  prior: 'standard'
+  transition: 'cgru'
+
+
+
+# Experiment 7: DS2VAE: Disentangled Slot Sequential VAE
 train_mmnist_ds2vae:
   # python main.py --config defaults train_mmnist_ds2vae experimental
   id: 'ds2vae_mmnist_train'
