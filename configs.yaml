@@ -71,6 +71,7 @@ defaults:
   in_channels: 1
   num_digits: 3
   n_layers: 3
+  gru_layers: 2
   data_points: 10000
 
   lr: 8e-4
@@ -366,7 +367,7 @@ train_mmnist_s2vae:
   # python main.py --config defaults train_mmnist_s2vae experimental
   id: 's2vae_mmnist_train'
   ckpt_id: 'train_mmnist_s2vae'
-  lr: 1e-3
+  lr: 8e-4
   model: 'S2VAE'
   extrapolate: True
   train_seq: 40
@@ -385,6 +386,7 @@ test_mmnist_s2vae:
   load_model: True
   extrapolate: True
   slot_att: True
+
 
 # Experiment 6: CS2VAE: Convolutional Slot Sequential VAE
 train_mmnist_cs2vae:

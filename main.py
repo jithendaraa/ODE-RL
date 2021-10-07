@@ -52,7 +52,7 @@ def get_opt():
     
 def init_model(opt, device):
 
-    implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv', 'S3VAE', 'DS2VAE', 'S2VAE']
+    implemented_models = ['ConvGRU', 'cgrudecODE', 'ODEConv', 'S3VAE', 'DS2VAE', 'S2VAE', 'CS2VAE']
     
     if opt.model in ['ConvGRU', 'cgrudecODE']:
       model = ConvGRU(opt, device, decODE=opt.decODE)
@@ -63,7 +63,7 @@ def init_model(opt, device):
     elif opt.model in ['S3VAE']:
       model = S3VAE(opt, device)
     
-    elif opt.model in ['S2VAE']:
+    elif opt.model in ['S2VAE', 'CS2VAE']:
       model = S2VAE(opt, device)
 
     elif opt.model in ['DS2VAE']:
