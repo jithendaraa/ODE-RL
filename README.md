@@ -30,7 +30,7 @@ Using <a href="https://arxiv.org/abs/1806.07366">Neural Ordinary Differential Eq
      python main.py --config defaults train_mmnist_odecgru 
      <test_command_and_config_yet_to_be_added>
     ```
-
+PS: Readme still under construction, coming soon!
 
 
 
